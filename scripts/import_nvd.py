@@ -75,21 +75,27 @@ _CVSS_METRIC_KEYS = ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2")
 
 def iter_nvd_items(payload: dict) -> Iterator[dict]:
     """Itere les objets `cve` (un par CVE) d'une reponse API NVD 2.0 deja chargee en memoire."""
+    logger.debug("iter_nvd_items: entrée")
     for vuln in payload.get("vulnerabilities", []):
         cve = vuln.get("cve")
         if cve is not None:
             yield cve
+    logger.debug("iter_nvd_items: fin")
 
 
 def _extract_description(cve: dict) -> str:
+    logger.debug("_extract_description: entrée")
     for desc in cve.get("descriptions", []):
         if desc.get("lang") == "en":
+            logger.debug("_extract_description: si desc.get('lang') == 'en' -> retour desc.get(…)")
             return desc.get("value", "")
     descriptions = cve.get("descriptions", [])
+    logger.debug("_extract_description: retour descriptions[0].get('value', '') if descriptions …")
     return descriptions[0].get("value", "") if descriptions else ""
 
 
 def _extract_cvss(cve: dict) -> tuple[float | None, str | None]:
+    logger.debug("_extract_cvss: entrée")
     metrics = cve.get("metrics", {})
     for key in _CVSS_METRIC_KEYS:
         entries = metrics.get(key)
@@ -99,7 +105,9 @@ def _extract_cvss(cve: dict) -> tuple[float | None, str | None]:
         score = data.get("baseScore")
         # V2 ne porte pas baseSeverity dans cvssData mais a cote, sur l'entree elle-meme.
         severity = data.get("baseSeverity") or entries[0].get("baseSeverity")
+        logger.debug("_extract_cvss: boucle sur _CVSS_METRIC_KEYS -> retour tuple de 2")
         return score, severity
+    logger.debug("_extract_cvss: retour tuple de 2")
     return None, None
 
 
@@ -112,6 +120,7 @@ def _extract_affected(cve: dict) -> list[AffectedProduct]:
     matching ; la version du criteria elle-meme (champ 6) sert de
     version exacte quand aucun versionStart/End n'est fourni.
     """
+    logger.debug("_extract_affected: entrée")
     affected: list[AffectedProduct] = []
     for config in cve.get("configurations", []):
         for node in config.get("nodes", []):
@@ -134,12 +143,15 @@ def _extract_affected(cve: dict) -> list[AffectedProduct]:
                         version_end_excluding=cpe_match.get("versionEndExcluding"),
                     )
                 )
+    logger.debug("_extract_affected: retour affected")
     return affected
 
 
 def parse_nvd_item(cve: dict) -> CveEntry:
     """Convertit un objet `cve` brut (API NVD 2.0) en CveEntry pret pour cve_db.upsert_cve()."""
+    logger.debug("parse_nvd_item: entrée")
     score, severity = _extract_cvss(cve)
+    logger.debug("parse_nvd_item: retour CveEntry(…)")
     return CveEntry(
         cve_id=cve["id"],
         description=_extract_description(cve),
@@ -152,6 +164,7 @@ def parse_nvd_item(cve: dict) -> CveEntry:
 
 def import_from_file(path, db_path) -> int:
     """Charge un export NVD local (--input) dans la base `db_path`. Renvoie le nombre de CVE importees."""
+    logger.debug("import_from_file: entrée")
     with open(path, encoding="utf-8") as f:
         payload = json.load(f)
     conn = connect_cve_db(db_path)
@@ -162,13 +175,16 @@ def import_from_file(path, db_path) -> int:
             count += 1
     finally:
         conn.close()
+    logger.debug("import_from_file: retour count")
     return count
 
 
 def _fetch_page_once(params: dict[str, Any]) -> dict:
+    logger.debug("_fetch_page_once: entrée")
     url = f"{NVD_API_URL}?{urllib.parse.urlencode(params)}"
     request = urllib.request.Request(url, headers={"User-Agent": "netcross-cve-import/1.0"})
     with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 -- URL fixe, hote NVD officiel
+        logger.debug("_fetch_page_once: retour json.load(…)")
         return json.load(response)
 
 
@@ -176,7 +192,9 @@ def _is_throttled(payload: dict) -> bool:
     """Le NVD limite le debit SANS code d'erreur : HTTP 200, `totalResults`
     renseigne mais `resultsPerPage` a 0 et aucune vulnerabilite (constate
     en 2026, issue #353). Une telle page n'est pas une fin de resultats."""
+    logger.debug("_is_throttled: entrée")
     start = payload.get("startIndex", 0)
+    logger.debug("_is_throttled: retour not payload.get('vulnerabilities') and payload.ge…")
     return not payload.get("vulnerabilities") and payload.get("totalResults", 0) > start
 
 
@@ -185,6 +203,7 @@ def _fetch_page(params: dict[str, Any], *, retries: int = 4, backoff: float = 10
     que le NVD renvoie une page vide de limitation de debit. Leve
     RuntimeError si la limitation persiste, plutot que tronquer l'import
     en silence."""
+    logger.debug("_fetch_page: entrée")
     page_size = int(params.get("resultsPerPage", 2000))
     for attempt in range(retries + 1):
         # une page vide de limitation semble mise en cache par URL : faire
@@ -192,9 +211,11 @@ def _fetch_page(params: dict[str, Any], *, retries: int = 4, backoff: float = 10
         # de la taille reellement recue) change la cle de cache.
         payload = _fetch_page_once({**params, "resultsPerPage": max(1, page_size - attempt)} if attempt else params)
         if not _is_throttled(payload):
+            logger.debug("_fetch_page: si not _is_throttled(payload) -> retour payload")
             return payload
         if attempt < retries:
             time.sleep(backoff * (attempt + 1))
+    logger.debug("_fetch_page: levée RuntimeError")
     raise RuntimeError(
         f"Le NVD limite le debit (page vide malgre totalResults={payload.get('totalResults')}, "
         f"parametres {params}) : relancer plus tard ou augmenter --delay."
@@ -210,6 +231,7 @@ def import_from_api(db_path, *, keyword: str | None, results_per_page: int, dela
     (upsert) plutot qu'accumulee : un import interrompu au milieu
     conserve les CVE deja recuperees.
     """
+    logger.debug("import_from_api: entrée")
     conn = connect_cve_db(db_path)
     total = 0
     start_index = 0
@@ -240,10 +262,12 @@ def import_from_api(db_path, *, keyword: str | None, results_per_page: int, dela
             time.sleep(delay)
     finally:
         conn.close()
+    logger.debug("import_from_api: retour total")
     return total
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    logger.debug("_build_parser: entrée")
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--db", required=True, help="chemin de la base SQLite CVE (cree si absente)")
     parser.add_argument("--input", help="fichier JSON local au format API NVD 2.0 (mode hors-ligne, prioritaire)")
@@ -251,23 +275,28 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--keyword", help="filtre keywordSearch de l'API NVD (--fetch uniquement)")
     parser.add_argument("--results-per-page", type=int, default=2000, help="taille de page (--fetch), defaut 2000")
     parser.add_argument("--delay", type=float, default=6.0, help="secondes entre deux pages (--fetch), defaut 6.0")
+    logger.debug("_build_parser: retour parser")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     args = _build_parser().parse_args(argv)
 
     if args.input:
         count = import_from_file(args.input, args.db)
         print(f"{count} CVE importees depuis {args.input} vers {args.db}")
+        logger.debug("main: si args.input -> retour 0")
         return 0
 
     if args.fetch:
         count = import_from_api(args.db, keyword=args.keyword, results_per_page=args.results_per_page, delay=args.delay)
         print(f"{count} CVE importees depuis l'API NVD vers {args.db}")
+        logger.debug("main: si args.fetch -> retour 0")
         return 0
 
     print("Aucune source fournie : utiliser --input FICHIER.json ou --fetch.", file=sys.stderr)
+    logger.debug("main: retour 1")
     return 1
 
 

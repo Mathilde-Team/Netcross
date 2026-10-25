@@ -36,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.input.exists():
         print(f"JSON introuvable : {args.input} (lancer tools/extract_lua_api.py)", file=sys.stderr)
+        logger.debug("main: si not args.input.exists() -> retour 1")
         return 1
 
     args.db.parent.mkdir(parents=True, exist_ok=True)
