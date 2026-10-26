@@ -63,7 +63,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 from pcap_parser.capture import start_ring_recorder, stop_ring_recorder
 
 logger = get_logger(__name__)
@@ -151,11 +151,13 @@ class LiveCaptureRequest(BaseModel):
 
 def live_enabled(environ: dict[str, str] | None = None) -> bool:
     env = os.environ if environ is None else environ
+    logger.debug("live_enabled: retour env.get(LIVE_ENV, '').strip().lower() in ('1', 't…")
     return env.get(LIVE_ENV, "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def allowed_interfaces(environ: dict[str, str] | None = None) -> frozenset[str]:
     env = os.environ if environ is None else environ
+    logger.debug("allowed_interfaces: retour frozenset(…)")
     return frozenset(i.strip() for i in env.get(INTERFACES_ENV, "").split(",") if i.strip())
 
 
@@ -166,12 +168,18 @@ def max_duration(environ: dict[str, str] | None = None) -> float:
         valeur = float(brut) if brut else DEFAULT_MAX_DURATION
     except ValueError:
         logger.warning("{}={!r} invalide : {} s par défaut", MAX_DURATION_ENV, brut, DEFAULT_MAX_DURATION)
+        logger.debug(
+            "max_duration: except ValueError -> retour DEFAULT_MAX_DURATION={}",
+            summarize(DEFAULT_MAX_DURATION, "DEFAULT_MAX_DURATION"),
+        )
         return DEFAULT_MAX_DURATION
+    logger.debug("max_duration: retour valeur if valeur > 0 else DEFAULT_MAX_DURATION")
     return valeur if valeur > 0 else DEFAULT_MAX_DURATION
 
 
 def _size(path: str) -> int:
     try:
+        logger.debug("_size: retour os.path.getsize(…)")
         return os.path.getsize(path)
     except OSError as exc:  # fichier supprimé entre glob et stat
         logger.debug("live: taille de {} illisible ({})", path, exc)
@@ -179,6 +187,7 @@ def _size(path: str) -> int:
 
 
 def _safe_name(name: str) -> str:
+    logger.debug("_safe_name: retour re.sub('[^A-Za-z0-9_.-]', '_', name) or 'point'")
     return re.sub(r"[^A-Za-z0-9_.-]", "_", name) or "point"
 
 
@@ -186,9 +195,11 @@ class _LiveCaptures:
     """Captures en cours ou terminées (mémoire du processus)."""
 
     def __init__(self, deps: dict[str, Callable[..., Any]]) -> None:
+        logger.debug("_LiveCaptures.__init__: entrée")
         self._deps = deps
         self._lock = threading.Lock()
         self._entries: dict[str, dict[str, Any]] = {}
+        logger.debug("_LiveCaptures.__init__: fin")
 
     # -- validation ------------------------------------------------------------------
 
@@ -211,20 +222,32 @@ class _LiveCaptures:
                     detail=f"interface {point.interface!r} non autorisée par {INTERFACES_ENV}"
                     + ("" if autorisees else " (vide)"),
                 )
+        logger.debug("_LiveCaptures._check_security: fin")
 
     def _check_request(self, req: LiveCaptureRequest) -> tuple[list[str], list[str] | None, Any]:
         if not req.points:
+            logger.debug("_LiveCaptures._check_request: si not req.points -> levée HTTPException")
             raise HTTPException(status_code=400, detail="au moins un point est requis")
         if len(req.points) > self._deps["max_files"]():
+            logger.debug(
+                "_LiveCaptures._check_request: si len(req.points) > self._deps['max_files']() -> levée HTTPException"
+            )
             raise HTTPException(status_code=400, detail=f"au plus {self._deps['max_files']()} points par capture")
         noms = [p.name.strip() for p in req.points]
         if any(not n for n in noms) or len(set(noms)) != len(noms):
+            logger.debug(
+                "_LiveCaptures._check_request: si any((not n for n in noms)) or len(set(noms)) != len(noms) -> levée…"
+            )
             raise HTTPException(status_code=400, detail="chaque point doit avoir un nom non vide et distinct")
         if any(not p.interface.strip() for p in req.points):
+            logger.debug(
+                "_LiveCaptures._check_request: si any((not p.interface.strip() for p in req.points)) -> levée HTTPExc…"
+            )
             raise HTTPException(status_code=400, detail="interface manquante")
         for p in req.points:
             if p.bpf_library is not None:
                 if p.bpf:
+                    logger.debug("_LiveCaptures._check_request: si p.bpf -> levée HTTPException")
                     raise HTTPException(status_code=400, detail=f"{p.name} : bpf et bpf_library sont exclusifs")
                 p.bpf = self._deps["resolve_bpf_library"](p.bpf_library)
                 p.bpf_library = None  # résolu : un second contrôle (check puis start) ne le refuse pas
@@ -232,23 +255,29 @@ class _LiveCaptures:
         if req.ring_buffer is not None:
             for p in req.points:
                 if p.interface.strip().startswith("pipe://"):
+                    logger.debug(
+                        "_LiveCaptures._check_request: si p.interface.strip().startswith('pipe://') -> levée HTTPExce…"
+                    )
                     raise HTTPException(
                         status_code=400, detail=f"{p.name} : ring_buffer incompatible avec une source pipe://"
                     )
         borne = max_duration()
         if req.duration > borne:
+            logger.debug("_LiveCaptures._check_request: si req.duration > borne -> levée HTTPException")
             raise HTTPException(status_code=400, detail=f"duration : {borne:g} s au plus ({MAX_DURATION_ENV})")
         order = None
         if req.points_order:
             order = self._deps["parse_points_order"](",".join(req.points_order), noms)
         inconnues = sorted(set(req.options) - self._deps["option_names"]())
         if inconnues:
+            logger.debug("_LiveCaptures._check_request: si inconnues -> levée HTTPException")
             raise HTTPException(status_code=422, detail=f"options inconnues : {', '.join(inconnues)}")
         try:
             options = self._deps["make_options"](**req.options)
         except TypeError as exc:
             logger.debug("live: options invalides ({})", exc)
             raise HTTPException(status_code=422, detail=f"options invalides : {exc}") from exc
+        logger.debug("_LiveCaptures._check_request: retour tuple de 3")
         return noms, order, options
 
     # -- cycle de vie ------------------------------------------------------------------
@@ -261,6 +290,7 @@ class _LiveCaptures:
         if any(e["status"] == CAPTURING for e in self._entries.values()):
             logger.debug("live: capture déjà en cours -> 409")
             raise HTTPException(status_code=409, detail="une capture en direct est déjà en cours sur ce serveur")
+        logger.debug("_LiveCaptures.check: fin")
 
     def start(
         self,
@@ -318,6 +348,7 @@ class _LiveCaptures:
             self._entries[capture_id] = entry
         threading.Thread(target=self._run, args=(entry, order, options), daemon=True).start()
         logger.info("capture en direct {} démarrée : {} point(s), {} s", capture_id, len(noms), req.duration)
+        logger.debug("_LiveCaptures.start: retour self.public(…)")
         return self.public(entry)
 
     def _start_report(self, entry: dict[str, Any]) -> tuple[Any, list[threading.Thread]]:
@@ -325,6 +356,7 @@ class _LiveCaptures:
         dissection par point (``parse_live``) alimente le LiveReporter ; les
         enregistreurs, eux, gardent les fichiers de l'analyse finale."""
         if entry["live_report"] is None:
+            logger.debug("_LiveCaptures._start_report: si entry['live_report'] is None -> retour tuple de 2")
             return None, []
         reporter = self._deps["make_reporter"](entry["_report_dir"], entry["live_report"]["interval"])
         for point in entry["points"]:
@@ -343,20 +375,24 @@ class _LiveCaptures:
                 reporter.aggregator.set_status(point["name"], "erreur", str(exc))
             else:
                 reporter.aggregator.set_status(point["name"], "arrete")
+            logger.debug("_LiveCaptures._start_report._worker: fin")
 
         threads = [threading.Thread(target=_worker, args=(p,), daemon=True) for p in entry["points"]]
         reporter.start()
         for t in threads:
             t.start()
+        logger.debug("_LiveCaptures._start_report: retour tuple de 2")
         return reporter, threads
 
     @staticmethod
     def _stop_report(reporter: Any, threads: list[threading.Thread]) -> None:
         if reporter is None:
+            logger.debug("_LiveCaptures._stop_report: si reporter is None -> retour")
             return
         for t in threads:
             t.join(timeout=10)
         reporter.stop()  # dernier relevé (final)
+        logger.debug("_LiveCaptures._stop_report: fin")
 
     def _run(self, entry: dict[str, Any], order: list[str] | None, options: Any) -> None:
         recorders: list[tuple[dict[str, Any], Any]] = []
@@ -409,6 +445,7 @@ class _LiveCaptures:
             if entry.get("_report_dir"):
                 shutil.rmtree(entry["_report_dir"], ignore_errors=True)
             entry["_handoff"].set()
+            logger.debug("_LiveCaptures._run: si entry['_abort'] -> retour")
             return
         if entry["error"] is None and erreurs:
             entry["error"] = "; ".join(erreurs)
@@ -421,9 +458,11 @@ class _LiveCaptures:
             self._notify_abort(entry, f"capture en direct en échec : {entry['error']}")
             shutil.rmtree(entry["_workdir"], ignore_errors=True)
             entry["_handoff"].set()
+            logger.debug("_LiveCaptures._run: si entry['error'] is not None -> retour")
             return
         if entry["_analyse"] is not None:
             self._run_custom(entry, captures)
+            logger.debug("_LiveCaptures._run: si entry['_analyse'] is not None -> retour")
             return
         multi = len(entry["points"]) > 1
         metadata = {
@@ -446,15 +485,18 @@ class _LiveCaptures:
             entry["status"] = FAILED
             entry["error"] = analyse.get("error") or "analyse en échec"
         logger.info("capture en direct {} : {}", entry["capture_id"], entry["status"])
+        logger.debug("_LiveCaptures._run: fin")
 
     @staticmethod
     def _notify_abort(entry: dict[str, Any], raison: str) -> None:
         if entry.get("_on_abort") is None:
+            logger.debug("_LiveCaptures._notify_abort: si entry.get('_on_abort') is None -> retour")
             return
         try:
             entry["_on_abort"](raison)
         except Exception:  # noqa: BLE001 -- tâche de fond : ne doit pas bloquer la fin de capture
             logger.exception("capture en direct {} : on_abort en échec", entry["capture_id"])
+        logger.debug("_LiveCaptures._notify_abort: fin")
 
     @staticmethod
     def _run_custom(entry: dict[str, Any], captures: list[tuple[str, str]]) -> None:
@@ -472,6 +514,7 @@ class _LiveCaptures:
         finally:
             shutil.rmtree(entry["_workdir"], ignore_errors=True)
         logger.info("capture en direct {} : {}", entry["capture_id"], entry["status"])
+        logger.debug("_LiveCaptures._run_custom: fin")
 
     # -- fichiers du ring buffer (issue #905) --------------------------------------------
 
@@ -480,8 +523,10 @@ class _LiveCaptures:
         if entry.get("_ringdir"):
             shutil.rmtree(entry["_ringdir"], ignore_errors=True)
             entry["_ring_purged"] = True
+        logger.debug("_LiveCaptures._purge_ring: fin")
 
     def ring_files(self, capture_id: str) -> dict[str, Any]:
+        logger.debug("ring_files: entrée")
         entry = self.get(capture_id)
         if entry.get("ring_buffer") is None:
             logger.debug("live: {} sans ring_buffer -> 404", capture_id)
@@ -502,6 +547,7 @@ class _LiveCaptures:
                     ],
                 }
             )
+        logger.debug("_LiveCaptures.ring_files: retour dictionnaire")
         return {
             "capture_id": capture_id,
             "status": entry["status"],
@@ -513,17 +559,22 @@ class _LiveCaptures:
     def ring_file(self, capture_id: str, point: str, filename: str) -> Path:
         """Chemin d'un fichier listé par ``ring_files`` : seuls ces noms sont
         servis (aucun chemin construit depuis la requête)."""
+        logger.debug("ring_file: entrée")
         doc = self.ring_files(capture_id)
         entry = self.get(capture_id)
         for p, desc in zip(entry["points"], doc["points"], strict=True):
             if desc["name"] == point:
                 for f in desc["files"]:
                     if f["filename"] == filename:
+                        logger.debug(
+                            "_LiveCaptures.ring_file: si f['filename'] == filename -> retour Path(p['_ring']) / f['fi…"
+                        )
                         return Path(p["_ring"]) / f["filename"]
         logger.debug("live: fichier {}/{} absent de {} -> 404", point, filename, capture_id)
         raise HTTPException(status_code=404, detail=f"Fichier {point}/{filename} introuvable")
 
     def purge_ring(self, capture_id: str) -> dict[str, Any]:
+        logger.debug("purge_ring: entrée")
         entry = self.get(capture_id)
         self.ring_files(capture_id)  # 404 sans ring_buffer
         if entry["status"] == CAPTURING:
@@ -531,6 +582,7 @@ class _LiveCaptures:
             raise HTTPException(status_code=409, detail="capture en cours : l'arrêter avant de supprimer ses fichiers")
         self._purge_ring(entry)
         logger.info("capture en direct {} : fichiers du ring buffer supprimés", capture_id)
+        logger.debug("_LiveCaptures.purge_ring: retour self.ring_files(…)")
         return self.ring_files(capture_id)
 
     # -- rapport en continu (issue #907) -----------------------------------------------------
@@ -549,14 +601,17 @@ class _LiveCaptures:
             logger.debug("live: {} sans live_report -> 404", capture_id)
             raise HTTPException(status_code=404, detail=f"Capture en direct {capture_id} lancée sans live_report")
         if name not in REPORT_FILES:
+            logger.debug("_LiveCaptures.report_path: si name not in REPORT_FILES -> levée HTTPException")
             raise HTTPException(status_code=404, detail="Rapport introuvable")
         chemin = Path(entry["_report_dir"]) / name
         if not chemin.is_file():
             logger.debug("live: {} absent pour {} -> 404", name, capture_id)
             raise HTTPException(status_code=404, detail="Rapport pas encore publié ou supprimé")
+        logger.debug("_LiveCaptures.report_path: retour chemin={}", summarize(chemin, "chemin"))
         return chemin
 
     def report_response(self, capture_id: str, name: str = "index.html", token: str | None = None) -> Response:
+        logger.debug("report_response: entrée")
         chemin = self.report_path(capture_id, name, token)
         entry = self.get(capture_id)
         headers = {"Cache-Control": "no-store"}
@@ -564,12 +619,15 @@ class _LiveCaptures:
             headers["Refresh"] = str(max(1, round(entry["live_report"]["interval"])))
         contenu = chemin.read_text(encoding="utf-8")
         if name == "index.html":
+            logger.debug("_LiveCaptures.report_response: si name == 'index.html' -> retour HTMLResponse(…)")
             return HTMLResponse(contenu, headers=headers)
+        logger.debug("_LiveCaptures.report_response: retour PlainTextResponse(…)")
         return PlainTextResponse(contenu, media_type=REPORT_FILES[name], headers=headers)
 
     @staticmethod
     def _files(point: dict[str, Any]) -> list[str]:
         dossier = Path(point["_dir"])
+        logger.debug("_LiveCaptures._files: retour sorted((str(p) for p in dossier.glob('*.pcap*')))…")
         return sorted(str(p) for p in dossier.glob("*.pcap*")) if dossier.is_dir() else []
 
     def get(self, capture_id: str) -> dict[str, Any]:
@@ -577,6 +635,7 @@ class _LiveCaptures:
         if entry is None:
             logger.debug("live: capture {} inconnue -> 404", capture_id)
             raise HTTPException(status_code=404, detail=f"Capture en direct {capture_id} introuvable")
+        logger.debug("_LiveCaptures.get: retour entry={}", summarize(entry, "entry"))
         return entry
 
     def stop(self, capture_id: str) -> dict[str, Any]:
@@ -587,11 +646,13 @@ class _LiveCaptures:
             entry["_stop"].set()
             if not entry["_handoff"].wait(STOP_WAIT_SECONDS):
                 logger.warning("capture en direct {} : arrêt plus long que {} s", capture_id, STOP_WAIT_SECONDS)
+        logger.debug("_LiveCaptures.stop: retour self.public(…)")
         return self.public(entry)
 
     def cancel(self, capture_id: str) -> dict[str, Any]:
         """Abandon sans analyse (issue #904) : arrête tshark, supprime les
         fichiers, statut ``cancelled``. 409 si la capture est déjà finie."""
+        logger.debug("cancel: entrée")
         entry = self.get(capture_id)
         if entry["status"] != CAPTURING:
             logger.debug("live: abandon de {} au statut {} -> 409", capture_id, entry["status"])
@@ -603,6 +664,7 @@ class _LiveCaptures:
         entry["_stop"].set()
         if not entry["_handoff"].wait(STOP_WAIT_SECONDS):
             logger.warning("capture en direct {} : abandon plus long que {} s", capture_id, STOP_WAIT_SECONDS)
+        logger.debug("_LiveCaptures.cancel: retour self.public(…)")
         return self.public(entry)
 
     def public(self, entry: dict[str, Any]) -> dict[str, Any]:
@@ -613,6 +675,7 @@ class _LiveCaptures:
             points.append({"name": p["name"], "interface": p["interface"], "bpf": p["bpf"], "bytes_captured": taille})
         analyse = self._deps["get_analysis"](entry["analysis_id"]) if entry["analysis_id"] else None
         summary = (analyse or {}).get("summary") or {}
+        logger.debug("_LiveCaptures.public: retour dictionnaire")
         return {
             "capture_id": entry["capture_id"],
             "status": entry["status"],
@@ -648,6 +711,7 @@ def register(app: FastAPI, verify: Callable[..., None], deps: dict[str, Callable
     from netcross_report.live_html import render_live_html
 
     def make_reporter(directory: str, interval: float) -> LiveReporter:
+        logger.debug("register.make_reporter: retour LiveReporter(…)")
         return LiveReporter(LiveReportWriter(directory, render_live_html, interval))
 
     deps = {
@@ -666,29 +730,34 @@ def register(app: FastAPI, verify: Callable[..., None], deps: dict[str, Callable
         """Démarre une capture en direct puis son analyse (équiv. ``--live`` + ``--live-duration``)."""
         etat = live.start(body)
         url = f"/live-captures/{etat['capture_id']}"
+        logger.debug("register.start_live_capture: retour JSONResponse(…)")
         return JSONResponse(status_code=202, content=etat, headers={"Location": url})
 
     @app.get("/live-captures/{capture_id}", tags=["live"], responses=_RESPONSES, dependencies=auth)
     def get_live_capture(capture_id: str) -> dict[str, Any]:
         """État : capturing, analysing, completed ou failed ; octets par point ; analysis_id."""
+        logger.debug("register.get_live_capture: retour live.public(…)")
         return live.public(live.get(capture_id))
 
     @app.post("/live-captures/{capture_id}/stop", tags=["live"], responses=_RESPONSES, dependencies=auth)
     def stop_live_capture(capture_id: str) -> dict[str, Any]:
         """Arrête la capture avant la fin de ``duration`` (équiv. Ctrl+C / « Arreter et analyser ») ;
         l'analyse porte sur ce qui a été capturé et la réponse donne son ``analysis_id``."""
+        logger.debug("register.stop_live_capture: retour live.stop(…)")
         return live.stop(capture_id)
 
     @app.delete("/live-captures/{capture_id}", tags=["live"], responses=_RESPONSES, dependencies=auth)
     def cancel_live_capture(capture_id: str) -> dict[str, Any]:
         """Abandonne une capture en cours sans l'analyser (fichiers supprimés, statut ``cancelled``) ;
         409 si elle est déjà terminée."""
+        logger.debug("register.cancel_live_capture: retour live.cancel(…)")
         return live.cancel(capture_id)
 
     @app.get("/live-captures/{capture_id}/files", tags=["live"], responses=_RESPONSES, dependencies=auth)
     def list_live_capture_files(capture_id: str) -> dict[str, Any]:
         """Fichiers pcapng conservés par le ``ring_buffer`` (équiv. ``--ring-buffer``), par point ;
         404 si la capture a été lancée sans ``ring_buffer``."""
+        logger.debug("register.list_live_capture_files: retour live.ring_files(…)")
         return live.ring_files(capture_id)
 
     @app.get(
@@ -700,11 +769,13 @@ def register(app: FastAPI, verify: Callable[..., None], deps: dict[str, Callable
     def download_live_capture_file(capture_id: str, point: str, filename: str) -> FileResponse:
         """Télécharge un fichier du ``ring_buffer`` (nom donné par ``GET .../files``)."""
         chemin = live.ring_file(capture_id, point, filename)
+        logger.debug("register.download_live_capture_file: retour FileResponse(…)")
         return FileResponse(chemin, media_type="application/vnd.tcpdump.pcap", filename=chemin.name)
 
     @app.delete("/live-captures/{capture_id}/files", tags=["live"], responses=_RESPONSES, dependencies=auth)
     def purge_live_capture_files(capture_id: str) -> dict[str, Any]:
         """Supprime les fichiers du ``ring_buffer`` ; 409 pendant la capture."""
+        logger.debug("register.purge_live_capture_files: retour live.purge_ring(…)")
         return live.purge_ring(capture_id)
 
     @app.get(
@@ -717,6 +788,7 @@ def register(app: FastAPI, verify: Callable[..., None], deps: dict[str, Callable
     def get_live_capture_report(capture_id: str) -> Response:
         """Dernière version du rapport en continu (équiv. ``--live-report``), avec l'en-tête ``Refresh``
         pendant la capture ; 404 si la capture a été lancée sans ``live_report``."""
+        logger.debug("register.get_live_capture_report: retour live.report_response(…)")
         return live.report_response(capture_id)
 
     # URL de consultation (report_url) : jeton propre à la capture, sans clé API,
@@ -729,6 +801,7 @@ def register(app: FastAPI, verify: Callable[..., None], deps: dict[str, Callable
     )
     def view_live_capture_report(capture_id: str, token: str) -> Response:
         """Page du rapport en continu ouverte avec ``report_url`` (jeton, lecture seule)."""
+        logger.debug("register.view_live_capture_report: retour live.report_response(…)")
         return live.report_response(capture_id, "index.html", token)
 
     @app.get(
@@ -738,6 +811,7 @@ def register(app: FastAPI, verify: Callable[..., None], deps: dict[str, Callable
     )
     def view_live_capture_report_file(capture_id: str, token: str, name: str) -> Response:
         """``index.html``, ``live.json`` (instantané) ou ``live.jsonl`` (journal) du rapport en continu."""
+        logger.debug("register.view_live_capture_report_file: retour live.report_response(…)")
         return live.report_response(capture_id, name, token)
 
     logger.debug("live_routes.register: 10 routes")
