@@ -61,6 +61,9 @@ def start_ring_recorders(
         except (CaptureSourceError, TsharkNotFoundError, OSError) as exc:
             logger.warning("start_ring_recorders: point {} refuse ({})", label, exc)
             stop_ring_recorders(recorders)
+            logger.debug(
+                "start_ring_recorders: except (CaptureSourceError, TsharkNotFoundErro… -> levée RingRecorderError"
+            )
             raise RingRecorderError(f"[{label}] {exc}") from exc
         recorders[label] = (proc, directory)
         messages.append(

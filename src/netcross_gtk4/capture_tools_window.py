@@ -23,7 +23,7 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gio, GLib, Gtk  # noqa: E402
 
 from netcross_core import capture_tools  # noqa: E402
-from netcross_core.logging_config import get_logger  # noqa: E402
+from netcross_core.logging_config import get_logger, summarize  # noqa: E402
 
 logger = get_logger(__name__)
 
@@ -37,6 +37,7 @@ class PathChooser(Gtk.Box):
     """Bouton de choix (ouvrir, enregistrer, dossier) + chemin retenu."""
 
     def __init__(self, label: str, mode: str = "open", initial_name: str = ""):
+        logger.debug("PathChooser.__init__: entrée")
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.mode = mode
         self.initial_name = initial_name
@@ -46,10 +47,12 @@ class PathChooser(Gtk.Box):
         self.name_label = Gtk.Label(label="(aucun)", halign=Gtk.Align.START, hexpand=True, xalign=0.0)
         self.append(self.button)
         self.append(self.name_label)
+        logger.debug("PathChooser.__init__: fin")
 
     def set_path(self, path: str | None) -> None:
         self.path = path or None
         self.name_label.set_text(path or "(aucun)")
+        logger.debug("PathChooser.set_path: fin")
 
     def _on_clicked(self, _btn) -> None:
         dialog = Gtk.FileDialog()
@@ -70,6 +73,7 @@ class PathChooser(Gtk.Box):
             filters.append(filt)
             dialog.set_filters(filters)
             dialog.open(parent, None, self._on_done)
+        logger.debug("PathChooser._on_clicked: fin")
 
     def _on_done(self, dialog, result) -> None:
         finish = {"folder": dialog.select_folder_finish, "save": dialog.save_finish}.get(self.mode, dialog.open_finish)
@@ -79,13 +83,16 @@ class PathChooser(Gtk.Box):
             logger.debug("PathChooser: dialogue annule ({})", exc)
             return
         self.set_path(gfile.get_path())
+        logger.debug("PathChooser._on_done: fin")
 
 
 def _optional_float(text: str, name: str) -> float | None:
     text = text.strip().replace(",", ".")
     if not text:
+        logger.debug("_optional_float: si not text -> retour None")
         return None
     try:
+        logger.debug("_optional_float: retour float(…)")
         return float(text)
     except ValueError as exc:
         logger.debug("_optional_float: {} invalide ({})", name, exc)
@@ -93,21 +100,26 @@ def _optional_float(text: str, name: str) -> float | None:
 
 
 def _grid() -> Gtk.Grid:
+    logger.debug("_grid: entrée")
     grid = Gtk.Grid(column_spacing=8, row_spacing=6)
     for side in ("top", "bottom", "start", "end"):
         getattr(grid, f"set_margin_{side}")(10)
+    logger.debug("_grid: retour grid={}", summarize(grid, "grid"))
     return grid
 
 
 def _row(grid: Gtk.Grid, row: int, label: str, widget: Gtk.Widget) -> None:
+    logger.debug("_row: entrée")
     grid.attach(Gtk.Label(label=label, xalign=0.0), 0, row, 1, 1)
     grid.attach(widget, 1, row, 1, 1)
+    logger.debug("_row: fin")
 
 
 class CaptureToolsWindow(Gtk.Window):
     def __init__(
         self, parent: Gtk.Window | None = None, start_thread: Callable[[Callable[[], None]], None] | None = None
     ):
+        logger.debug("CaptureToolsWindow.__init__: entrée")
         super().__init__(title="Outils de capture", default_width=760, default_height=420)
         if parent is not None:
             self.set_transient_for(parent)
@@ -128,17 +140,21 @@ class CaptureToolsWindow(Gtk.Window):
         self._build_export()
         self._build_adjust()
         self._build_replay()
+        logger.debug("CaptureToolsWindow.__init__: fin")
 
     # -- construction --------------------------------------------------------
 
     def _action(self, grid: Gtk.Grid, row: int, label: str, work: Callable[[], str]) -> Gtk.Button:
+        logger.debug("CaptureToolsWindow._action: entrée")
         btn = Gtk.Button(label=label, halign=Gtk.Align.START)
         btn.connect("clicked", lambda _b: self._launch(work))
         grid.attach(btn, 1, row, 1, 1)
         self.buttons.append(btn)
+        logger.debug("CaptureToolsWindow._action: retour btn={}", summarize(btn, "btn"))
         return btn
 
     def _build_merge(self) -> None:
+        logger.debug("CaptureToolsWindow._build_merge: entrée")
         grid = _grid()
         self.merge_files: list[str] = []
         files_box = Gtk.Box(spacing=6)
@@ -156,8 +172,10 @@ class CaptureToolsWindow(Gtk.Window):
         _row(grid, 2, "Sortie (--merge) :", self.merge_output)
         self._action(grid, 3, "Fusionner", self.run_merge)
         self.notebook.append_page(grid, Gtk.Label(label="Fusion"))
+        logger.debug("CaptureToolsWindow._build_merge: fin")
 
     def _build_split(self) -> None:
+        logger.debug("CaptureToolsWindow._build_split: entrée")
         grid = _grid()
         self.split_source = PathChooser("Capture...")
         _row(grid, 0, "Capture :", self.split_source)
@@ -171,8 +189,10 @@ class CaptureToolsWindow(Gtk.Window):
         _row(grid, 2, "Dossier (--split-output-dir) :", self.split_output)
         self._action(grid, 3, "Decouper", self.run_split)
         self.notebook.append_page(grid, Gtk.Label(label="Decoupage"))
+        logger.debug("CaptureToolsWindow._build_split: fin")
 
     def _build_convert(self) -> None:
+        logger.debug("CaptureToolsWindow._build_convert: entrée")
         grid = _grid()
         self.convert_source = PathChooser("Capture...")
         _row(grid, 0, "Capture :", self.convert_source)
@@ -183,8 +203,10 @@ class CaptureToolsWindow(Gtk.Window):
         _row(grid, 2, "Sortie (--convert) :", self.convert_output)
         self._action(grid, 3, "Convertir", self.run_convert)
         self.notebook.append_page(grid, Gtk.Label(label="Conversion"))
+        logger.debug("CaptureToolsWindow._build_convert: fin")
 
     def _build_export(self) -> None:
+        logger.debug("CaptureToolsWindow._build_export: entrée")
         grid = _grid()
         self.export_source = PathChooser("Capture...")
         _row(grid, 0, "Capture :", self.export_source)
@@ -200,8 +222,10 @@ class CaptureToolsWindow(Gtk.Window):
         _row(grid, 5, "Sortie (--export-pcap) :", self.export_output)
         self._action(grid, 6, "Exporter", self.run_export)
         self.notebook.append_page(grid, Gtk.Label(label="Export filtre"))
+        logger.debug("CaptureToolsWindow._build_export: fin")
 
     def _build_adjust(self) -> None:
+        logger.debug("CaptureToolsWindow._build_adjust: entrée")
         grid = _grid()
         self.adjust_source = PathChooser("Capture...")
         _row(grid, 0, "Capture :", self.adjust_source)
@@ -215,8 +239,10 @@ class CaptureToolsWindow(Gtk.Window):
         _row(grid, 4, "Sortie (--adjust-time-output) :", self.adjust_output)
         self._action(grid, 5, "Recaler", self.run_adjust)
         self.notebook.append_page(grid, Gtk.Label(label="Recalage temporel"))
+        logger.debug("CaptureToolsWindow._build_adjust: fin")
 
     def _build_replay(self) -> None:
+        logger.debug("CaptureToolsWindow._build_replay: entrée")
         grid = _grid()
         warning = Gtk.Label(
             label="ATTENTION : le rejeu EMET du trafic reseau reel sur l'interface choisie. "
@@ -250,16 +276,19 @@ class CaptureToolsWindow(Gtk.Window):
         self._replay_proc: subprocess.Popen | None = None
         self._replay_stopped = False
         self.notebook.append_page(grid, Gtk.Label(label="Rejeu"))
+        logger.debug("CaptureToolsWindow._build_replay: fin")
 
     # -- etat --------------------------------------------------------------
 
     def set_merge_files(self, paths: list[str]) -> None:
         self.merge_files = list(paths)
         self.merge_label.set_text(", ".join(os.path.basename(p) for p in paths) or "(aucune)")
+        logger.debug("CaptureToolsWindow.set_merge_files: fin")
 
     def _on_merge_add(self, _btn) -> None:
         dialog = Gtk.FileDialog()
         dialog.open_multiple(self, None, self._on_merge_chosen)
+        logger.debug("CaptureToolsWindow._on_merge_add: fin")
 
     def _on_merge_chosen(self, dialog, result) -> None:
         try:
@@ -269,23 +298,29 @@ class CaptureToolsWindow(Gtk.Window):
             return
         paths = [files.get_item(i).get_path() for i in range(files.get_n_items())]
         self.set_merge_files(self.merge_files + [p for p in paths if p])
+        logger.debug("CaptureToolsWindow._on_merge_chosen: fin")
 
     @staticmethod
     def _need(path: str | None, what: str) -> str:
         if not path:
+            logger.debug("CaptureToolsWindow._need: si not path -> levée ValueError")
             raise ValueError(f"choisissez {what}")
+        logger.debug("CaptureToolsWindow._need: retour path={}", summarize(path, "path"))
         return path
 
     # -- actions (synchrones, pour les tests) -------------------------------
 
     def run_merge(self) -> str:
         if not self.merge_files:
+            logger.debug("CaptureToolsWindow.run_merge: si not self.merge_files -> levée ValueError")
             raise ValueError("ajoutez au moins une capture a fusionner")
         out = self._need(self.merge_output.path, "le fichier de sortie")
+        logger.debug("CaptureToolsWindow.run_merge: retour capture_tools.merge(…)")
         return capture_tools.merge(self.merge_files, out, dedup=self.merge_dedup.get_active())
 
     def split_spec(self) -> str:
         mode = capture_tools.SPLIT_MODES[self.split_mode.get_selected()]
+        logger.debug("CaptureToolsWindow.split_spec: retour chaîne formatée")
         return f"{mode}:{self.split_value.get_text().strip()}"
 
     def run_split(self) -> str:
@@ -295,18 +330,22 @@ class CaptureToolsWindow(Gtk.Window):
         folder = self._need(self.split_output.path, "le dossier de sortie")
         segments = capture_tools.split(source, folder, spec)
         if not segments:
+            logger.debug("CaptureToolsWindow.run_split: si not segments -> retour chaîne formatée")
             return f"aucun paquet a decouper dans {source} -- aucun segment cree."
+        logger.debug("CaptureToolsWindow.run_split: retour chaîne formatée")
         return f"{len(segments)} segment(s) dans {folder}."
 
     def run_convert(self) -> str:
         fmt = capture_tools.CONVERT_FORMATS[self.convert_format.get_selected()]
         source = self._need(self.convert_source.path, "la capture a convertir")
         out = self._need(self.convert_output.path, "le fichier de sortie")
+        logger.debug("CaptureToolsWindow.run_convert: retour capture_tools.convert(…)")
         return capture_tools.convert(source, out, fmt)
 
     def run_export(self) -> str:
         source = self._need(self.export_source.path, "la capture source")
         out = self._need(self.export_output.path, "le fichier de sortie")
+        logger.debug("CaptureToolsWindow.run_export: retour capture_tools.export_subset(…)")
         return capture_tools.export_subset(
             source,
             out,
@@ -322,18 +361,23 @@ class CaptureToolsWindow(Gtk.Window):
         mode = self.adjust_mode.get_selected()
         if mode == 0:
             offset = _optional_float(self.adjust_offset.get_text(), "decalage")
+            logger.debug("CaptureToolsWindow.run_adjust: si mode == 0 -> retour capture_tools.adjust_time(…)")
             return capture_tools.adjust_time(source, out, offset=offset if offset is not None else 0.0)
         if mode == 1:
+            logger.debug("CaptureToolsWindow.run_adjust: si mode == 1 -> retour capture_tools.adjust_time(…)")
             return capture_tools.adjust_time(source, out, normalize=True)
         reference = self._need(self.adjust_reference.path, "la capture de reference")
+        logger.debug("CaptureToolsWindow.run_adjust: retour capture_tools.adjust_time(…)")
         return capture_tools.adjust_time(source, out, align_to=reference)
 
     def run_replay(self) -> str:
         if not self.replay_confirm.get_active():
+            logger.debug("CaptureToolsWindow.run_replay: si not self.replay_confirm.get_active() -> levée ValueError")
             raise ValueError("cochez la confirmation d'autorisation avant de rejouer")
         source = self._need(self.replay_source.path, "la capture a rejouer")
         interface = self.replay_interface.get_text().strip()
         if not interface:
+            logger.debug("CaptureToolsWindow.run_replay: si not interface -> levée ValueError")
             raise ValueError("indiquez l'interface d'emission")
         speed = self.replay_speed.get_text().strip() or "1.0"
         loop = self.replay_loop.get_value_as_int()
@@ -346,12 +390,17 @@ class CaptureToolsWindow(Gtk.Window):
         except RuntimeError:
             logger.debug("run_replay: echec (arret demande : {})", self._replay_stopped)
             if not self._replay_stopped:
+                logger.debug(
+                    "CaptureToolsWindow.run_replay: si not self._replay_stopped -> relance de l'exception en cours"
+                )
                 raise
         finally:
             self._replay_proc = None
             GLib.idle_add(self.replay_stop_btn.set_sensitive, False)
         if self._replay_stopped:
+            logger.debug("CaptureToolsWindow.run_replay: si self._replay_stopped -> retour chaîne formatée")
             return f"Rejeu de {source} sur {interface} interrompu."
+        logger.debug("CaptureToolsWindow.run_replay: retour capture_tools.replay_message(…)")
         return capture_tools.replay_message(source, interface, speed, loop)
 
     def stop_replay(self) -> None:
@@ -360,11 +409,13 @@ class CaptureToolsWindow(Gtk.Window):
             self._replay_stopped = True
             proc.terminate()
             logger.info("CaptureToolsWindow: rejeu interrompu")
+        logger.debug("CaptureToolsWindow.stop_replay: fin")
 
     # -- execution en arriere-plan -------------------------------------------
 
     def _launch(self, work: Callable[[], str]) -> None:
         if self.running:
+            logger.debug("CaptureToolsWindow._launch: si self.running -> retour")
             return
         self.running = True
         for btn in self.buttons:
@@ -378,8 +429,10 @@ class CaptureToolsWindow(Gtk.Window):
                 logger.warning("CaptureToolsWindow: {}", exc)
                 message = f"Erreur : {exc}"
             GLib.idle_add(self._done, message)
+            logger.debug("CaptureToolsWindow._launch._thread: fin")
 
         self._start_thread(_thread)
+        logger.debug("CaptureToolsWindow._launch: fin")
 
     def _done(self, message: str) -> bool:
         self.running = False

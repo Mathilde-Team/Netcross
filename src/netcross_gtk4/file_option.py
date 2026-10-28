@@ -21,6 +21,7 @@ logger = get_logger(__name__)
 
 class FileOption(Gtk.Box):
     def __init__(self, label: str, tooltip: str, patterns: tuple[str, ...], filter_name: str):
+        logger.debug("FileOption.__init__: entrée")
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.path: str | None = None
         self._label = label
@@ -35,6 +36,7 @@ class FileOption(Gtk.Box):
         for widget in (self.choose_btn, self.clear_btn, self.name_label):
             self.append(widget)
         self.set_path(None)
+        logger.debug("FileOption.__init__: fin")
 
     def set_path(self, path: str | None) -> None:
         self.path = path or None
@@ -54,6 +56,7 @@ class FileOption(Gtk.Box):
         dialog.set_filters(filters)
         root = self.get_root()
         dialog.open(root if isinstance(root, Gtk.Window) else None, None, self._on_chosen)
+        logger.debug("FileOption._on_choose: fin")
 
     def _on_chosen(self, dialog, result) -> None:
         try:
@@ -62,3 +65,4 @@ class FileOption(Gtk.Box):
             logger.debug("FileOption._on_chosen: dialogue annule ({})", exc)
             return
         self.set_path(gfile.get_path())
+        logger.debug("FileOption._on_chosen: fin")
