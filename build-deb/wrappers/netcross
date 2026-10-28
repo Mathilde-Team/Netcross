@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Wrapper installe dans /usr/bin/netcross par le paquet Debian/RPM.
 export PYTHONPATH="/usr/share/netcross:${PYTHONPATH:-}"
 exec /usr/bin/python3 /usr/share/netcross/cross_capture_analyzer_cli.py "$@"

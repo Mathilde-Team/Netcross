@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # install.sh -- installe les dependances systeme de netcross.
 #
 # Utilise les paquets systeme (apt/dnf) plutot que pip quand ils existent :

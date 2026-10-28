@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # build-rpm/build.sh -- construit le paquet .rpm de netcross (Rocky 8/9,
 # RHEL et derives).
 #
@@ -31,6 +32,7 @@ rm -rf "$SCRIPT_DIR/_build"
 mkdir -p "$STAGE_DIR"
 mkdir -p "$TOPDIR"/{SOURCES,SPECS,BUILD,RPMS,SRPMS,BUILDROOT}
 
+cp "$REPO_ROOT/LICENSE" "$STAGE_DIR/"
 cp -r "$REPO_ROOT/src/pcap_parser" "$STAGE_DIR/"
 cp -r "$REPO_ROOT/src/netcross_core" "$STAGE_DIR/"
 cp -r "$REPO_ROOT/src/netcross_report" "$STAGE_DIR/"

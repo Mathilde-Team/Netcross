@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Wrapper installe dans /usr/bin/netcross-diff par le paquet Debian/RPM.
 # Comparaison avant/apres entre deux jeux de captures.
 export PYTHONPATH="/usr/share/netcross:${PYTHONPATH:-}"
