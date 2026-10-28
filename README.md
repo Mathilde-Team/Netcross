@@ -1332,9 +1332,15 @@ vers la branche `dev`. La branche `main` reste stable.
 GPL-3.0-or-later — voir [LICENSE](LICENSE) (texte officiel de la GNU General
 Public License, version 3 ou ultérieure).
 
-Dépendances : cryptography (BSD-3 / Apache-2.0), loguru (MIT), reportlab (BSD-3),
-matplotlib (licence Matplotlib, compatible BSD), networkx (BSD-3) — toutes
-compatibles avec la GPL-3.0-or-later ; `scikit-learn` (BSD-3) et `fastapi`
-(MIT) sont optionnelles et compatibles également. `tshark`
-(GPL-2.0-or-later) est appelé comme programme externe, sans liaison de
+Historique de licence : le projet était précédemment distribué sous licence
+MIT — « Copyright (c) 2026 Mathilde Deuscher » — ; les versions publiées
+avant ce changement de licence restent couvertes par cette licence MIT.
+
+Dépendances (licences vérifiées dans les métadonnées des versions
+distribuées) : cryptography 50.0.1 (Apache-2.0 OR BSD-3-Clause),
+loguru (MIT), reportlab (BSD-3-Clause), matplotlib (licence Matplotlib,
+compatible BSD), networkx (BSD-3-Clause) — toutes compatibles avec la
+GPL-3.0-or-later ; `scikit-learn` (BSD-3-Clause) et `fastapi` (MIT) sont
+optionnelles et compatibles également. `tshark` (projet Wireshark,
+GPL-2.0-or-later) est appelé comme programme externe, sans liaison de
 code.
