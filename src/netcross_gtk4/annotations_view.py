@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.annotations_view -- logique de presentation pour
 l'etiquetage/signets sur paquets (Job 40 / issue #160, section
 "Metadonnees et annotation").

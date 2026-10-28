@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.dga + fast_flux -- tests (issue #152, SCENARIO-6).
 

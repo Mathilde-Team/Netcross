@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.dns_tunnel -- issue #144 (FLOW-3, parent #141) :
 detection de tunneling DNS (exfiltration, C2, VPN over DNS).

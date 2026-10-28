@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_forensic.py -- tests de l'index de correlation bidirectionnel
 (netcross_core.forensic, Job 8/issue #5).

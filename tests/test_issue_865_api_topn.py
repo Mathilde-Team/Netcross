@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #865 : le topn de GET /analyses/{id}/pdf (équivalent de
 --topn-charts) change vraiment les graphiques Top-N, comme la CLI."""
 

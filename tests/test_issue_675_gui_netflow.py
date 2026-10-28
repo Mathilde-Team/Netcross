@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #675 : resume NetFlow v5 dans la GUI (equivalent de --netflow /
 --netflow-top / JSON de --json-report). Module sans GTK et panneau."""
 

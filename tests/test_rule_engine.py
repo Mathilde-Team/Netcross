@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.rule_engine -- premier pilote du moteur d'execution
 (voir docstring de module, CLAUDE.md section "Prochaine feature").

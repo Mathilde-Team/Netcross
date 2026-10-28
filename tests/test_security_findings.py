@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.findings -- alimentation du rapport de securite
 (CVE-5, issue #139) a partir des modules CVE-1 a CVE-4, et cablage

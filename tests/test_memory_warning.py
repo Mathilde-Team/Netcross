@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de l'estimation memoire et de l'avertissement avant analyse (issue
 #283, Etape 2), et de --max-packets/--sample (Etape 3).

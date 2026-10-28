@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de l'extraction de l'API Lua Wireshark depuis l'AsciiDoc de make-wsluarm.py (issue #386)."""
 
 from __future__ import annotations

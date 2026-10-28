@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #678 (suite #665) : branches restantes de cross_capture_analyzer_cli.py.
 
 Complete tests/test_analyzer_cli_auxiliaires.py : chemins nominaux « sans

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #866 (GUI) : module IA local, équivalent des options --ai-*.
 Partie sans GTK : module et pipeline."""
 

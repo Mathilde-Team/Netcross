@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Paquets de modeles partageables (issue #271).
 
 Un **paquet de modele** est une archive ZIP autoportante qui transporte des

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Couverture GTK4 de app.py, lot 7 (issue #428, sous-issue de #421).
 
 Portee : export PDF (_on_pdf_path_chosen, export_pdf_to) et panneau

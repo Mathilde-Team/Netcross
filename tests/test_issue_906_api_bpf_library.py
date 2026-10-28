@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #906 : bibliothèque de filtres BPF dans l'API, même fichier et
 mêmes règles que ``--bpf-library`` (CLI) et le panneau BPF de la GUI."""
 

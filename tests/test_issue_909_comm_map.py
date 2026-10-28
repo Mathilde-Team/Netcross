@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #909 : cartographie des communications en CLI (--comm-map) et dans
 l'API (GET /analyses/{analysis_id}/comm-map), exports JSON et DOT."""
 

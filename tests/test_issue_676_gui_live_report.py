@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #676 : rapport HTML rafraichi en continu pendant une capture en
 direct de la GUI (equivalent de --live-report, --live-report-interval et
 --live-report-serve). Module sans GTK : testable sans affichage."""

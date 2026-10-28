@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #902 : POST /live-captures, GET /live-captures/{id},
 POST /live-captures/{id}/stop -- capture en direct puis analyse.
 

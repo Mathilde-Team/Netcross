@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Instrumentation Loguru assistée (issue #441).
 
 Ajoute, dans les fonctions non triviales qui n'ont encore aucun appel

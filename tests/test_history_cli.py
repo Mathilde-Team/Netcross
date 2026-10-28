@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de `cross_history_cli.py` -- issue #287.
 

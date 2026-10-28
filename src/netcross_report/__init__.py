@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_report -- synthese, triage, et generation de rapports (PDF,
 JSON) a partir d'un Report netcross_core.
 

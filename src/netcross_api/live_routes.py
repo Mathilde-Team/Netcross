@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_api.live_routes -- capture en direct sur des interfaces du
 serveur, puis analyse (issue #902), équivalent API de ``--live`` et de la
 case « Capture en direct » de la GUI.

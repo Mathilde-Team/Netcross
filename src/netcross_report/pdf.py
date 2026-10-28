@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.pdf -- assemble le rapport PDF final (synthese, graphiques,
 tableaux de detail) a partir d'un Report netcross_core, avec reportlab.

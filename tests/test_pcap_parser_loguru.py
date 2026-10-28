@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de non-régression de l'issue #446 : `pcap_parser` utilisé seul
 n'écrit rien sur stderr (handler loguru par défaut), et les points

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #676 : reglages de notification dans la fenetre principale (menu
 « Notifier si », canaux, detail), validation avant lancement et
 transmission au thread d'analyse.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests pour les pipelines d'analyse et de diff extraits de app.py (#246, #285).
 
 Ces tests vérifient la logique pure extraite de MainWindow._run_analysis_thread

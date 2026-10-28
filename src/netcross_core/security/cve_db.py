@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.cve_db -- base SQLite locale des CVE, peuplee par
 scripts/import_nvd.py depuis le flux NVD (voir ce script pour le format

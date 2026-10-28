@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """#468 -- premier demarrage : ressources locales absentes et captures
 illisibles ne doivent ni produire de traces ERROR trompeuses, ni un message
 brut de tshark sans piste de correction."""

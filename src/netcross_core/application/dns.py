@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.application.dns -- construction de transactions DNS a
 partir des paquets (Job 23, §6.9).

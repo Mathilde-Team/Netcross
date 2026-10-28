@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de pcap_parser.capture.export_filtered (Job 36, issue #156) et de la
 CLI --export-pcap.

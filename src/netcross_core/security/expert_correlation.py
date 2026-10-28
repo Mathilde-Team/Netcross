@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.expert_correlation -- issue #137 (CVE-3) :
 exploitation des alertes Expert Info de tshark pour DETECTER des

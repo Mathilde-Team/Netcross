@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #698 (suite de #665) : branches restantes de ``netcross_gtk4.dashboard_context``.
 
 Complete ``tests/test_dashboard_context.py`` (scenario reel via ``correlate``)

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Issue #329 -- test de non-regression : chaque type de detection produit par
 les modules de securite apparait dans au moins un rendu utilisateur, avec un

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """#468 -- lancement de la GUI sans affichage accessible (root, SSH) :
 message explicite et code de sortie, pas de trace Gtk-CRITICAL."""
 

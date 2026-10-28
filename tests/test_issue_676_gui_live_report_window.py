@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #676 : rapport HTML en continu dans la fenetre principale (case,
 reglages, demarrage avec la capture en direct, alimentation par les threads
 de capture, derniere publication a l'arret).

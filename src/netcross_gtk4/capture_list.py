@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Enumeration, ordre et retrait des lignes des panneaux de captures, sortis de
 ``netcross_gtk4/app.py`` (issue #285, cinquieme lot).

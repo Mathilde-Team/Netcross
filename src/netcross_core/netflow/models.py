@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.netflow.models -- structure de donnees partagee pour un
 flux agrege NetFlow/sFlow (FlowRecord), distincte de Pkt.

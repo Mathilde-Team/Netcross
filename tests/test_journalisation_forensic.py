@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """#441, lot 3 : journalisation de netcross_core.forensic et forensic_search."""
 
 from __future__ import annotations

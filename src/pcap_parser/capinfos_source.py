@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.capinfos_source -- lecture du commentaire de SECTION pcapng
 (Section Header Block, "capture comment") d'un fichier de capture, via

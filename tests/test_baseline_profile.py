@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_baseline_profile.py -- tests du profil de reference dynamique
 (netcross_core.baseline_profile, Job 12/issue #9).

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.forensic -- index de correlation bidirectionnel evenement ↔
 flow ↔ paquet (Job 8/issue #5, §6.3 et §6.14 de FEATURES.md).

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Fixtures et fabriques partagees par toute la suite de tests.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """pcap_parser.remote -- sources de capture distantes (issue #166).
 
 Le champ « interface » d'une capture en direct accepte, en plus d'un nom

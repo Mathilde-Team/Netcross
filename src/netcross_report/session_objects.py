@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.session_objects -- construction et rendu CONSOLE des objets
 de contrat de la Session 0 (Job 4/issue #13).

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de netcross_core.security.exfiltration (issue #148, SCENARIO-2).
 Detection d'exfiltration : volume anormal, ratio asymetrique,

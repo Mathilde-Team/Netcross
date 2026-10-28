@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de couverture de cross_capture_diff_cli.py (issue #677, suite #665).
 
 Sorties optionnelles de main() apres la comparaison (triage, TLS, QUIC,

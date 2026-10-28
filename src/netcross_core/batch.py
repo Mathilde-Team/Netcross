@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Mode batch : inventaire d'un dossier de captures et regroupement
 automatique CONSERVATEUR des captures qui semblent etre plusieurs points

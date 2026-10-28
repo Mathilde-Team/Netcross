@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Mode batch (issue #277) : expertise de toutes les captures d'un dossier,
 et analyse croisee automatique des captures qui semblent etre plusieurs

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_report.lua_doc_text -- rendu texte de la documentation Lua
 Wireshark (``netcross-lua-doc``, issue #388), partage avec la fenetre
 « Documentation Lua » de la GUI (issue #873)."""

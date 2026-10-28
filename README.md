@@ -1329,6 +1329,12 @@ vers la branche `dev`. La branche `main` reste stable.
 
 ## Licence
 
-MIT — voir [LICENSE](LICENSE). Adresse de contact du mainteneur à compléter
-dans `LICENSE`, `build-deb/debian/control` et `build-rpm/netcross.spec`
-(actuellement `FIXME-mettre-votre-email@example.com`).
+GPL-3.0-or-later — voir [LICENSE](LICENSE) (texte officiel de la GNU General
+Public License, version 3 ou ultérieure).
+
+Dépendances : cryptography (BSD-3 / Apache-2.0), loguru (MIT), reportlab (BSD-3),
+matplotlib (licence Matplotlib, compatible BSD), networkx (BSD-3) — toutes
+compatibles avec la GPL-3.0-or-later ; `scikit-learn` (BSD-3) et `fastapi`
+(MIT) sont optionnelles et compatibles également. `tshark`
+(GPL-2.0-or-later) est appelé comme programme externe, sans liaison de
+code.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.triage.rank_segments -- module duck-type, on utilise
 des objets minimalistes (namedtuple) exposant juste .severity/.category

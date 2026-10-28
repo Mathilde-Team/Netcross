@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 scripts/bench_memory.py -- banc de mesure memoire pour de grosses captures
 (issue #283, Etape 1 : "mesurer avant d'optimiser").

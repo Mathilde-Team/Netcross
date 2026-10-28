@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Commentaires pcapng (Job 39, issue #159) -- paquets ET section.
 

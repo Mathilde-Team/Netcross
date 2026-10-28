@@ -2,7 +2,7 @@ Name:           netcross
 Version:        1.1.0
 Release:        1%{?dist}
 Summary:        Analyse croisee de captures Wireshark multi-points
-License:        MIT
+License:        GPL-3.0-or-later
 URL:            https://github.com/Mathilde-Team/Netcross
 BuildArch:      noarch
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.redact -- anonymisation des adresses IP/MAC (--redact).
 

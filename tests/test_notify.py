@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Notifications sortantes sur seuil de gravite (issue #280).
 

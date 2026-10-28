@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Garde commune des tests GTK4 : pygobject, GTK4 ET un affichage réel.
 
 Les tests pilotés via pygobject (#357, #363, lots de #421) doivent être

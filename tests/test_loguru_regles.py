@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Regles loguru de l'issue #245, verifiees sur tout ``src/``
 (issue #954 : ``scripts/`` et ``tools/`` inclus) :

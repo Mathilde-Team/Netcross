@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Test du repli ImportError de netcross_report/__init__.py (lignes 85-88, #680).
 
 netcross_report importe netcross_report.pdf (reportlab/matplotlib/networkx)

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_report.charts -- graphiques matplotlib exportes en PNG pour le PDF."""
 
 import statistics

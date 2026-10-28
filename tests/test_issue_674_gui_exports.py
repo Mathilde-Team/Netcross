@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #674 : diagramme de sequence, export SIEM, historique et ticket de
 support dans la GUI. Partie sans GTK, puis panneau et fenetre."""
 

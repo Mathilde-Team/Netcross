@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_gtk4.live_capture_points -- eclatement d'une ligne du panneau de
 capture live en un point par interface (Job 48, issue #168).

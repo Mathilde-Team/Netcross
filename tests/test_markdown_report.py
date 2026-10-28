@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.markdown_report -- vérifie que le rapport Markdown produit
 est structurellement correct et cohérent avec les autres formats (PDF,

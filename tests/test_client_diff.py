@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.client_diff -- comparaison "client vs client". On
 construit des Pkt synthetiques (make_pkt) avec des src/dst distincts par

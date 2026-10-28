@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Rapport de securite (CVE-5, issue #139) sur de VRAIS fichiers pcap decodes
 par tshark : le critere d'acceptation « aucun faux positif sur trafic normal

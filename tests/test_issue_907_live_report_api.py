@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ruff: noqa: F811 -- fixtures pytest importées de test_issue_902_api_live
 """Issue #907 : live_report de POST /live-captures (équiv. --live-report,
 --live-report-interval), GET /live-captures/{id}/report et URL de consultation

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Lot 4/10 de couverture de netcross_gtk4/app.py (issue #425, sous-issue de
 
 #421) : `add_capture_row`, `_log`, `on_run_analysis` et

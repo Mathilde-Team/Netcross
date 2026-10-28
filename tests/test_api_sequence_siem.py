@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests pour l'issue #674 : diagramme de séquence, SIEM, ticket de support."""
 
 from __future__ import annotations

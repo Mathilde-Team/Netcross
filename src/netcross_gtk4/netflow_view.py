@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.netflow_view -- resume NetFlow v5 dans la GUI (issue #675).
 
 Equivalent GUI de ``--netflow [EXPORTATEUR=]FICHIER`` (repete),

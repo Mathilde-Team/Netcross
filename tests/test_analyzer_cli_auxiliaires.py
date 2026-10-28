@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de couverture des fonctions auxiliaires de
 cross_capture_analyzer_cli.py (issue #678, suite #665).
 

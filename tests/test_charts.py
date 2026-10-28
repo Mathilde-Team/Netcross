@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests des graphiques (`netcross_report/charts.py`) -- issue #286.
 

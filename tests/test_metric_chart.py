@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_metric_chart -- tests du generateur de graphes generique
 (Job 20, §6.18). Les tests ne verifient pas les pixels : ils

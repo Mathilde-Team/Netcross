@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_compliance_catalog.py -- tests du catalogue de referentiels
 techniques enrichi (netcross_core.compliance, Job 10/issue #7).

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.ek_source -- couche 1 : execution de tshark -T ek et lecture
 du flux NDJSON qui en resulte, fichier pcap ou interface live.

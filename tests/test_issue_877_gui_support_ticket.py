@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #877 (GUI) : portées, marqueurs et correspondance privée du ticket
 de support, mêmes règles et même fichier que la CLI."""
 

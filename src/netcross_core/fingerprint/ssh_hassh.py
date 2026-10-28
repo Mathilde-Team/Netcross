@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.fingerprint.ssh_hassh -- empreinte HASSH d'une negociation
 SSH (issue #143, FLOW-2).

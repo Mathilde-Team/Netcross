@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Test du repli ImportError de quic_diagnostics (lines 55-62).
 
 Le module quic_diagnostics importe cryptography au niveau module. Si

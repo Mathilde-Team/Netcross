@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.netflow.netflow_v5 -- parseur NetFlow v5 (RFC 1568 /
 format Cisco historique, le plus repandu et le plus simple des

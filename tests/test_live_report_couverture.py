@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """tests/test_live_report_couverture.py -- couverture >= 98 % de netcross_core/live_report.py (issue #732).
 
 Complete tests/test_live_report.py sur ce qu'il ne prenait pas : chemin

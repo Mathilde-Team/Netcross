@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Issue #259 -- les empreintes JA4/HASSH doivent (a) etre correctes au
 regard de l'implementation de reference, (b) atteindre reellement

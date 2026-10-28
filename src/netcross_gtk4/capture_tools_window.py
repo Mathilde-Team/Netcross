@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.capture_tools_window -- fenetre « Outils de capture »
 (issues #868, #869, #870, #886, #887) : fusion, decoupage, conversion,
 export filtre et recalage temporel, equivalents des modes utilitaires de

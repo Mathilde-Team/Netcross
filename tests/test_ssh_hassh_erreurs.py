@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests des chemins d'erreur de netcross_core.fingerprint.ssh_hassh (#684).
 
 Couvre les sorties None de `_parse_kexinit` (banniere sans fin de ligne,

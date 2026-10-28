@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.report_exports_panel -- panneau « SIEM, ticket de support,
 historique » de la page Resultats (issue #674).
 

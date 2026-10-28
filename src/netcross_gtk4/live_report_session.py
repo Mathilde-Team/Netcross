@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.live_report_session -- rapport HTML rafraichi en continu
 pendant une capture en direct de la GUI (issue #676).
 

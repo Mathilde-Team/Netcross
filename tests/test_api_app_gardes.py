@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #736 : gardes de netcross_api/app.py non atteintes par les tests
 HTTP (repli ImportError QUIC, erreurs d'analyse, nom de fichier vide)."""
 

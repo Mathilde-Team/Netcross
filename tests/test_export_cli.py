@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de la CLI --export-pcap (Job 36, issue #156) : verification des
 flags, mutual exclusion et dispatch. tshark est simule (monkeypatch).

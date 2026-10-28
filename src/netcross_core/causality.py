@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.causality -- moteur de correlation causale (Session 3 de la
 section 13.3 de FEATURES.md, Job 4/issue #4).

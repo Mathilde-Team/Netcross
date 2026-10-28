@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests des decisions de panneaux de la GUI (`netcross_gtk4/panel_state.py`).
 

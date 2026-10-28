@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests pour netcross_gtk4.dashboard_context (issue #18, section 6.17).
 

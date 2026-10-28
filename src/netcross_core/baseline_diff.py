@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.baseline_diff -- compare deux Report (avant/apres un
 correctif, site A / site B, ou toute paire de scenarios comparables) et

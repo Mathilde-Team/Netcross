@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.capinfos_source -- lecture du commentaire de section pcapng
 via `capinfos -k`. Meme discipline que test_ek_source.py (capinfos,

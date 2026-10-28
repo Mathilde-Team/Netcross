@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #873 : fenêtre « Documentation Lua » de la GUI, même texte et même
 JSON que ``netcross-lua-doc``."""
 

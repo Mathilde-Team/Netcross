@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.expert_events -- build_expert_events()/build_diagnoses()
 (Session 36, objets de contrat de la Session 0 : ExpertEvent/Diagnosis).

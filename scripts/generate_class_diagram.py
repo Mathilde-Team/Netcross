@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 scripts/generate_class_diagram.py -- genere docs/class-diagram.md depuis le code.
 

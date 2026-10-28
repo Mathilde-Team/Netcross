@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Signatures web courantes (issue #353) : traversees, injections.
 
 Critere de l'issue : la requete `/.%2e/.%2e/etc/passwd` (CVE-2021-41773)

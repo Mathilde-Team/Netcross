@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.expertise_view -- sections d'expertise de l'analyse simple
 (issue #673), sans GTK.
 

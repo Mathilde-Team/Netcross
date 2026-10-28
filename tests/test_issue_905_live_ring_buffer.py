@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ruff: noqa: F811 -- fixtures pytest importées de test_issue_902_api_live
 """Issue #905 : ring_buffer de POST /live-captures (équiv. --ring-buffer N:SECONDES),
 liste, téléchargement et suppression des fichiers conservés."""

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.fingerprint.tls_ja4 -- empreinte JA4 d'un ClientHello TLS
 (issue #143, FLOW-2).

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests du mode debug de netcross_core.logging_config (issue #245 : « activer
 le tracing en mode debug pour suivre efficacement l'exécution »).

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.application.banners -- extraction passive des bannieres de
 versions logicielles et construction de `Report.service_fingerprints`

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #676 : rotation de capture de la GUI (netcross_gtk4.ring_recorders,
 module sans GTK). tshark n'est jamais lance : starter/stopper simules."""
 

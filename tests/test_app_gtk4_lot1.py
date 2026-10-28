@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests GTK4 de CaptureRow et du debut de LiveCaptureRow (issue #422,
 lot 1/N de #421), pilotes via pygobject.
 

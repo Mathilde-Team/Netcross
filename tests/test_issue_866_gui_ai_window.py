@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #866 : champs « Module IA local » de la fenetre principale,
 validation avant lancement et transmission au thread d'analyse.
 

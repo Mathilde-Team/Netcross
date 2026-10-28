@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Traces loguru des dialogues d'export de la fenêtre GTK (issue #245).
 
 Les callbacks ``_on_pdf_path_chosen``, ``_on_json_path_chosen`` et

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #676 : comparaison d'un baseline enregistre avec un courant capture
 en direct dans la fenetre principale (equivalent de --live-current) :
 demarrage, reglages releves, fin de capture -> comparaison.

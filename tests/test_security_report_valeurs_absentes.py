@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """_opt_int / _opt_float : une valeur absente n'est pas une erreur (pas de
 trace ERROR dans le journal à chaque rapport de sécurité)."""
 

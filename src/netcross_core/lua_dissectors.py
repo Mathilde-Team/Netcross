@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.lua_dissectors -- catalogue des dissecteurs Wireshark écrits en
 Lua, dans la banque Lua (issue #917).

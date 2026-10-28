@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ruff: noqa: E501 -- CSV de test sur une ligne par dissecteur
 """Issue #917 : catalogue des dissecteurs Lua (recensement wireshark-lua) dans
 la banque Lua -- même texte et même JSON en CLI, API et GUI."""

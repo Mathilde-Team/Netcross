@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Non-regression du CEF apres le refactoring `_to_siem_records` (issue #279) :
 sortie figee capturee AVANT le refactoring, horloge figee.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.tshark_stats.parse_utils -- tests des cas limites non couverts
 par les tests de parsers (issue #246).

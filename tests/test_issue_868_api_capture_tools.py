@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issues #868, #869, #870, #886, #887 : manipulation de captures dans
 l'API (/tools/*), mêmes résultats et mêmes refus que la CLI."""
 

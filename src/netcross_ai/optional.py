@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Detection de disponibilite des dependances ML et repli gracieux."""
 
 from __future__ import annotations

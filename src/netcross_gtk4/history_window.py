@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.history_window -- fenetre « Historique des runs »
 (issue #874) : consultation d'une base ``--history-db`` sans relancer
 d'analyse, avec les filtres de ``netcross-history`` (``--run-type``,

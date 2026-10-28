@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.extraction_panel -- panneau GTK « Contenus (extraction) »
 de la page Resultats (issue #675).
 

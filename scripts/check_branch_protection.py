@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """check_branch_protection.py -- verifie la protection d'une branche (#334).
 
 La regle de protection de ``dev`` est versionnee dans

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests app.py -- lot 3/10 (issue #424, sous-issue de #421) : listes de
 captures + bascules de MainWindow (lignes 479-1073).
 

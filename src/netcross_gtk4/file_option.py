@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.file_option -- champ « fichier facultatif » de la
 configuration : bouton de choix, « Retirer », nom du fichier retenu.
 

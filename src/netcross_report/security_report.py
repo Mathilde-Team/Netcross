@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.security_report -- rapport de securite consolide et
 tableau de bord (CVE-5, issue #139, parent #133).

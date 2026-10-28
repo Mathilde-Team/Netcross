@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Couverture GTK4 de app.py, lot 2 (issue #423, sous-issue de #421).
 
 Portee : LiveCaptureRow (menu de filtres BPF, popover de sauvegarde,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.baseline_diff -- compare deux Report deja calcules. On
 construit ici directement des Report minimalistes (pas besoin de

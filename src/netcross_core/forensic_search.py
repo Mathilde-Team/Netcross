@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.forensic_search -- moteur de recherche analytique post-capture
 transversal (Job 17 / issue #16, section 6.13 de FEATURES.md).

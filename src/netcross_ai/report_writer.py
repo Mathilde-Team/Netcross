@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Redaction du resume executif en francais, des correlations et des
 recommandations a partir d'un ``Report``.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests en processus de netcross_core.logging_config (#681).
 
 `tests/test_logging_config.py` verifie le comportement de bout en bout dans

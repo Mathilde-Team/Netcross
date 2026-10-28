@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core -- moteur d'analyse croisee de captures Wireshark
 multi-points, sans dependance a une interface (CLI, GTK4, PDF...).

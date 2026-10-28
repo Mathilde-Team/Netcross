@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.capture.split_capture -- decoupage par duree / nombre de
 paquets (wrapper editcap) et par taille (pcap_parser.capfile) -- Job 35,

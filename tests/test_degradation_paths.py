@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests supplémentaires pour les branches de dégradation (#246).
 
 Couvre les chemins d'erreur et les cas limites identifiés dans l'audit

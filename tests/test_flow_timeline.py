@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_flow_timeline.py -- tests de la vue temporelle detaillee
 (netcross_core.flow_timeline, Job 13/issue #10).

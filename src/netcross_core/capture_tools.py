@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_core.capture_tools -- manipulation de fichiers de capture
 partagee par la CLI, la GUI et l'API (issues #868, #869, #870, #886, #887).
 

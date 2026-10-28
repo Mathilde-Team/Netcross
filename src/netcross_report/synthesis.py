@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.synthesis -- transforme un Report en une liste de constats
 (Finding) via des regles et seuils explicites. Chaque Finding est

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.packet -- couche 5 : assemblage d'un RawPacket normalise a
 partir des couches EK d'un paquet, une fois l'encapsulation detectee

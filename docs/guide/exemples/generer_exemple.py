@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Régénère les captures d'exemple du guide utilisateur.
 
 Scénario : un poste (10.0.0.5) ouvre trois connexions TCP vers un serveur
