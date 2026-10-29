@@ -38,29 +38,47 @@ def _log_level(stmt: ast.stmt | None) -> str | None:
         while isinstance(base, ast.Call) and isinstance(base.func, ast.Attribute):
             base = base.func.value
         if isinstance(base, ast.Name) and base.id in LOGGER_NAMES:
+            logger.debug(
+                "_log_level: si isinstance(base, ast.Name) and base.id in LOGGER_NAMES -> retour stmt.value.func.attr"
+            )
             return stmt.value.func.attr
+    logger.debug("_log_level: retour None")
     return None
 
 
 def _can_fall_through(body: list[ast.stmt]) -> bool:
     if not body:
+        logger.debug("_can_fall_through: si not body -> retour True")
         return True
     last = body[-1]
     if isinstance(last, (ast.Return, ast.Raise)):
+        logger.debug("_can_fall_through: si isinstance(last, (ast.Return, ast.Raise)) -> retour False")
         return False
     if isinstance(last, ast.If):
+        logger.debug(
+            "_can_fall_through: si isinstance(last, ast.If) -> retour _can_fall_through(last.body) or _can_fall_throu…"
+        )
         return _can_fall_through(last.body) or _can_fall_through(last.orelse)
     if isinstance(last, (ast.With, ast.AsyncWith)):
+        logger.debug("_can_fall_through: si isinstance(last, (ast.With, ast.AsyncWith)) -> retour _can_fall_through(…)")
         return _can_fall_through(last.body)
     if isinstance(last, ast.Try) or (hasattr(ast, "TryStar") and isinstance(last, ast.TryStar)):
         if last.finalbody and not _can_fall_through(last.finalbody):
+            logger.debug(
+                "_can_fall_through: si last.finalbody and (not _can_fall_through(last.finalbody)) -> retour False"
+            )
             return False
         main = last.body + last.orelse
+        logger.debug(
+            "_can_fall_through: si isinstance(last, ast.Try) or (hasattr(ast, 'TryStar') and i… -> retour _can_fall_t…"
+        )
         return _can_fall_through(main) or any(_can_fall_through(h.body) for h in last.handlers)
     if isinstance(last, ast.While):
         infinite = isinstance(last.test, ast.Constant) and bool(last.test.value)
         has_break = any(isinstance(n, ast.Break) for n in ast.walk(last))
+        logger.debug("_can_fall_through: si isinstance(last, ast.While) -> retour not infinite or has_break")
         return not infinite or has_break
+    logger.debug("_can_fall_through: retour True")
     return True
 
 
@@ -68,6 +86,7 @@ def _is_stub(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     for dec in fn.decorator_list:
         name = dec.attr if isinstance(dec, ast.Attribute) else getattr(dec, "id", None)
         if name == "overload":
+            logger.debug("_is_stub: si name == 'overload' -> retour True")
             return True
     body = list(fn.body)
     if (
@@ -77,6 +96,7 @@ def _is_stub(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
         and isinstance(body[0].value.value, str)
     ):
         body = body[1:]
+    logger.debug("_is_stub: retour all(…)")
     return all(
         isinstance(s, ast.Pass)
         or (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant) and s.value.value is Ellipsis)
@@ -104,6 +124,7 @@ def _blocks(node: ast.AST):
         for s in c.body:
             if not isinstance(s, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 yield from _blocks(s)
+    logger.debug("_blocks: fin")
 
 
 def audit_function(fn) -> tuple[int, list[tuple[int, str]]]:
@@ -123,6 +144,7 @@ def audit_function(fn) -> tuple[int, list[tuple[int, str]]]:
         exits += 1
         if _log_level(fn.body[-1]) != "debug":
             bad.append((fn.end_lineno or fn.lineno, "fin implicite"))
+    logger.debug("audit_function: retour tuple de 2")
     return exits, bad
 
 
@@ -137,8 +159,10 @@ def qualname_walk(tree: ast.Module):
                 yield from rec(child, f"{prefix}{child.name}.")
             else:
                 yield from rec(child, prefix)
+        logger.debug("qualname_walk.rec: fin")
 
     yield from rec(tree, "")
+    logger.debug("qualname_walk: fin")
 
 
 def main() -> None:
@@ -189,6 +213,7 @@ def main() -> None:
     tot_b = sum(m["exits_bad"] for m in result)
     if args.total:
         print(tot_b)
+        logger.debug("main: si args.total -> retour")
         return
     print(f"{len(result)} modules avec fonctions, {len(bad_mods)} non conformes")
     print(f"sorties : {tot_e - tot_b}/{tot_e} conformes ({tot_b} sans logger.debug)")
