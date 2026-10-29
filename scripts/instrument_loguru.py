@@ -105,6 +105,7 @@ class _Usage(ast.NodeVisitor):
     visit_AsyncFor = visit_For  # noqa: N815
 
     def visit_While(self, node: ast.While) -> None:  # noqa: N802
+        logger.debug("_Usage.visit_While: entrée")
         # boucle de lecture/reception : toujours supposee chaude
         self._visit_loop(node)
         logger.debug("_Usage.visit_While: fin")
@@ -127,6 +128,7 @@ class _Usage(ast.NodeVisitor):
     visit_FunctionDef = visit_AsyncFunctionDef = _visit_func  # noqa: N815
 
     def visit_Lambda(self, node: ast.Lambda) -> None:  # noqa: N802
+        logger.debug("_Usage.visit_Lambda: entrée")
         # corps de lambda : rappel potentiellement appelé en boucle
         self._visit_loop(node)
         logger.debug("_Usage.visit_Lambda: fin")
@@ -160,6 +162,7 @@ class _Usage(ast.NodeVisitor):
         logger.debug("_Usage.visit_Name: fin")
 
     def visit_Attribute(self, node: ast.Attribute) -> None:  # noqa: N802
+        logger.debug("_Usage.visit_Attribute: entrée")
         self._reference(node.attr, node.ctx)
         self.visit(node.value)
         logger.debug("_Usage.visit_Attribute: fin")
