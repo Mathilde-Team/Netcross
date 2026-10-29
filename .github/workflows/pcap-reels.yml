@@ -1,0 +1,107 @@
+name: Tests réels (banque de pcap)
+
+# Issue #1008 : analyse de la banque de captures RÉELLES rangée sur la VM
+# `ubuntu` qui porte le runner `docker` (/app/pcaps). Ces captures sont
+# sensibles et ne quittent jamais la VM :
+#   - jamais de déclencheur pull_request : le dépôt est public, le code d'une
+#     PR (fork compris) s'exécuterait sur la machine qui détient la banque ;
+#     seuls la planification nocturne et le lancement manuel (droits
+#     d'écriture requis) existent, sur du code déjà relu (dev par défaut) ;
+#   - banque montée en LECTURE SEULE, conteneur sans --privileged ;
+#   - aucun upload-artifact, aucun cache des sorties : les rapports vivent
+#     dans un répertoire temporaire 0700 du conteneur, supprimé à chaque cas ;
+#   - journaux et résumé anonymes (identifiants opaques, voir
+#     scripts/pcap_reels.py). Ne JAMAIS ajouter --noms ici.
+# Documentation : docs/quality/tests-reels.md.
+
+"on":
+  schedule:
+    - cron: "23 1 * * *"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branche ou commit à tester (code déjà poussé sur le dépôt)"
+        default: dev
+      filtre:
+        description: "Motif fnmatch sur le chemin relatif, ou identifiant d'un cas (vide = tout)"
+        default: ""
+
+# Une seule exécution à la fois : le runner docker est unique (#966).
+concurrency:
+  group: pcap-reels
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  reels:
+    name: Banque de pcap réels
+    if: github.repository == 'Mathilde-Team/Netcross'
+    # NETCROSS_RUNS_ON_PCAP désigne le runner qui voit /app/pcaps ; repli :
+    # le runner docker de la VM `ubuntu` (même cible que le job Qualité).
+    runs-on: ${{ fromJSON(vars.NETCROSS_RUNS_ON_PCAP || vars.NETCROSS_RUNS_ON || '{"group":"maison","labels":["self-hosted","linux","docker"]}') }}
+    timeout-minutes: 360
+    container:
+      image: ubuntu:26.04
+      volumes:
+        - /app/pcaps:/app/pcaps:ro
+
+    steps:
+      - name: Prérequis du conteneur (git, certificats, compilateur)
+        run: |
+          DEBIAN_FRONTEND=noninteractive apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential python3 python3-venv
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Checkout du dépôt
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || 'dev' }}
+
+      - name: Installation de Wireshark CLI (tshark, editcap, capinfos)
+        run: |
+          echo "wireshark-common wireshark-common/install-setuid boolean false" \
+            | debconf-set-selections
+          DEBIAN_FRONTEND=noninteractive apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark
+          tshark --version 2>&1 | sed -n 1p
+
+      - name: Installation de uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Installation de Python
+        run: uv python install 3.14
+
+      - name: Installation des dépendances (extra dev pour pyyaml)
+        run: uv sync --extra dev
+
+      - name: Banque présente et en lecture seule
+        # Échec explicite plutôt qu'un succès vide si le montage manque
+        # (runner sans la banque, chemin déplacé).
+        run: |
+          test -d /app/pcaps || { echo "::error::/app/pcaps absent du conteneur (mauvais runner ?)"; exit 1; }
+          if touch /app/pcaps/.ecriture-test 2>/dev/null; then
+            rm -f /app/pcaps/.ecriture-test
+            echo "::error::/app/pcaps est inscriptible : le montage doit être en lecture seule"; exit 1
+          fi
+          echo "banque montée en lecture seule"
+
+      - name: Analyse de la banque
+        env:
+          FILTRE: ${{ inputs.filtre }}
+        run: |
+          args=(--banque /app/pcaps --resume "$GITHUB_STEP_SUMMARY")
+          if [ -n "$FILTRE" ]; then args+=(--filtre "$FILTRE"); fi
+          uv run python scripts/pcap_reels.py "${args[@]}"
+
+      - name: Restituer le workspace au runner (chown)
+        # Cf. job Qualité de ci.yml : conteneur root, workspace partagé (#919/#936).
+        if: always()
+        run: |
+          chown -R --reference="$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE"
+          chown -R --reference="$RUNNER_TEMP" "$RUNNER_TEMP"
