@@ -51,6 +51,7 @@ class LiveReportSession:
     ``point_stopped`` a la fin de chaque point, ``stop`` a l'arret."""
 
     def __init__(self, reporter: LiveReporter, server: ThreadingHTTPServer | None) -> None:
+        logger.debug("LiveReportSession.__init__: entrée")
         self.reporter = reporter
         self.server = server
         logger.debug("LiveReportSession.__init__: fin")
