@@ -33,6 +33,7 @@ EMPTY_MESSAGE = "(ajoutez un ou plusieurs exports NetFlow v5 : datagrammes conca
 
 class NetflowPanel(Gtk.Box):
     def __init__(self, start_thread: Callable[[Callable[[], None]], None] | None = None):
+        logger.debug("NetflowPanel.__init__: entrée")
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         logger.debug("NetflowPanel: construction du panneau")
         for side in ("top", "bottom", "start", "end"):
@@ -74,6 +75,7 @@ class NetflowPanel(Gtk.Box):
         self.status_label = Gtk.Label(label="", halign=Gtk.Align.START, wrap=True, xalign=0.0)
         self.append(self.status_label)
         self._sync()
+        logger.debug("NetflowPanel.__init__: fin")
 
     # -- etat --------------------------------------------------------------
 
@@ -88,6 +90,7 @@ class NetflowPanel(Gtk.Box):
             self.files_label.set_text(f"{len(self.files)} export(s) : {noms}")
         else:
             self.files_label.set_text(EMPTY_MESSAGE)
+        logger.debug("NetflowPanel._sync: fin")
 
     def add_files(self, paths) -> None:
         """Ajoute des exports ; etiquette d'exportateur = nom du fichier
@@ -98,6 +101,7 @@ class NetflowPanel(Gtk.Box):
                 self.files.append((exporter, path))
         self.summary = None
         self._sync()
+        logger.debug("NetflowPanel.add_files: fin")
 
     def clear_files(self) -> None:
         self.files = []
@@ -105,11 +109,13 @@ class NetflowPanel(Gtk.Box):
         self.text_view.get_buffer().set_text("")
         self.status_label.set_text("")
         self._sync()
+        logger.debug("NetflowPanel.clear_files: fin")
 
     # -- actions -----------------------------------------------------------
 
     def start_summary(self) -> bool:
         if self.running or not self.files:
+            logger.debug("NetflowPanel.start_summary: si self.running or not self.files -> retour False")
             return False
         files = list(self.files)
         top = int(self.top_spin.get_value())
@@ -123,10 +129,13 @@ class NetflowPanel(Gtk.Box):
             except NetflowFileError as exc:
                 logger.debug("NetflowPanel.start_summary: {}", exc)
                 GLib.idle_add(self._on_summary_done, None, [], str(exc))
+                logger.debug("NetflowPanel.start_summary.work: except NetflowFileError -> retour")
                 return
             GLib.idle_add(self._on_summary_done, summary, lines, None)
+            logger.debug("NetflowPanel.start_summary.work: fin")
 
         self._start_thread(work)
+        logger.debug("NetflowPanel.start_summary: retour True")
         return True
 
     def _on_summary_done(self, summary, lines, error):
@@ -139,20 +148,24 @@ class NetflowPanel(Gtk.Box):
             self.text_view.get_buffer().set_text("\n".join(lines))
             self.status_label.set_text("")
         self._sync()
+        logger.debug("NetflowPanel._on_summary_done: retour False")
         return False
 
     def export_to(self, path) -> None:
         if self.summary is None:
             self.status_label.set_text("Rien a exporter : lancez d'abord « Resumer ».")
+            logger.debug("NetflowPanel.export_to: si self.summary is None -> retour")
             return
         written = write_netflow_json(path, self.summary)
         self.status_label.set_text(f"Rapport JSON ecrit : {written}")
+        logger.debug("NetflowPanel.export_to: fin")
 
     def _on_add_clicked(self, _btn):
         dialog = Gtk.FileDialog()
         dialog.set_title("Exports NetFlow v5")
         root = self.get_root()
         dialog.open_multiple(root if isinstance(root, Gtk.Window) else None, None, self._on_files_chosen)
+        logger.debug("NetflowPanel._on_add_clicked: fin")
 
     def _on_files_chosen(self, dialog, result):
         try:
@@ -162,14 +175,17 @@ class NetflowPanel(Gtk.Box):
             return
         paths = [files.get_item(i).get_path() for i in range(files.get_n_items())]
         self.add_files([p for p in paths if p])
+        logger.debug("NetflowPanel._on_files_chosen: fin")
 
     def _on_json_clicked(self, _btn):
         if self.summary is None:
+            logger.debug("NetflowPanel._on_json_clicked: si self.summary is None -> retour")
             return
         dialog = Gtk.FileDialog()
         dialog.set_initial_name("netflow.json")
         root = self.get_root()
         dialog.save(root if isinstance(root, Gtk.Window) else None, None, self._on_json_chosen)
+        logger.debug("NetflowPanel._on_json_clicked: fin")
 
     def _on_json_chosen(self, dialog, result):
         try:
@@ -179,9 +195,11 @@ class NetflowPanel(Gtk.Box):
             return
         path = gfile.get_path() if gfile is not None else None
         if not path:
+            logger.debug("NetflowPanel._on_json_chosen: si not path -> retour")
             return
         try:
             self.export_to(path)
         except OSError as exc:
             logger.warning("NetflowPanel: export impossible ({})", exc)
             self.status_label.set_text(f"Export impossible : {exc}")
+        logger.debug("NetflowPanel._on_json_chosen: fin")
