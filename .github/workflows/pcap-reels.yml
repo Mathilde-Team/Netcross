@@ -17,6 +17,11 @@ name: Tests réels (banque de pcap)
 "on":
   schedule:
     - cron: "23 1 * * *"
+  # TEMPORAIRE (#1008) : premier passage depuis la branche de la PR, le
+  # lancement manuel exigeant que le workflow soit déjà sur main. Limité à
+  # cette branche interne (jamais un fork) ; à retirer avant la fusion.
+  push:
+    branches: [feat/1008-tests-reels]
   workflow_dispatch:
     inputs:
       ref:
@@ -58,10 +63,19 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential python3 python3-venv
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Checkout du dépôt
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ inputs.ref || 'dev' }}
+      # Récupération du code et de uv en shell, sans action JavaScript :
+      # dans un job conteneur, une action Node exige /__e/node24 sur le
+      # runner, absent des runners maison (#984).
+      - name: Récupération du code (sans action Node, #984)
+        env:
+          REF: ${{ inputs.ref || (github.event_name == 'push' && github.sha) || 'dev' }}
+          DEPOT: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git init -q .
+          git fetch -q --depth 1 "$DEPOT" "$REF"
+          git checkout -q FETCH_HEAD
+          git log -1 --format='commit %H'
 
       - name: Installation de Wireshark CLI (tshark, editcap, capinfos)
         run: |
@@ -71,8 +85,12 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark
           tshark --version 2>&1 | sed -n 1p
 
-      - name: Installation de uv
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - name: Installation de uv (pip, sans action Node, #984)
+        run: |
+          python3 -m venv /opt/uv
+          /opt/uv/bin/pip install -q uv
+          echo /opt/uv/bin >> "$GITHUB_PATH"
+          /opt/uv/bin/uv --version
 
       - name: Installation de Python
         run: uv python install 3.14
