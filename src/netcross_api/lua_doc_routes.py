@@ -51,6 +51,7 @@ def _connexion() -> Iterator[sqlite3.Connection]:
         yield conn
     finally:
         conn.close()
+    logger.debug("_connexion: fin")
 
 
 @contextmanager
@@ -69,6 +70,7 @@ def _catalogue() -> Iterator[sqlite3.Connection]:
         yield conn
     finally:
         conn.close()
+    logger.debug("_catalogue: fin")
 
 
 def get_lua_dissectors(
@@ -81,18 +83,21 @@ def get_lua_dissectors(
     ``netcross-lua-doc --dissectors --json``), triés par étoiles ; ``total``
     compte toutes les correspondances. Aucun résultat : liste vide (200)."""
     with _catalogue() as conn:
+        logger.debug("get_lua_dissectors: retour lua_dissectors.search_document(…)")
         return lua_dissectors.search_document(conn, q.strip(), domain, non_native, limit)
 
 
 def get_lua_dissector_domains() -> dict[str, Any]:
     """Domaines du catalogue et leur nombre de dissecteurs (``--domains --json``)."""
     with _catalogue() as conn:
+        logger.debug("get_lua_dissector_domains: retour lua_dissectors.domains_document(…)")
         return lua_dissectors.domains_document(conn)
 
 
 def get_lua_classes() -> dict[str, Any]:
     """Liste des classes (équivalent de ``netcross-lua-doc --classes --json``)."""
     with _connexion() as conn:
+        logger.debug("get_lua_classes: retour dictionnaire")
         return {"meta": lua_doc.get_meta(conn), "classes": lua_doc.list_classes(conn)}
 
 
@@ -106,6 +111,7 @@ def get_lua_class(name: str) -> dict[str, Any]:
             detail = f"Classe inconnue : {name}" + (f" (voir : {', '.join(suggestion)})" if suggestion else "")
             logger.debug("get_lua_class: {}", detail)
             raise HTTPException(status_code=404, detail=detail)
+        logger.debug("get_lua_class: retour dictionnaire")
         return {"meta": lua_doc.get_meta(conn), "classe": asdict(fiche)}
 
 
@@ -118,8 +124,10 @@ def search_lua_doc(
     Aucun résultat : liste vide (code 200), comme le JSON de la CLI."""
     terme = q.strip()
     if not terme:
+        logger.debug("search_lua_doc: si not terme -> levée HTTPException")
         raise HTTPException(status_code=422, detail="terme de recherche vide")
     with _connexion() as conn:
+        logger.debug("search_lua_doc: retour lua_doc.search_document(…)")
         return lua_doc.search_document(conn, terme, limit, full)
 
 
