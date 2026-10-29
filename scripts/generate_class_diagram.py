@@ -100,52 +100,76 @@ class ModuleInfo:
 
 def _flatten_union(node: ast.expr) -> list[ast.expr]:
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        logger.debug(
+            "_flatten_union: si isinstance(node, ast.BinOp) and isinstance(node.op, ast.Bit… -> retour _flatten_union…"
+        )
         return _flatten_union(node.left) + _flatten_union(node.right)
+    logger.debug("_flatten_union: retour liste")
     return [node]
 
 
 def _join_union(parts: list[str]) -> str:
     non_none = [p for p in parts if p != "None"]
     if len(non_none) == 1 and len(parts) == 2:
+        logger.debug("_join_union: si len(non_none) == 1 and len(parts) == 2 -> retour non_none[0] + '?'")
         return non_none[0] + "?"
+    logger.debug("_join_union: retour ' or '.join(…)")
     return " or ".join(parts)
 
 
 def _annotation_text(node: ast.expr | None) -> str:
     """Rend une annotation en syntaxe mermaid (`list~str~`, `int?`)."""
     if node is None:
+        logger.debug("_annotation_text: si node is None -> retour ''")
         return ""
     if isinstance(node, ast.Constant):
         if node.value is None:
+            logger.debug("_annotation_text: si node.value is None -> retour 'None'")
             return "None"
         if node.value is Ellipsis:
+            logger.debug("_annotation_text: si node.value is Ellipsis -> retour '...'")
             return "..."
         if isinstance(node.value, str):
             try:
+                logger.debug("_annotation_text: si isinstance(node.value, str) -> retour _annotation_text(…)")
                 return _annotation_text(ast.parse(node.value, mode="eval").body)
             except SyntaxError as exc:
                 logger.debug("annotation non parsable, valeur brute conservee : {}", exc)
                 return _safe(node.value)
+        logger.debug("_annotation_text: si isinstance(node, ast.Constant) -> retour _safe(…)")
         return _safe(repr(node.value))
     if isinstance(node, ast.Name):
+        logger.debug("_annotation_text: si isinstance(node, ast.Name) -> retour node.id")
         return node.id
     if isinstance(node, ast.Attribute):
+        logger.debug("_annotation_text: si isinstance(node, ast.Attribute) -> retour _safe(…)")
         return _safe(ast.unparse(node))
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        logger.debug(
+            "_annotation_text: si isinstance(node, ast.BinOp) and isinstance(node.op, ast.Bit… -> retour _join_union(…"
+        )
         return _join_union([_annotation_text(p) for p in _flatten_union(node)])
     if isinstance(node, ast.Subscript):
         base = _annotation_text(node.value)
         inner = node.slice
         args = [_annotation_text(e) for e in inner.elts] if isinstance(inner, ast.Tuple) else [_annotation_text(inner)]
         if base == "Optional" and len(args) == 1:
+            logger.debug("_annotation_text: si base == 'Optional' and len(args) == 1 -> retour args[0] + '?'")
             return args[0] + "?"
         if base == "Union":
+            logger.debug("_annotation_text: si base == 'Union' -> retour _join_union(…)")
             return _join_union(args)
+        logger.debug("_annotation_text: si isinstance(node, ast.Subscript) -> retour chaîne formatée")
         return f"{base}~{', '.join(args)}~"
     if isinstance(node, ast.List):
+        logger.debug(
+            "_annotation_text: si isinstance(node, ast.List) -> retour '(' + ', '.join((_annotation_text(e) for e in…"
+        )
         return "(" + ", ".join(_annotation_text(e) for e in node.elts) + ")"
     if isinstance(node, ast.Tuple):
+        logger.debug("_annotation_text: si isinstance(node, ast.Tuple) -> retour ', '.join(…)")
         return ", ".join(_annotation_text(e) for e in node.elts)
+    logger.debug("_annotation_text: retour _safe(…)")
     return _safe(ast.unparse(node))
 
 
@@ -153,6 +177,7 @@ def _safe(text: str) -> str:
     """Retire ce que mermaid interpreterait dans une ligne de membre."""
     for ch in ('"', "'", "`", "{", "}", "<", ">", "|", "\n", "\r"):
         text = text.replace(ch, " " if ch in "\n\r|" else "")
+    logger.debug("_safe: retour ' '.join(…)")
     return " ".join(text.split())
 
 
@@ -160,6 +185,7 @@ def _annotation_names(node: ast.expr | None) -> set[str]:
     """Tous les identifiants cites dans une annotation (y compris `\"Foo\"`)."""
     names: set[str] = set()
     if node is None:
+        logger.debug("_annotation_names: si node is None -> retour names")
         return names
     for sub in ast.walk(node):
         if isinstance(sub, ast.Name):
@@ -170,6 +196,7 @@ def _annotation_names(node: ast.expr | None) -> set[str]:
             except SyntaxError as exc:
                 logger.debug("sous-annotation non parsable, ignoree : {}", exc)
                 continue
+    logger.debug("_annotation_names: retour names")
     return names
 
 
@@ -191,18 +218,23 @@ def _iter_toplevel(body: list[ast.stmt]):
                 yield from _iter_toplevel(handler.body)
             yield from _iter_toplevel(node.orelse)
             yield from _iter_toplevel(node.finalbody)
+    logger.debug("_iter_toplevel: fin")
 
 
 def _decorator_name(dec: ast.expr) -> str:
     target = dec.func if isinstance(dec, ast.Call) else dec
     if isinstance(target, ast.Name):
+        logger.debug("_decorator_name: si isinstance(target, ast.Name) -> retour target.id")
         return target.id
     if isinstance(target, ast.Attribute):
+        logger.debug("_decorator_name: si isinstance(target, ast.Attribute) -> retour target.attr")
         return target.attr
+    logger.debug("_decorator_name: retour ''")
     return ""
 
 
 def _is_true(node: ast.expr) -> bool:
+    logger.debug("_is_true: retour isinstance(node, ast.Constant) and node.value is …")
     return isinstance(node, ast.Constant) and node.value is True
 
 
@@ -218,6 +250,7 @@ def _function_line(fn: ast.FunctionDef | ast.AsyncFunctionDef, *, is_method: boo
     ret = _annotation_text(fn.returns)
     decos = {_decorator_name(d) for d in fn.decorator_list}
     static = "$" if decos & {"staticmethod", "classmethod"} else ""
+    logger.debug("_function_line: retour f\"+(fn.name)((', '.join(params)))(static)\" + (f' …")
     return f"+{fn.name}({', '.join(params)}){static}" + (f" {ret}" if ret else "")
 
 
@@ -253,11 +286,13 @@ def _extract_class(node: ast.ClassDef, module: str) -> ClassInfo:
         ):
             seen_methods.add(item.name)
             info.methods.append(_function_line(item, is_method=True))
+    logger.debug("_extract_class: retour info")
     return info
 
 
 def _first_sentence(doc: str | None, module_name: str) -> str:
     if not doc:
+        logger.debug("_first_sentence: si not doc -> retour ''")
         return ""
     paragraph = " ".join(doc.strip().split("\n\n")[0].split())
     for sep in (" -- ", " - ", " : "):
@@ -270,6 +305,7 @@ def _first_sentence(doc: str | None, module_name: str) -> str:
         paragraph = paragraph[: cut + 1]
     elif len(paragraph) > DOC_MAX_CHARS:
         paragraph = paragraph[:DOC_MAX_CHARS].rsplit(" ", 1)[0] + "…"
+    logger.debug("_first_sentence: retour paragraph.replace(…)")
     return paragraph.replace("|", "\\|")
 
 
@@ -277,11 +313,13 @@ def _module_name(rel: Path) -> str:
     parts = list(rel.with_suffix("").parts)
     if parts[-1] == "__init__":
         parts = parts[:-1]
+    logger.debug("_module_name: retour '.'.join(…)")
     return ".".join(parts)
 
 
 def _group_of(rel: Path) -> str:
     dirs = rel.parts[:-1]
+    logger.debug("_group_of: retour '.'.join(dirs[:2]) if dirs else CLI_GROUP")
     return ".".join(dirs[:2]) if dirs else CLI_GROUP
 
 
@@ -300,11 +338,13 @@ def extract_module(path: Path, src: Path) -> ModuleInfo:
             info.imports.extend(a.name for a in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
             info.imports.append(node.module)
+    logger.debug("extract_module: retour info")
     return info
 
 
 def collect_modules(src: Path) -> list[ModuleInfo]:
     files = sorted(p for p in src.rglob("*.py") if "__pycache__" not in p.parts)
+    logger.debug("collect_modules: retour liste")
     return [extract_module(p, src) for p in files]
 
 
@@ -316,7 +356,9 @@ def collect_modules(src: Path) -> list[ModuleInfo]:
 def _group_sort_key(group: str) -> tuple[int, str]:
     top = group.split(".")[0]
     if top in LAYER_ORDER:
+        logger.debug("_group_sort_key: si top in LAYER_ORDER -> retour tuple de 2")
         return (LAYER_ORDER.index(top), group)
+    logger.debug("_group_sort_key: retour tuple de 2")
     return (len(LAYER_ORDER), group)
 
 
@@ -328,6 +370,7 @@ def _stereotype(cls: ClassInfo, local_names: set[str]) -> str:
         parts.append("__slots__")
     parts.extend(cls.dataclass_options)
     parts.extend(b for b in cls.bases if b not in local_names)
+    logger.debug("_stereotype: retour f\"<<(', '.join(parts))>>\" if parts else ''")
     return f"<<{', '.join(parts)}>>" if parts else ""
 
 
@@ -342,6 +385,7 @@ def _class_ids(modules: list[ModuleInfo]) -> dict[tuple[str, str], str]:
         for c in m.classes:
             unique = counts[c.name] == 1
             ids[(m.name, c.name)] = c.name if unique else f"{m.name.replace('.', '_')}_{c.name}"
+    logger.debug("_class_ids: retour ids")
     return ids
 
 
@@ -350,12 +394,14 @@ def _render_class(cls: ClassInfo, cid: str, local_names: set[str], indent: str =
     stereo = _stereotype(cls, local_names)
     members = [*cls.fields, *cls.methods]
     if not stereo and not members:
+        logger.debug("_render_class: si not stereo and (not members) -> retour liste")
         return [head]
     lines = [head + " {"]
     if stereo:
         lines.append(f"{indent}    {stereo}")
     lines.extend(f"{indent}    {m}" for m in members)
     lines.append(f"{indent}}}")
+    logger.debug("_render_class: retour lines")
     return lines
 
 
@@ -398,6 +444,7 @@ def _render_block(modules: list[ModuleInfo], ids: dict[tuple[str, str], str]) ->
         lines.append("")
         lines.append("    %% ===== relations =====")
         lines.extend(relations)
+    logger.debug("_render_block: retour '\\n'.join(…)")
     return "\n".join(lines)
 
 
@@ -413,11 +460,13 @@ def _chunk_modules(modules: list[ModuleInfo], ids: dict[tuple[str, str], str]) -
         chunk.append(m)
     if chunk:
         blocks.append(_render_block(chunk, ids))
+    logger.debug("_chunk_modules: retour blocks")
     return blocks
 
 
 def _top_level(dotted: str) -> str | None:
     top = dotted.split(".")[0]
+    logger.debug("_top_level: retour top if top in LAYER_ORDER else None")
     return top if top in LAYER_ORDER else None
 
 
@@ -462,6 +511,7 @@ def _render_inter_module_relations(modules: list[ModuleInfo], ids: dict[tuple[st
                     relations.append(f"    {cid} -->|{label}| {tid}")
 
     if not relations:
+        logger.debug("_render_inter_module_relations: si not relations -> retour ''")
         return ""  # aucune relation inter-module détectée
 
     # Nœuds déclarés (pour que le flowchart soit autonome) : on liste chaque
@@ -493,6 +543,7 @@ def _render_inter_module_relations(modules: list[ModuleInfo], ids: dict[tuple[st
                         break
             node_lines.append(f'    {dst}["{dst_label}"]')
 
+    logger.debug("_render_inter_module_relations: retour '\\n'.join(…)")
     return "\n".join(["flowchart LR", *sorted(node_lines), *sorted(relations)])
 
 
@@ -511,6 +562,7 @@ def _render_package_graph(modules: list[ModuleInfo]) -> str:
         lines.append(f'    {n}["{label}"]')
     for (a, b), n in sorted(counts.items(), key=lambda kv: (nodes.index(kv[0][0]), nodes.index(kv[0][1]))):
         lines.append(f'    {a} -->|"{n} import{"s" if n > 1 else ""}"| {b}')
+    logger.debug("_render_package_graph: retour '\\n'.join(…)")
     return "\n".join(lines)
 
 
@@ -582,6 +634,7 @@ def render_document(modules: list[ModuleInfo]) -> str:
         for i, block in enumerate(blocks, start=1):
             out += ["", f"### Diagramme ({i}/{len(blocks)})" if len(blocks) > 1 else "### Diagramme", ""]
             out += ["```mermaid", block, "```"]
+    logger.debug("render_document: retour '\\n'.join(out) + '\\n'")
     return "\n".join(out) + "\n"
 
 
@@ -602,17 +655,20 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.check:
         if current == text:
+            logger.debug("main: si current == text -> retour 0")
             return 0
         print(
             f"{args.output} est obsolete ou absent : lancer `python3 scripts/generate_class_diagram.py`.",
             file=sys.stderr,
         )
+        logger.debug("main: si args.check -> retour 1")
         return 1
 
     if current != text:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(text, encoding="utf-8")
         print(f"{args.output} regenere.")
+    logger.debug("main: retour 0")
     return 0
 
 

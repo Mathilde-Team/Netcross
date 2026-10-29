@@ -22,10 +22,12 @@ DEFAULT_PATH = Path(__file__).resolve().parents[1] / "src" / "netcross_gtk4" / "
 
 
 def _instructions(node: ast.AST) -> int:
+    logger.debug("_instructions: retour sum((isinstance(n, ast.stmt) for n in ast.walk(no…")
     return sum(isinstance(n, ast.stmt) for n in ast.walk(node)) - 1
 
 
 def _touche_gtk(node: ast.AST) -> bool:
+    logger.debug("_touche_gtk: retour any(…)")
     return any(isinstance(n, ast.Name) and n.id in GUI_NAMES for n in ast.walk(node))
 
 
@@ -37,6 +39,7 @@ def inventaire(source: str) -> dict:
         for methode in (m for m in classe.body if isinstance(m, ast.FunctionDef)):
             entree = (_instructions(methode), f"{classe.name}.{methode.name}")
             (gtk if methode.name == "__init__" or _touche_gtk(methode) else sans_gtk).append(entree)
+    logger.debug("inventaire: retour dictionnaire")
     return {
         "lignes": len(source.splitlines()),
         "gtk": sorted(gtk, reverse=True),
