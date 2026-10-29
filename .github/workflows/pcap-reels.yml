@@ -17,11 +17,6 @@ name: Tests réels (banque de pcap)
 "on":
   schedule:
     - cron: "23 1 * * *"
-  # TEMPORAIRE (#1008) : premier passage depuis la branche de la PR, le
-  # lancement manuel exigeant que le workflow soit déjà sur main. Limité à
-  # cette branche interne (jamais un fork) ; à retirer avant la fusion.
-  push:
-    branches: [feat/1008-tests-reels]
   workflow_dispatch:
     inputs:
       ref:
