@@ -318,6 +318,7 @@ def _module_name(rel: Path) -> str:
 
 
 def _group_of(rel: Path) -> str:
+    logger.debug("_group_of: entrée")
     dirs = rel.parts[:-1]
     logger.debug("_group_of: retour '.'.join(dirs[:2]) if dirs else CLI_GROUP")
     return ".".join(dirs[:2]) if dirs else CLI_GROUP
@@ -343,6 +344,7 @@ def extract_module(path: Path, src: Path) -> ModuleInfo:
 
 
 def collect_modules(src: Path) -> list[ModuleInfo]:
+    logger.debug("collect_modules: entrée")
     files = sorted(p for p in src.rglob("*.py") if "__pycache__" not in p.parts)
     logger.debug("collect_modules: retour liste")
     return [extract_module(p, src) for p in files]
@@ -465,6 +467,7 @@ def _chunk_modules(modules: list[ModuleInfo], ids: dict[tuple[str, str], str]) -
 
 
 def _top_level(dotted: str) -> str | None:
+    logger.debug("_top_level: entrée")
     top = dotted.split(".")[0]
     logger.debug("_top_level: retour top if top in LAYER_ORDER else None")
     return top if top in LAYER_ORDER else None
