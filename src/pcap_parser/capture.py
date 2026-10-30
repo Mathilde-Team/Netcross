@@ -461,6 +461,98 @@ def stop_ring_recorder(proc: subprocess.Popen, timeout: float = 5.0) -> str:
     return err.decode("utf-8", "replace").strip()
 
 
+@dataclass(frozen=True)
+class RingFile:
+    """Un fichier du tampon circulaire d'un point (issue #1086).
+
+    ``index`` : numero de rotation ecrit par tshark (``<prefix>_<NNNNN>_...``).
+    ``start``/``end`` : horodatage (secondes depuis l'epoque) du premier et
+    du dernier paquet, lus par ``capinfos`` ; ``None`` si l'intervalle est
+    inconnu (capinfos absent, fichier vide, illisible ou en cours d'ecriture
+    sans paquet encore vidé sur disque).
+    """
+
+    path: str
+    index: int
+    start: float | None
+    end: float | None
+    packet_count: int | None = None
+
+    @property
+    def known(self) -> bool:
+        """True si l'intervalle [start, end] est connu."""
+        logger.debug("RingFile.known: retour bool")
+        return self.start is not None and self.end is not None
+
+    def covers(self, start: float, end: float) -> bool:
+        """True si [self.start, self.end] chevauche [start, end] -- bornes
+        INCLUSES : un fichier dont le dernier paquet est a ``start`` pile
+        couvre la fenetre."""
+        logger.debug("RingFile.covers: entrée")
+        if self.start is None or self.end is None:
+            logger.debug("RingFile.covers: si intervalle inconnu -> retour False")
+            return False
+        logger.debug("RingFile.covers: retour bool")
+        return self.start <= end and self.end >= start
+
+
+def ring_inventory(directory: str, prefix: str = "capture", reader=None) -> list[RingFile]:
+    """Inventaire horodate des fichiers du tampon circulaire ecrit par
+    ``ring_recorder_args`` dans ``directory`` (meme nommage tshark que
+    ``split_capture`` : ``<prefix>_<NNNNN>_<AAAAMMJJhhmmss>.pcapng``).
+
+    Trie par numero de rotation (ordre d'ecriture). ``reader`` : lecteur de
+    metadonnees (defaut ``capinfos_source.read_capture_info``), injectable
+    pour les tests. Un repertoire absent donne une liste vide (rien encore
+    ecrit) ; aucun fichier n'est modifie.
+    """
+    logger.debug("ring_inventory: entrée ({} / {})", directory, prefix)
+    if reader is None:
+        from pcap_parser.capinfos_source import read_capture_info
+
+        reader = read_capture_info
+    if not os.path.isdir(directory):
+        logger.debug("ring_inventory: si repertoire absent -> retour []")
+        return []
+    pattern = re.compile(re.escape(prefix) + r"_(\d{5,})(?:_\d{14})?\.pcap(?:ng)?")
+    fichiers: list[RingFile] = []
+    for name in sorted(os.listdir(directory)):
+        m = pattern.fullmatch(name)
+        if not m:
+            continue
+        path = os.path.join(directory, name)
+        info = reader(path)
+        start = getattr(info, "start_time", None)
+        end = getattr(info, "end_time", None)
+        if start is not None and end is not None and end < start:
+            logger.warning("ring_inventory: intervalle incoherent pour {} ({} > {}), ignore", path, start, end)
+            start = end = None
+        fichiers.append(RingFile(path, int(m.group(1)), start, end, getattr(info, "packet_count", None)))
+    fichiers.sort(key=lambda f: (f.index, f.path))
+    inconnus = sum(1 for f in fichiers if not f.known)
+    logger.debug("ring_inventory: retour {} fichier(s), {} sans intervalle", len(fichiers), inconnus)
+    return fichiers
+
+
+def select_ring_files(
+    inventory: Sequence[RingFile], start: float, end: float, include_unknown: bool = False
+) -> list[RingFile]:
+    """Fichiers du tampon qui couvrent la fenetre [start, end] (bornes
+    incluses), dans l'ordre de l'inventaire.
+
+    ``include_unknown`` : ajoute aussi les fichiers dont l'intervalle est
+    inconnu (choix prudent pour ne rien perdre lors d'une extraction ; par
+    defaut ils sont exclus car rien ne prouve qu'ils couvrent la fenetre).
+    """
+    logger.debug("select_ring_files: entrée [{}, {}]", start, end)
+    if end < start:
+        logger.debug("select_ring_files: si end < start -> ValueError")
+        raise ValueError("fenetre invalide : fin anterieure au debut")
+    retenus = [f for f in inventory if f.covers(start, end) or (include_unknown and not f.known)]
+    logger.debug("select_ring_files: retour {} fichier(s) sur {}", len(retenus), len(inventory))
+    return retenus
+
+
 def _wireshark_tool_path(name: str) -> str:
     """Chemin d'un outil de ligne de commande livre avec tshark (mergecap,
     reordercap, editcap). Meme paquet systeme que tshark lui-meme : meme

@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+202 modules · 293 classes · 723 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -220,6 +220,16 @@ classDiagram
         +rotate(now) str
         +maybe_rotate(now) str?
     }
+    class RingFile {
+        <<dataclass, frozen>>
+        +str path
+        +int index
+        +float? start
+        +float? end
+        +int? packet_count
+        +known() bool
+        +covers(start, end) bool
+    }
     class TcpreplayNotFoundError {
         <<RuntimeError>>
     }
@@ -251,6 +261,8 @@ classDiagram
         +ring_recorder_args(interface, directory, max_files, max_duration_per_file, prefix, bpf_filter) list
         +start_ring_recorder(interface, directory, max_files, max_duration_per_file, prefix, bpf_filter) subprocess.Popen
         +stop_ring_recorder(proc, timeout) str
+        +ring_inventory(directory, prefix, reader) list~RingFile~
+        +select_ring_files(inventory, start, end, include_unknown) list~RingFile~
         +merge_captures(paths, output_path, dedup) None
         +replay_capture(path, interface, speed, loop) None
         +replay_command(path, interface, speed, loop) list~str~
