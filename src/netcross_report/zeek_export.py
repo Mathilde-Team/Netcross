@@ -45,6 +45,7 @@ import statistics
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import Pkt
@@ -294,10 +295,9 @@ def build_conn_records(
         proto = _PROTO_MAP.get(pk.proto)
         if proto is None or not pk.src or not pk.dst or pk.is_duplicate:
             continue
-        if proto == "icmp":
-            ends = tuple(sorted(((pk.src, None), (pk.dst, None)), key=lambda e: e[0]))
-        else:
-            ends = tuple(sorted(((pk.src, pk.sport), (pk.dst, pk.dport)), key=lambda e: (e[0], e[1] or 0)))
+        a: tuple[str, int | None] = (pk.src, None if proto == "icmp" else pk.sport)
+        b: tuple[str, int | None] = (pk.dst, None if proto == "icmp" else pk.dport)
+        ends = (a, b) if (a[0], a[1] or 0) <= (b[0], b[1] or 0) else (b, a)
         by_conn.setdefault((proto, ends), {}).setdefault(pk.point, []).append(pk)
 
     segments = _segments(points_order) if points_order else {}
@@ -406,7 +406,7 @@ def _tsv_value(value: object, zeek_type: str) -> str:
     if value is None:
         out = "-"
     elif zeek_type.startswith("set["):
-        items = [str(v).translate(_SET_ESCAPE) for v in value]  # type: ignore[union-attr]
+        items = [str(v).translate(_SET_ESCAPE) for v in cast("Iterable[object]", value)]
         out = ",".join(items) if items else "(empty)"
     elif zeek_type in ("time", "interval"):
         out = f"{float(value):.6f}"  # type: ignore[arg-type]
