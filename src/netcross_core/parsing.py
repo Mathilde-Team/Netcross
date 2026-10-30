@@ -39,6 +39,7 @@ from pcap_parser.capinfos_source import read_capture_comment
 from pcap_parser.ek_source import CaptureAccessError, TsharkError, TsharkNotFoundError
 from pcap_parser.packet import RawPacket
 from pcap_parser.protocols import compute_mos
+from pcap_parser.radio import missing_radiotap_note
 
 logger = get_logger(__name__)
 __all__ = [
@@ -134,6 +135,7 @@ def _to_pkt(label: str, raw: RawPacket) -> Pkt:
         http_content_length=raw.http_content_length,
         tcp_len=raw.tcp_len,
         dns_answers=raw.dns_answers,
+        radio=raw.radio,
         comment=raw.comment,
         ip_checksum=raw.ip_checksum,
         ip_checksum_bad=raw.ip_checksum_bad,
@@ -185,6 +187,11 @@ def parse_capture(label, path, raise_on_error=False) -> list[Pkt]:
     # (O(n) par appel sur une liste Python) : le cout residuel est une
     # liste de pointeurs None de la meme longueur, negligeable face aux
     # ~600 octets par RawPacket ainsi liberes immediatement.
+    # Issue #1142 : 802.11 sans en-tete radiotap -> message explicite (les
+    # paquets restent analyses, seules les metadonnees radio manquent).
+    note = missing_radiotap_note(path)
+    if note:
+        logger.warning("[{}] {}", label, note)
     n = len(raw_packets)
     pkts: list[Pkt] = []
     for i in range(n):

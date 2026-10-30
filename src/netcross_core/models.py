@@ -9,6 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from netcross_core.logging_config import get_logger
+from pcap_parser.radio import RadioInfo
 
 logger = get_logger(__name__)
 
@@ -193,6 +194,9 @@ class Pkt:
     # Adresses A/AAAA d'une reponse DNS (issue #344, fast flux), reportees
     # depuis RawPacket.dns_answers ; tuple vide hors reponse DNS.
     dns_answers: tuple[str, ...] = ()
+    # Metadonnees radio 802.11 par trame (issue #1142), reportees depuis
+    # RawPacket.radio ; None hors capture 802.11.
+    radio: RadioInfo | None = None
     # -- Checksums IP/TCP/UDP (Job 43/issue #163) : valeurs brutes (chaine
     # hex) et verdicts tri-etats (True=invalide, False=valide, None=non
     # determine) reportes tels quels depuis RawPacket. Pas encore consommes
