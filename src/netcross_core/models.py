@@ -711,6 +711,12 @@ class Report:
     # print_report(). Vide si capinfos est absent ou si la capture ne
     # porte aucune metadonnee (cas le plus frequent).
     capture_infos: list[dict] = field(default_factory=list)
+    # -- Vitesse de lien et resolution d'horodatage par point (issue
+    # #1132) -- remplie par l'appelant via
+    # netcross_core.link_speed.resolve_link_speeds(captures, overrides) :
+    # point -> {speed_bps, speed_source ("if_speed", "--link-speed" ou
+    # None), ts_resolution (s), interfaces}. Vide hors CLI.
+    link_speeds: dict[str, dict] = field(default_factory=dict)
     # -- Integrite/qualite de capture (Job 43/issue #163) -- voir
     # netcross_core.forensic.validate_checksums().
     checksum_errors: list[ChecksumError] = field(default_factory=list)
