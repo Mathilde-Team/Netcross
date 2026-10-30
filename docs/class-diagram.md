@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+203 modules · 293 classes · 723 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -34,7 +34,7 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"24 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"50 imports"| netcross_core
+    CLI -->|"51 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"32 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
@@ -491,6 +491,7 @@ classDiagram
 | `netcross_core.naming` | table locale de correspondance adresse/MAC -> nom logique, type, contexte (Job 18 / issue #16-bis, section 6.15 de FEATURES.md). |
 | `netcross_core.packet_limits` | ``--max-packets`` et ``--sample`` (issue #283), partages par la CLI et la GUI (issue #672). |
 | `netcross_core.parsing` | adaptateur entre pcap_parser (decodage via tshark -T ek) et le modele Pkt de netcross_core. |
+| `netcross_core.profiling` | Mesure par étape du pipeline d'analyse (issue #1016, banc #994). |
 | `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial (RFC 9000/9001), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP brut. |
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
@@ -1714,27 +1715,18 @@ classDiagram
         +detect_encapsulation(layers)
     }
 
-    %% ===== netcross_core.quic_diagnostics =====
-    class QuicEvent {
-        <<dataclass>>
-        +str point
-        +float ts
-        +str src
-        +str dst
-        +int sport
-        +int dport
-        +bytes dcid
-        +bool decryptable
-        +str? sni
-        +str? tls_version
+    %% ===== netcross_core.profiling =====
+    class MesuresPipeline {
+        +etape(nom) None
+        +terminer() dict
+        +en_dict() dict
+        +ecrire_json(chemin) dict
+        +resume() str
     }
-    class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
+    class mod_netcross_core_profiling["netcross_core.profiling"] {
         <<module>>
-        +derive_initial_secrets(dcid) tuple~bytes, bytes~
-        +derive_packet_protection_keys(secret) tuple~bytes, bytes, bytes~
-        +parse_quic_capture(label, path) list~QuicEvent~
-        +diagnose_quic(events, points_order)
-        +print_quic_diagnostics(findings) None
+        +creer_mesures(actif, tracemalloc_actif) MesuresPipeline?
+        +marquer(mesures, nom) None
     }
 
     %% ===== relations =====
@@ -1780,6 +1772,29 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_core.quic_diagnostics =====
+    class QuicEvent {
+        <<dataclass>>
+        +str point
+        +float ts
+        +str src
+        +str dst
+        +int sport
+        +int dport
+        +bytes dcid
+        +bool decryptable
+        +str? sni
+        +str? tls_version
+    }
+    class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
+        <<module>>
+        +derive_initial_secrets(dcid) tuple~bytes, bytes~
+        +derive_packet_protection_keys(secret) tuple~bytes, bytes, bytes~
+        +parse_quic_capture(label, path) list~QuicEvent~
+        +diagnose_quic(events, points_order)
+        +print_quic_diagnostics(findings) None
+    }
 
     %% ===== netcross_core.redact =====
     class AddressRedactor {

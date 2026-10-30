@@ -73,6 +73,10 @@ Une capture de plusieurs Go peut épuiser la mémoire.
 - `--parallel` accélère la lecture, à condition d'avoir plusieurs cœurs.
 - `--sample 1/50` n'analyse qu'un paquet sur 50.
 - `--max-packets 1000000` s'arrête au millionième paquet.
+- `--profile-steps mesures.json` indique où part le temps et la mémoire
+  (lecture tshark, corrélation, détecteurs, rapport) ; ajoutez
+  `--profile-tracemalloc` pour le pic des allocations Python par étape
+  (plus lent).
 - Mieux encore : filtrer dès la capture (`tcpdump ... host 203.0.113.10`),
   ou découper le fichier avec `editcap`.
 
