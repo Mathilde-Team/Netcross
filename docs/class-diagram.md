@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+203 modules · 292 classes · 724 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -44,7 +44,7 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"54 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"41 imports"| netcross_core
+    netcross_report -->|"43 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"19 imports"| pcap_parser
 ```
@@ -3467,6 +3467,7 @@ classDiagram
 | `netcross_report.comm_map` | cartographie des communications observees (Job 15/issue #15, FEATURES.md section 6.6). |
 | `netcross_report.expert_events` | construit les vues `ExpertEvent`/ `Diagnosis` (Session 36, cinquieme et sixieme objets de contrat de la Session 0, FEATURES.md section 13.3) a partir d'une liste de `Finding`/ `DiffFinding` deja… |
 | `netcross_report.history` | persiste un resume de chaque run (analyse ou diff) dans une base SQLite locale, pour observer une tendance dans le temps (score de sante, nombre de constats par severite) sur des runs successifs --… |
+| `netcross_report.html_report` | rapport HTML autonome alimente par le JSON du rapport (issue #1073, sous-issue 1/6 du chantier #1000). |
 | `netcross_report.json_report` | serialise un Report/DiffFinding en JSON structure, pour l'integration externe (dashboard, ticketing, pipeline CI qui veut parser un resultat sans dependre du format texte console). |
 | `netcross_report.live_html` | issue #274 : page de presentation du rapport temps reel (voir netcross_core.live_report). |
 | `netcross_report.lua_dissectors_text` | rendu texte du catalogue des dissecteurs Lua (issue #917), partagé par ``netcross-lua-doc --dissectors`` et la fenêtre « Documentation Lua » de la GUI. |
@@ -3616,6 +3617,14 @@ classDiagram
         +record_diff_run(findings, baseline, current, db_path, meta, label) int
         +list_history(db_path, limit, label, run_type) list~HistoryEntry~
         +print_history(entries) None
+    }
+
+    %% ===== netcross_report.html_report =====
+    class mod_netcross_report_html_report["netcross_report.html_report"] {
+        <<module>>
+        +render_html_report(doc) str
+        +write_html_report(doc, output_path) str
+        +generate_html_report(r, output_path, title, kwargs) str
     }
 
     %% ===== netcross_report.json_report =====

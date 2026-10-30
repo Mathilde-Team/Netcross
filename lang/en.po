@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: netcross\n"
 "Report-Msgid-Bugs-To: https://github.com/MathildeDec/Netcross/issues\n"
-"POT-Creation-Date: 2026-09-23 07:01+0000\n"
+"POT-Creation-Date: 2026-10-30 11:11+0000\n"
 "PO-Revision-Date: 2026-09-23 07:01+0000\n"
 "Last-Translator: Netcross\n"
 "Language-Team: none\n"
@@ -76,7 +76,7 @@ msgstr "Packets"
 msgid "Protocole"
 msgstr "Protocol"
 
-#: src/netcross_gtk4/stats_view.py
+#: src/netcross_gtk4/stats_view.py src/netcross_report/html_report.py
 msgid "Segment"
 msgstr "Segment"
 
@@ -134,3 +134,91 @@ msgstr "{v:.1f} KB"
 #, python-brace-format
 msgid "{v:.1f} Mo"
 msgstr "{v:.1f} MB"
+
+#: src/netcross_report/html_report.py
+msgid "A surveiller"
+msgstr "Watch"
+
+#: src/netcross_report/html_report.py
+msgid "Anomalie"
+msgstr "Anomaly"
+
+#: src/netcross_report/html_report.py
+msgid "Aucun constat : rien d'anormal detecte."
+msgstr "No findings: nothing abnormal detected."
+
+#: src/netcross_report/html_report.py
+msgid "Aucun segment a prioriser."
+msgstr "No segment to prioritise."
+
+#: src/netcross_report/html_report.py
+msgid "Bon"
+msgstr "Good"
+
+#: src/netcross_report/html_report.py
+msgid "Categorie"
+msgstr "Category"
+
+#: src/netcross_report/html_report.py
+msgid "Categories"
+msgstr "Categories"
+
+#: src/netcross_report/html_report.py
+msgid "Constats"
+msgstr "Findings"
+
+#: src/netcross_report/html_report.py
+msgid "Critique"
+msgstr "Critical"
+
+#: src/netcross_report/html_report.py
+msgid "Degrade"
+msgstr "Degraded"
+
+#: src/netcross_report/html_report.py
+msgid "Genere le"
+msgstr "Generated on"
+
+#: src/netcross_report/html_report.py
+msgid "Information"
+msgstr "Information"
+
+#: src/netcross_report/html_report.py
+msgid "Message"
+msgstr "Message"
+
+#: src/netcross_report/html_report.py
+msgid "Points de capture"
+msgstr "Capture points"
+
+#: src/netcross_report/html_report.py
+msgid "Rapport Netcross"
+msgstr "Netcross report"
+
+#: src/netcross_report/html_report.py
+msgid "Score"
+msgstr "Score"
+
+#: src/netcross_report/html_report.py
+msgid "Score de sante"
+msgstr "Health score"
+
+#: src/netcross_report/html_report.py
+msgid "Segments classes du plus au moins prioritaire"
+msgstr "Segments ranked from highest to lowest priority"
+
+#: src/netcross_report/html_report.py
+msgid "Segments par priorite"
+msgstr "Segments by priority"
+
+#: src/netcross_report/html_report.py
+msgid "Severite"
+msgstr "Severity"
+
+#: src/netcross_report/html_report.py
+msgid "Synthese"
+msgstr "Summary"
+
+#: src/netcross_report/html_report.py
+msgid "Tous les constats de l'analyse"
+msgstr "All findings of the analysis"
