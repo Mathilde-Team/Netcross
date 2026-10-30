@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+203 modules · 294 classes · 724 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -44,7 +44,7 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"54 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"41 imports"| netcross_core
+    netcross_report -->|"42 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"19 imports"| pcap_parser
 ```
@@ -1516,6 +1516,7 @@ classDiagram
         +float bucket_seconds
         +int rtp_clock_rate
         +dict~str, int~ seen_count
+        +dict~str, int~ packet_count
         +dict~str, int~ loss_count
         +dict~str, int~ off_path_count
         +dict~tuple~str, str~, list~float~~ latency
@@ -3473,6 +3474,7 @@ classDiagram
 | `netcross_report.lua_doc_text` | rendu texte de la documentation Lua Wireshark (``netcross-lua-doc``, issue #388), partage avec la fenetre « Documentation Lua » de la GUI (issue #873). |
 | `netcross_report.markdown_report` | generation d'un rapport au format Markdown (issue #761). |
 | `netcross_report.metric_charts` | API generique de graphiques : tout module d'analyse peut produire un graphique a partir d'une MetricSeries sans reimplementer son propre code matplotlib. |
+| `netcross_report.metrics_export` | catalogue des metriques Prometheus / OpenMetrics de Netcross et production des series depuis un rapport (issue #1110, sous-issue 1/5 du chantier #1003). |
 | `netcross_report.path_metrics` | metriques de qualite par segment du chemin observe (Job 16/issue #12, FEATURES.md section 6.7). |
 | `netcross_report.pdf` | assemble le rapport PDF final (synthese, graphiques, tableaux de detail) a partir d'un Report netcross_core, avec reportlab. |
 | `netcross_report.rule_engine` | premier PILOTE du moteur d'EXECUTION evoque comme premier chantier ouvert par CLAUDE.md/`Prochaine feature` depuis la Session 54 (bibliotheque de regles §6.2 complete, 41 regles) : faire evaluer une… |
@@ -3693,6 +3695,29 @@ classDiagram
         +render_histogram(series, path) str?
         +render_scatter(series, path) str?
         +render_metric_chart(series, path, kind) str?
+    }
+
+    %% ===== netcross_report.metrics_export =====
+    class MetricSpec {
+        <<dataclass, frozen>>
+        +str name
+        +str type
+        +str unit
+        +str help
+        +tuple~str, ...~ labels
+    }
+    class Sample {
+        <<dataclass, frozen>>
+        +str name
+        +tuple~tuple~str, str~, ...~ labels
+        +float value
+        +label(key) str?
+    }
+    class mod_netcross_report_metrics_export["netcross_report.metrics_export"] {
+        <<module>>
+        +series_upper_bound(n_points, n_segments) int
+        +segment_label(a, b) str
+        +collect_samples(r, run, findings, max_points, max_segments) list~Sample~
     }
 
     %% ===== netcross_report.path_metrics =====

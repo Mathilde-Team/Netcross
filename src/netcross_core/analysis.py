@@ -172,6 +172,7 @@ def analyse(
         r.topology_order_conflicts = _check_order_consistency(points_order, topo_edges)
 
     for pk in all_packets:
+        r.packet_count[pk.point] += 1
         if pk.vlan_id is not None:
             r.vlan_seen[pk.point].add(pk.vlan_id)
         if pk.encap_tags:
