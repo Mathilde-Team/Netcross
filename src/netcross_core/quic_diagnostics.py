@@ -467,9 +467,9 @@ def _libelle(event: QuicEvent) -> str:
 
 def _constats_v2(events: list[QuicEvent]) -> list:
     """Un constat « info » par point ou des Initial QUIC v2 sont vus."""
+    logger.debug("_constats_v2: entrée")
     from netcross_core.tls_diagnostics import TlsFinding
 
-    logger.debug("_constats_v2: entrée")
     par_point: dict[str, int] = {}
     for e in events:
         if e.quic_version == "v2":
