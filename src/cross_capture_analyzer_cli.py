@@ -172,6 +172,15 @@ from netcross_core.support import (
     write_support_map_csv,
     write_ticket,
 )
+from netcross_core.tls_keylog import (
+    MESSAGE_SANS_CAPTURE,
+    TlsKeylogError,
+    options_lecture,
+    options_lecture_parallele,
+    resoudre_keylogs,
+    resume_keylogs,
+    verifier_compatibilite,
+)
 from netcross_report.comm_map import build_comm_map, write_comm_map
 from netcross_report.security_report import build_security_report, print_security_report
 from pcap_parser.capture import split_by_interface
@@ -1148,6 +1157,12 @@ def _parse_sample_spec(spec: str) -> int:
 def _apply_packet_limits(all_packets, max_packets, sample_n):
     """--max-packets/--sample (issue #283) : ``netcross_core.packet_limits``,
     partage avec la GUI (issue #672). Renvoie ``(paquets_retenus, note)``."""
+    logger.debug(
+        "_apply_packet_limits: all_packets={} max_packets={} sample_n={}",
+        summarize(all_packets, "all_packets"),
+        summarize(max_packets, "max_packets"),
+        summarize(sample_n, "sample_n"),
+    )
     from netcross_core.packet_limits import apply_packet_limits
 
     return apply_packet_limits(all_packets, max_packets, sample_n)
@@ -2211,6 +2226,16 @@ def main():
         "independamment de cette redaction.",
     )
     ap.add_argument(
+        "--tls-keylog",
+        action="append",
+        metavar="[NOM=]FICHIER",
+        help="Fichier de cles TLS (format SSLKEYLOGFILE) transmis a tshark "
+        "(-o tls.keylog_file:...) pour dechiffrer les sessions TLS des captures : "
+        "FICHIER vaut pour tous les points, NOM=FICHIER pour un seul point "
+        "(prioritaire). Repetable. Refuse avec --redact. Sans cette option, "
+        "comportement inchange (issue #1040).",
+    )
+    ap.add_argument(
         "--redact-map",
         metavar="CHEMIN",
         help="Avec --redact : ecrit la correspondance adresse reelle <-> "
@@ -2906,8 +2931,20 @@ def main():
     for c in args.capture or []:
         label, paths = _parse_capture_spec(c, "--capture")
         captures.extend((label, path) for path in paths)
+    try:
+        verifier_compatibilite(args.tls_keylog, redact=args.redact)
+        if args.tls_keylog and not captures:
+            logger.debug("main: si args.tls_keylog and (not captures) -> levée TlsKeylogError")
+            raise TlsKeylogError(MESSAGE_SANS_CAPTURE)
+        tls_keylogs = resoudre_keylogs(args.tls_keylog, [label for label, _ in captures])
+    except TlsKeylogError as exc:
+        logger.debug("main: --tls-keylog refusé ({})", exc)
+        print(exc, file=sys.stderr)
+        sys.exit(1)
     if args.split_interfaces and captures:
         captures = _expand_split_interfaces(captures)
+    if tls_keylogs:
+        print(f"Fichier(s) de cles TLS transmis a tshark pour : {resume_keylogs(tls_keylogs)}", file=sys.stderr)
 
     # Avertissement memoire (issue #283, Etape 2) : AVANT toute lecture de
     # paquets -- une fois parse_capture() lance sur une capture trop
@@ -2971,7 +3008,9 @@ def main():
                 "la lecture de chaque fichier individuellement plutot que "
                 "l'accelerer."
             )
-        all_packets, per_file_stats = parse_captures_parallel(captures, args.parallel_workers)
+        all_packets, per_file_stats = parse_captures_parallel(
+            captures, args.parallel_workers, **options_lecture_parallele(tls_keylogs, captures)
+        )
         # chaque fichier est rapporte explicitement, succes ou echec -- rien
         # ne doit pouvoir passer sous silence derriere un total agrege
         for s in per_file_stats:
@@ -3008,7 +3047,7 @@ def main():
         # emprunte. raise_on_error=True rend l'echec visible ici.
         for label, path in captures:
             try:
-                pkts = parse_capture(label, path, raise_on_error=True)
+                pkts = parse_capture(label, path, raise_on_error=True, **options_lecture(tls_keylogs, label))
             except (TsharkNotFoundError, TsharkError) as exc:
                 logger.exception(f"échec dans main: {exc}")
                 any_error = True

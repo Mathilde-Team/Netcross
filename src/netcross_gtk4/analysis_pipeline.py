@@ -30,6 +30,7 @@ from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import Report
 from netcross_core.parsing import parse_capture
 from netcross_core.report_text import print_report
+from netcross_core.tls_keylog import options_lecture, options_lecture_parallele
 from netcross_core.wireshark_expert import build_wireshark_expert_events
 from netcross_gtk4 import capture_list
 from netcross_gtk4.advanced_options import AdvancedSettings, load_host_set, workers_note
@@ -133,17 +134,22 @@ def load_packets(
     parallel: bool,
     on_progress: Callable[[str], None] | None = None,
     max_workers: int | None = None,
+    tls_keylog: str | None = None,
 ) -> list:
     """Charge les paquets depuis une liste de (label, chemin).
 
     Remplace MainWindow._load_packets : même logique, sans dépendance GTK.
-    Supporte le mode parallèle via parse_captures_parallel.
+    Supporte le mode parallèle via parse_captures_parallel. ``tls_keylog``
+    (issue #1040) : fichier de clés TLS transmis à tshark pour tous les points.
     """
     logger.debug("load_packets: {} capture(s), parallel={}", len(captures), parallel)
+    keylogs = {label: tls_keylog for label, _ in captures} if tls_keylog else {}
     if parallel:
         from pcap_parser.capture import parse_captures_parallel
 
-        all_packets, per_file_stats = parse_captures_parallel(captures, max_workers=max_workers)
+        all_packets, per_file_stats = parse_captures_parallel(
+            captures, max_workers=max_workers, **options_lecture_parallele(keylogs, captures)
+        )
         if on_progress:
             for s in per_file_stats:
                 if s["error"]:
@@ -159,7 +165,7 @@ def load_packets(
     for label, path in captures:
         if on_progress:
             on_progress(f"Lecture de {os.path.basename(path)} ({label})...")
-        packets = parse_capture(label, path)
+        packets = parse_capture(label, path, **options_lecture(keylogs, label))
         sequential.extend(packets)
         if on_progress:
             on_progress(f"  -> {len(packets)} paquets chargés")
@@ -278,7 +284,7 @@ def _run_pipeline(
     # Issue #672 : refus et fichiers de securite lus AVANT la lecture des
     # captures, comme la CLI (une erreur ne coute pas une analyse)
     advanced = options.advanced or AdvancedSettings()
-    advanced_errors = validate_advanced(advanced, security=options.security)
+    advanced_errors = validate_advanced(advanced, security=options.security, redact=options.redact)
     if advanced_errors:
         raise ValueError("; ".join(advanced_errors))
     known_destinations = load_host_set(advanced.known_destinations, "--known-destinations")
@@ -290,7 +296,17 @@ def _run_pipeline(
         note = workers_note(advanced.parallel_workers, os.cpu_count())
         if note:
             _log(f"  ATTENTION : {note}")
-    all_packets = load_packets(captures, options.parallel, on_progress, max_workers=advanced.parallel_workers)
+    if advanced.tls_keylog:
+        _log("Fichier de cles TLS transmis a tshark pour tous les points (--tls-keylog)")
+        all_packets = load_packets(
+            captures,
+            options.parallel,
+            on_progress,
+            max_workers=advanced.parallel_workers,
+            tls_keylog=advanced.tls_keylog,
+        )
+    else:
+        all_packets = load_packets(captures, options.parallel, on_progress, max_workers=advanced.parallel_workers)
     truncation_note = None
     if advanced.max_packets is not None or advanced.sample_n:
         from netcross_core.packet_limits import apply_packet_limits

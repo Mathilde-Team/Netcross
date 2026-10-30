@@ -3843,6 +3843,26 @@ components:
           title: Extra Files
           description: Fichiers pcap/pcapng supplémentaires pour le même point (rotation)
             — équiv. --capture NOM=a,b
+        tls_keylog:
+          anyOf:
+          - items:
+              type: string
+              contentMediaType: application/octet-stream
+            type: array
+          - type: 'null'
+          title: Tls Keylog
+          description: Fichier(s) de clés TLS (format SSLKEYLOGFILE) transmis à tshark
+            pour déchiffrer les sessions TLS — équiv. --tls-keylog ; incompatible
+            avec redact. Copie temporaire en 0600, supprimée à la fin de l'analyse
+            ; le contenu n'est ni journalisé ni enregistré.
+        tls_keylog_labels:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tls Keylog Labels
+          description: 'Points des fichiers tls_keylog, séparés par des virgules,
+            un par fichier (« * » = tous les points). Absent : chaque fichier vaut
+            pour tous les points (un seul fichier).'
         split_interfaces:
           type: boolean
           title: Split Interfaces
@@ -4065,6 +4085,26 @@ components:
           - type: 'null'
           title: Known Hosts
           description: Hôtes connus (JSON, liste d'IP) — équiv. --known-hosts
+        tls_keylog:
+          anyOf:
+          - items:
+              type: string
+              contentMediaType: application/octet-stream
+            type: array
+          - type: 'null'
+          title: Tls Keylog
+          description: Fichier(s) de clés TLS (format SSLKEYLOGFILE) transmis à tshark
+            pour déchiffrer les sessions TLS — équiv. --tls-keylog ; incompatible
+            avec redact. Copie temporaire en 0600, supprimée à la fin de l'analyse
+            ; le contenu n'est ni journalisé ni enregistré.
+        tls_keylog_labels:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Tls Keylog Labels
+          description: 'Points des fichiers tls_keylog, séparés par des virgules,
+            un par fichier (« * » = tous les points). Absent : chaque fichier vaut
+            pour tous les points (un seul fichier).'
         split_interfaces:
           type: boolean
           title: Split Interfaces
