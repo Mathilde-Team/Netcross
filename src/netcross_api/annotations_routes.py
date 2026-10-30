@@ -31,7 +31,7 @@ from netcross_core.annotations import (
     remove_annotation,
     sort_annotations,
 )
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import PacketAnnotation
 
 logger = get_logger(__name__)
@@ -57,19 +57,23 @@ class AnnotationBody(BaseModel):
 
 class _Routes:
     def __init__(self, completed_entry: Callable[[str], dict], get_store: Callable[[], Any]) -> None:
+        logger.debug("_Routes.__init__: entrée")
         self._completed_entry = completed_entry
         self._get_store = get_store
+        logger.debug("_Routes.__init__: fin")
 
     def _load(self, analysis_id: str) -> tuple[list[str], dict[str, list[PacketAnnotation]]]:
         entry = self._completed_entry(analysis_id)
         points = [str(p) for p in (entry.get("document") or {}).get("points", [])]
         brut = (entry.get("metadata") or {}).get(METADATA_KEY) or {}
         by_point = {p: [annotation_from_dict(i) for i in items] for p, items in brut.items()}
+        logger.debug("_Routes._load: retour tuple de 2")
         return points, by_point
 
     def _save(self, analysis_id: str, by_point: dict[str, list[PacketAnnotation]]) -> None:
         doc = {p: [annotation_to_dict(a) for a in sort_annotations(lst)] for p, lst in by_point.items() if lst}
         self._get_store().set_metadata(analysis_id, METADATA_KEY, doc)
+        logger.debug("_Routes._save: fin")
 
     @staticmethod
     def _check_point(points: list[str], point: str) -> str:
@@ -79,10 +83,12 @@ class _Routes:
             raise HTTPException(
                 status_code=404, detail=f"Point {point!r} absent de l'analyse (points : {', '.join(points)})"
             )
+        logger.debug("_Routes._check_point: retour point={}", summarize(point, "point"))
         return point
 
     @staticmethod
     def _document(by_point: dict[str, list[PacketAnnotation]]) -> dict[str, Any]:
+        logger.debug("_Routes._document: retour dictionnaire")
         return {
             "annotations": {
                 p: [annotation_to_dict(a) for a in sort_annotations(lst)] for p, lst in sorted(by_point.items()) if lst
@@ -102,6 +108,7 @@ class _Routes:
             by_point = {cle: by_point.get(cle, [])}
         if tag is not None:
             by_point = {p: [a for a in lst if a.tag == tag.strip()] for p, lst in by_point.items()}
+        logger.debug("_Routes.list: retour self._document(…)")
         return self._document(by_point)
 
     def add(self, analysis_id: str, body: AnnotationBody) -> dict[str, Any]:
@@ -115,6 +122,7 @@ class _Routes:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         by_point[point] = add_annotation(by_point.get(point, []), nouvelle)
         self._save(analysis_id, by_point)
+        logger.debug("_Routes.add: retour self._document(…)")
         return self._document(by_point)
 
     def delete(
@@ -136,6 +144,7 @@ class _Routes:
             logger.debug("annotations.delete: absente ({})", exc)
             raise HTTPException(status_code=404, detail=f"Annotation introuvable : {exc.args[0]}") from exc
         self._save(analysis_id, by_point)
+        logger.debug("_Routes.delete: retour self._document(…)")
         return self._document(by_point)
 
 

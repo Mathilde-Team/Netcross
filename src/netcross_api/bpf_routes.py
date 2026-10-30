@@ -26,7 +26,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from netcross_core import bpf_filters
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import BPFFilter
 
 logger = get_logger(__name__)
@@ -50,11 +50,13 @@ class BPFFilterBody(BaseModel):
 def filters_path() -> Path | None:
     """Fichier utilisé : ``$NETCROSS_API_BPF_FILTERS`` ou ``None`` (défaut du cœur)."""
     valeur = os.environ.get(BPF_FILTERS_ENV, "").strip()
+    logger.debug("filters_path: retour Path(valeur).expanduser() if valeur else None")
     return Path(valeur).expanduser() if valeur else None
 
 
 def _document(filtres: list[BPFFilter]) -> dict[str, Any]:
     reserves = {f.name for f in bpf_filters.PREDEFINED_BPF_FILTERS}
+    logger.debug("_document: retour dictionnaire")
     return {
         "filters": [
             {
@@ -70,12 +72,14 @@ def _document(filtres: list[BPFFilter]) -> dict[str, Any]:
 
 def _erreur_fichier(exc: Exception) -> HTTPException:
     logger.warning("bpf-filters : {}", exc)
+    logger.debug("_erreur_fichier: retour HTTPException(…)")
     return HTTPException(status_code=500, detail=str(exc))
 
 
 def list_bpf_filters() -> dict[str, Any]:
     """Catalogue prédéfini puis filtres enregistrés (la liste de la GUI)."""
     try:
+        logger.debug("list_bpf_filters: retour _document(…)")
         return _document(bpf_filters.available_bpf_filters(filters_path()))
     except (ValueError, OSError) as exc:
         logger.debug("list_bpf_filters: (ValueError, OSError) -> {}", exc)
@@ -91,11 +95,15 @@ def put_bpf_filter(nom: str, body: BPFFilterBody) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     cle = nom.strip().casefold()
     if any(f.name.casefold() == cle for f in bpf_filters.PREDEFINED_BPF_FILTERS):
+        logger.debug(
+            "put_bpf_filter: si any((f.name.casefold() == cle for f in bpf_filters.PREDEFIN… -> levée HTTPException"
+        )
         raise HTTPException(
             status_code=409,
             detail=f"le nom '{nom.strip()}' est reserve au catalogue predefini : choisir un autre nom",
         )
     try:
+        logger.debug("put_bpf_filter: retour _document(…)")
         return _document(bpf_filters.upsert_bpf_filter(nouveau, filters_path()))
     except (ValueError, OSError) as exc:
         logger.debug("put_bpf_filter: (ValueError, OSError) -> {}", exc)
@@ -106,11 +114,15 @@ def delete_bpf_filter(nom: str) -> dict[str, Any]:
     """Supprime le filtre enregistré ``nom`` ; renvoie la liste à jour."""
     cle = nom.strip().casefold()
     if any(f.name.casefold() == cle for f in bpf_filters.PREDEFINED_BPF_FILTERS):
+        logger.debug(
+            "delete_bpf_filter: si any((f.name.casefold() == cle for f in bpf_filters.PREDEFIN… -> levée HTTPException"
+        )
         raise HTTPException(
             status_code=409,
             detail=f"le nom '{nom.strip()}' appartient au catalogue predefini : il ne peut pas etre supprime",
         )
     try:
+        logger.debug("delete_bpf_filter: retour _document(…)")
         return _document(bpf_filters.delete_bpf_filter(nom, filters_path()))
     except KeyError as exc:
         logger.debug("delete_bpf_filter: KeyError -> {}", exc)
@@ -132,8 +144,13 @@ def resolve_bpf_library(nom: str) -> str:
     cle = nom.strip().casefold()
     for f in filtres:
         if f.name.casefold() == cle:
+            logger.debug(
+                "resolve_bpf_library: si f.name.casefold() == cle -> retour f.expression={}",
+                summarize(f.expression, "expression"),
+            )
             return f.expression
     disponibles = ", ".join(f.name for f in filtres)
+    logger.debug("resolve_bpf_library: levée HTTPException")
     raise HTTPException(
         status_code=400,
         detail=f"Filtre BPF '{nom.strip()}' introuvable dans la bibliotheque (disponibles : {disponibles})",
