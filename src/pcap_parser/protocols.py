@@ -1,5 +1,5 @@
 """
-pcap_parser.protocols -- couche 4 : RTP / DHCP / SIP.
+pcap_parser.protocols -- couche 4 : RTP / DHCP / SIP (et SDP).
 
 Contrairement a l'ancienne version qui devait tout reimplementer
 a la main (parse_rtp, parse_dhcp, parse_sip operant sur les octets
@@ -220,6 +220,53 @@ def _parse_sip_heuristic(payload: bytes) -> dict | None:
         "user_agent": headers.get("user-agent"),
         "server": headers.get("server"),
     }
+
+
+def extract_sdp_media(payload: bytes) -> tuple[tuple[str, int], ...]:
+    """Points de reception media annonces par le corps SDP d'un message
+    SIP (issue #1120) : un couple (adresse, port) par ligne ``m=`` dont le
+    port est non nul, l'adresse venant de la ligne ``c=`` de niveau media
+    si elle existe, sinon de la ligne ``c=`` de session (RFC 4566, 5.7).
+
+    Seules les lignes situees apres la premiere ligne vide (fin des
+    en-tetes SIP) sont lues : un en-tete SIP ne peut donc jamais etre pris
+    pour une ligne SDP. Un port 0 (flux refuse, RFC 3264, 6) ou une ligne
+    ``m=``/``c=`` mal formee est ignore. Tuple vide si aucun SDP exploitable."""
+    logger.debug("extract_sdp_media: debut ({} octets)", len(payload) if payload else 0)
+    if not payload:
+        logger.debug("extract_sdp_media: si not payload -> retour ()")
+        return ()
+    text = payload.decode("utf-8", errors="replace")
+    lines = text.replace("\r\n", "\n").split("\n")
+    try:
+        body = lines[lines.index("") + 1 :]
+    except ValueError:
+        logger.debug("extract_sdp_media: pas de corps apres les en-tetes -> retour ()")
+        return ()
+
+    session_addr: str | None = None
+    medias: list[list] = []  # [port, adresse de niveau media ou None]
+    for raw in body:
+        line = raw.strip()
+        if line.startswith("c="):
+            parts = line[2:].split()
+            addr = parts[2].split("/", 1)[0] if len(parts) >= 3 and parts[0] == "IN" else None
+            if medias:
+                medias[-1][1] = addr
+            else:
+                session_addr = addr
+        elif line.startswith("m="):
+            parts = line[2:].split()
+            port_text = parts[1].split("/", 1)[0] if len(parts) >= 2 else ""
+            medias.append([int(port_text) if port_text.isdigit() else 0, None])
+
+    endpoints: list[tuple[str, int]] = []
+    for port, media_addr in medias:
+        addr = media_addr or session_addr
+        if port and addr and (addr, port) not in endpoints:
+            endpoints.append((addr, port))
+    logger.debug("extract_sdp_media: retour {} point(s) media", len(endpoints))
+    return tuple(endpoints)
 
 
 def extract_dns(layers: dict) -> dict | None:

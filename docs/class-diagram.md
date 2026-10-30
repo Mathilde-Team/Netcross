@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+202 modules · 292 classes · 722 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -139,7 +139,7 @@ flowchart LR
 | `pcap_parser.ek_fields` | couche 2 : acces bas niveau aux champs d'un paquet EK. |
 | `pcap_parser.ek_source` | couche 1 : execution de tshark -T ek et lecture du flux NDJSON qui en resulte, fichier pcap ou interface live. |
 | `pcap_parser.packet` | couche 5 : assemblage d'un RawPacket normalise a partir des couches EK d'un paquet, une fois l'encapsulation detectee (tunnels.py) et les protocoles applicatifs extraits (protocols.py). |
-| `pcap_parser.protocols` | couche 4 : RTP / DHCP / SIP. |
+| `pcap_parser.protocols` | couche 4 : RTP / DHCP / SIP (et SDP). |
 | `pcap_parser.remote` | sources de capture distantes (issue #166). |
 | `pcap_parser.tunnels` | couche 3 : detection de la pile d'encapsulation (VLAN/MPLS/GRE/VXLAN/GTP-U/ERSPAN/CAPWAP) et selection de la couche IP/TCP/UDP/ICMP la plus interne a utiliser pour l'analyse. |
 
@@ -393,6 +393,7 @@ classDiagram
         +int? http_content_length
         +int? tcp_len
         +tuple~str, ...~ dns_answers
+        +tuple~tuple~str, int~, ...~ sip_sdp_media
         +str? comment
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -412,6 +413,7 @@ classDiagram
         +extract_rtp(layers, udp_payload) dict?
         +extract_dhcp(layers) dict?
         +extract_sip(layers, payload) dict?
+        +extract_sdp_media(payload) tuple~tuple~str, int~, ...~
         +extract_dns(layers) dict?
         +extract_http(layers) dict?
         +extract_tls_certificate(layers) dict?
@@ -496,7 +498,7 @@ classDiagram
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
 | `netcross_core.tls_diagnostics` | extrait l'etat des handshakes TLS (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de capture et localise le segment ou un handshake qui reussissait en amont se met a echouer. |
-| `netcross_core.voip` | Analyse VoIP orientee appel. |
+| `netcross_core.voip` | Analyse VoIP orientee appel, association SIP/RTP par SDP. |
 | `netcross_core.wireshark_expert` | Session 1 de FEATURES.md section 13.3 ("exploitation de l'expertise Wireshark/TShark") : convertit les signaux d'expertise BRUTS deja produits par le moteur de dissection de tshark (champs… |
 
 ### Diagramme (1/2)
@@ -1475,6 +1477,7 @@ classDiagram
         +tuple~Banner, ...~ service_banners
         +int? tcp_len
         +tuple~str, ...~ dns_answers
+        +tuple~tuple~str, int~, ...~ sip_sdp_media
         +str? ip_checksum
         +bool? ip_checksum_bad
         +str? tcp_checksum

@@ -354,3 +354,17 @@ def test_redact_fonctionne_sur_un_raw_packet_pas_seulement_pkt():
     redact_packets([raw])
     assert raw.src == "192.0.2.1"
     assert raw.dst == "192.0.2.2"
+
+
+def test_redact_sip_sdp_media_meme_pseudonyme_que_src():
+    """Issue #1120 : les adresses media SDP partagent le mapping de src/dst
+    (association SIP/RTP par SDP preservee) ; une valeur non IP est laissee."""
+    pk = make_pkt(
+        proto="UDP",
+        src="10.0.0.1",
+        dst="10.0.0.2",
+        sip_sdp_media=(("10.0.0.1", 40000), ("pas-une-ip", 4)),
+    )
+    redact_packets([pk])
+    assert pk.sip_sdp_media == ((pk.src, 40000), ("pas-une-ip", 4))
+    assert pk.src != "10.0.0.1"

@@ -1212,3 +1212,27 @@ def test_raw_packet_champs_attendus_dans_slots():
     # future n'ait pas a le reverifier a la main.
     field_names = set(RawPacket.__dataclass_fields__)
     assert field_names == set(RawPacket.__slots__)
+
+
+def test_build_packet_sip_porte_les_points_media_sdp():
+    """Issue #1120 : le SDP d'un message SIP est reporte dans sip_sdp_media,
+    puis recopie sur Pkt par parsing._to_pkt."""
+    from netcross_core.parsing import _to_pkt
+
+    sip = (
+        b"INVITE sip:bob@example.org SIP/2.0\r\nCall-ID: abc\r\nCSeq: 1 INVITE\r\n\r\n"
+        b"v=0\r\nc=IN IP4 1.1.1.1\r\nm=audio 40000 RTP/AVP 0\r\n"
+    )
+    layers = {
+        **_frame(),
+        "ip": {"ip_ip_src": "1.1.1.1", "ip_ip_dst": "2.2.2.2"},
+        "udp": {
+            "udp_udp_srcport": "5060",
+            "udp_udp_dstport": "5060",
+            "udp_udp_payload": sip.hex(":"),
+        },
+    }
+    raw = build_packet(0.0, layers)
+    assert raw.sip_call_id == "abc"
+    assert raw.sip_sdp_media == (("1.1.1.1", 40000),)
+    assert _to_pkt("A", raw).sip_sdp_media == (("1.1.1.1", 40000),)
