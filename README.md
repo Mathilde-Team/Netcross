@@ -936,7 +936,7 @@ netcross/
 ├── pytest.ini               configuration pytest (pythonpath = src)
 ├── docs/                   documentation MkDocs
 │   ├── class-diagram.md     diagramme de classes (GENERE depuis src/)
-│   ├── detectors.md         comportement et limites des detecteurs (#365)
+│   ├── detectors.md         comportement, limites et inventaire des detecteurs (#365, #1020)
 │   ├── features-backlog.md  fonctionnalites, dette, comparaison OmniPeek
 │   └── sessions/             historique detaille session par session
 ├── scripts/
