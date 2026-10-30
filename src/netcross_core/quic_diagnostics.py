@@ -1,11 +1,13 @@
 """
 netcross_core.quic_diagnostics -- extraction du SNI des paquets QUIC
-Initial (RFC 9000/9001), pour voir le trafic HTTP/3 moderne (Chrome, Teams,
+Initial v1 et v2 (RFC 9000/9001/9369), pour voir le trafic HTTP/3 moderne (Chrome, Teams,
 Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP
 brut.
 
 Ce que ce module fait, precisement :
-  - detecte les paquets QUIC Initial (en-tete long, version 1 = RFC 9001)
+  - detecte les paquets QUIC Initial (en-tete long) des versions 1
+    (RFC 9000/9001) et 2 (RFC 9369, version 0x6b3343cf, issue #1061) ;
+    chaque evenement porte sa version, signalee dans les constats
   - derive les cles de "protection initiale" -- PAS un vrai chiffrement
     secret, une obfuscation dont la cle est publique (derivee du
     Destination Connection ID + un sel fixe defini par la RFC), justement
@@ -21,8 +23,11 @@ Ce que ce module fait, precisement :
     tls_diagnostics.py (reutilise, pas duplique).
 
 Ce que ce module NE fait PAS (limites volontaires, pas des oublis) :
-  - QUIC v2 (RFC 9369) : sel et codes de version differents, non
-    couverts. Seule la version 1 (RFC 9001) est geree.
+  - Versions autres que v1 et v2 (brouillons, versions privees, Version
+    Negotiation) : ignorees. Pour v2 (RFC 9369), seuls changent le sel
+    initial, les libelles HKDF ("quicv2 key/iv/hp") et les codes de type
+    d'en-tete long (Initial = 0b01 au lieu de 0b00) ; le reste du
+    pipeline est commun aux deux versions.
   - 0-RTT et 1-RTT (donnees applicatives apres le handshake) : chiffres
     avec des cles qui ne sont PAS publiques (derivees du secret partage
     TLS) -- structurellement indechiffrables sans capturer aussi les
@@ -68,6 +73,29 @@ except ImportError as e:
 QUIC_V1_INITIAL_SALT = bytes.fromhex("38762cf7f55934b34d179ae6a4c80cadccbb7f0a")
 QUIC_V1 = 0x00000001
 
+# QUIC v2 (RFC 9369 section 3.3.1) : sel initial public propre a v2,
+# libelles HKDF prefixes "quicv2" (3.3.2) et type Initial = 0b01 (3.2)
+QUIC_V2_INITIAL_SALT = bytes.fromhex("0dede3def700a6db819381be6e269dcbf9bd2ed9")
+QUIC_V2 = 0x6B3343CF
+
+
+@dataclass(frozen=True)
+class QuicVersion:
+    """Parametres de la protection initiale d'une version QUIC geree."""
+
+    number: int
+    name: str  # "v1", "v2"
+    rfc: str
+    initial_salt: bytes
+    label_prefix: str  # "quic" (v1) ou "quicv2" (v2)
+    initial_type: int  # bits 0x30 de l'octet 0 : 0b00 (v1), 0b01 (v2)
+
+
+QUIC_VERSIONS: dict[int, QuicVersion] = {
+    QUIC_V1: QuicVersion(QUIC_V1, "v1", "RFC 9001", QUIC_V1_INITIAL_SALT, "quic", 0b00),
+    QUIC_V2: QuicVersion(QUIC_V2, "v2", "RFC 9369", QUIC_V2_INITIAL_SALT, "quicv2", 0b01),
+}
+
 # frames QUIC sans corps a sauter en cherchant une frame CRYPTO (RFC 9000 19)
 _FRAME_NO_BODY = {0x00, 0x01}  # PADDING, PING
 
@@ -84,6 +112,8 @@ class QuicEvent:
     decryptable: bool
     sni: str | None = None
     tls_version: str | None = None
+    # Issue #1061 : version QUIC du paquet Initial ("v1" ou "v2")
+    quic_version: str = "v1"
 
 
 # ------------------------- primitives HKDF (RFC 5869 / RFC 8446 7.1) -------
@@ -122,20 +152,31 @@ def _hkdf_expand_label(secret: bytes, label: str, context: bytes, length: int) -
     return _hkdf_expand(secret, hkdf_label, length)
 
 
-def derive_initial_secrets(dcid: bytes) -> tuple[bytes, bytes]:
-    """Renvoie (client_initial_secret, server_initial_secret) pour QUIC v1."""
-    initial_secret = _hkdf_extract(QUIC_V1_INITIAL_SALT, dcid)
+def _version(version: int) -> QuicVersion:
+    """Parametres d'une version geree (KeyError sinon : appel interne)."""
+    logger.debug("_version: retour QuicVersion")
+    return QUIC_VERSIONS[version]
+
+
+def derive_initial_secrets(dcid: bytes, version: int = QUIC_V1) -> tuple[bytes, bytes]:
+    """Renvoie (client_initial_secret, server_initial_secret) pour QUIC v1
+    (defaut) ou v2 (``version=QUIC_V2``, sel de la RFC 9369)."""
+    logger.debug("derive_initial_secrets: entrée (version 0x{:08x})", version)
+    initial_secret = _hkdf_extract(_version(version).initial_salt, dcid)
     client_secret = _hkdf_expand_label(initial_secret, "client in", b"", 32)
     server_secret = _hkdf_expand_label(initial_secret, "server in", b"", 32)
     logger.debug("derive_initial_secrets: retour tuple de 2")
     return client_secret, server_secret
 
 
-def derive_packet_protection_keys(secret: bytes) -> tuple[bytes, bytes, bytes]:
-    """Renvoie (key, iv, hp) derives d'un secret initial (client ou serveur)."""
-    key = _hkdf_expand_label(secret, "quic key", b"", 16)
-    iv = _hkdf_expand_label(secret, "quic iv", b"", 12)
-    hp = _hkdf_expand_label(secret, "quic hp", b"", 16)
+def derive_packet_protection_keys(secret: bytes, version: int = QUIC_V1) -> tuple[bytes, bytes, bytes]:
+    """Renvoie (key, iv, hp) derives d'un secret initial (client ou serveur) ;
+    libelles "quic ..." (v1) ou "quicv2 ..." (v2, RFC 9369 3.3.2)."""
+    logger.debug("derive_packet_protection_keys: entrée (version 0x{:08x})", version)
+    prefixe = _version(version).label_prefix
+    key = _hkdf_expand_label(secret, f"{prefixe} key", b"", 16)
+    iv = _hkdf_expand_label(secret, f"{prefixe} iv", b"", 12)
+    hp = _hkdf_expand_label(secret, f"{prefixe} hp", b"", 16)
     logger.debug("derive_packet_protection_keys: retour tuple de 3")
     return key, iv, hp
 
@@ -167,15 +208,16 @@ def _parse_long_header(payload: bytes) -> dict | None:
     if len(payload) < 7 or (payload[0] & 0xC0) != 0xC0:
         logger.debug("_parse_long_header: si len(payload) < 7 or payload[0] & 192 != 192 -> retour None")
         return None  # pas un en-tete long QUIC (form=1, fixed=1)
-    if (payload[0] & 0x30) != 0x00:
-        logger.debug("_parse_long_header: si payload[0] & 48 != 0 -> retour None")
-        return None  # pas un paquet Initial (type=00 dans les 2 bits suivants)
 
     version = int.from_bytes(payload[1:5], "big")
-    if version != QUIC_V1:
+    parametres = QUIC_VERSIONS.get(version)
+    if parametres is None:
         logger.trace("_parse_long_header: version QUIC 0x{:08x} non geree, paquet ignore", version)
-        logger.debug("_parse_long_header: si version != QUIC_V1 -> retour None")
-        return None  # seule la v1 (RFC 9001) est geree -- voir limites en tete de fichier
+        logger.debug("_parse_long_header: si version non geree -> retour None")
+        return None  # seules v1 (RFC 9001) et v2 (RFC 9369) sont gerees -- voir limites en tete de fichier
+    if (payload[0] & 0x30) >> 4 != parametres.initial_type:
+        logger.debug("_parse_long_header: si type != Initial de la version -> retour None")
+        return None  # pas un paquet Initial (type 0b00 en v1, 0b01 en v2)
 
     i = 5
     dcid_len = payload[i]
@@ -261,7 +303,7 @@ def _decrypt_initial(payload: bytes, client_secret: bytes, header_info: dict) ->
     d'exception qui remonterait jusqu'a l'appelant : un echec de
     dechiffrement est un resultat normal (mauvais paquet, version, ou
     simplement pas assez de contexte), pas une erreur de programme."""
-    key, iv, hp = derive_packet_protection_keys(client_secret)
+    key, iv, hp = derive_packet_protection_keys(client_secret, header_info.get("version", QUIC_V1))
     buf = bytearray(payload)
     pn_offset = header_info["pn_offset"]
 
@@ -352,7 +394,7 @@ def _parse_tls_handshake_from_crypto(crypto_data: bytes) -> dict | None:
 
 def parse_quic_capture(label: str, path: str) -> list[QuicEvent]:
     """Lit une capture via pcap_parser (tshark -T ek) et renvoie un
-    QuicEvent pour chaque paquet QUIC Initial v1 detecte -- decrypte
+    QuicEvent pour chaque paquet QUIC Initial v1 ou v2 detecte -- decrypte
     avec succes ou non (decryptable=False et sni=None dans ce dernier
     cas, jamais de donnee inventee)."""
     events: list[QuicEvent] = []
@@ -368,7 +410,8 @@ def parse_quic_capture(label: str, path: str) -> list[QuicEvent]:
         if header_info is None:
             continue
 
-        client_secret, _server_secret = derive_initial_secrets(header_info["dcid"])
+        version = header_info["version"]
+        client_secret, _server_secret = derive_initial_secrets(header_info["dcid"], version)
         plaintext = _decrypt_initial(payload, client_secret, header_info)
 
         ts = raw.ts
@@ -383,6 +426,7 @@ def parse_quic_capture(label: str, path: str) -> list[QuicEvent]:
                     dport=raw.dport or 0,
                     dcid=header_info["dcid"],
                     decryptable=False,
+                    quic_version=QUIC_VERSIONS[version].name,
                 )
             )
             continue
@@ -401,17 +445,46 @@ def parse_quic_capture(label: str, path: str) -> list[QuicEvent]:
                 decryptable=True,
                 sni=info.get("sni") if info else None,
                 tls_version=info.get("tls_version") if info else None,
+                quic_version=QUIC_VERSIONS[version].name,
             )
         )
 
     logger.debug(
-        "parse_quic_capture: point {}, {} Initial QUIC v1 dont {} non dechiffrable(s), {} avec SNI",
+        "parse_quic_capture: point {}, {} Initial QUIC (v1/v2) dont {} non dechiffrable(s), {} avec SNI",
         label,
         len(events),
         sum(1 for ev in events if not ev.decryptable),
         sum(1 for ev in events if ev.sni),
     )
     return events
+
+
+def _libelle(event: QuicEvent) -> str:
+    """« QUIC » (v1, libelle historique) ou « QUIC v2 » (issue #1061)."""
+    logger.debug("_libelle: retour str")
+    return "QUIC" if event.quic_version == "v1" else f"QUIC {event.quic_version}"
+
+
+def _constats_v2(events: list[QuicEvent]) -> list:
+    """Un constat « info » par point ou des Initial QUIC v2 sont vus."""
+    from netcross_core.tls_diagnostics import TlsFinding
+
+    logger.debug("_constats_v2: entrée")
+    par_point: dict[str, int] = {}
+    for e in events:
+        if e.quic_version == "v2":
+            par_point[e.point] = par_point.get(e.point, 0) + 1
+    constats = [
+        TlsFinding(
+            "info",
+            "QUIC",
+            p,
+            f"{n} paquet(s) Initial QUIC v2 (RFC 9369, version 0x{QUIC_V2:08x}) reconnu(s)",
+        )
+        for p, n in par_point.items()
+    ]
+    logger.debug("_constats_v2: retour, {} constat(s)", len(constats))
+    return constats
 
 
 def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None):
@@ -449,6 +522,7 @@ def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None
                     f"(version non geree, ou paquet hors sequence)",
                 )
             )
+        findings.extend(_constats_v2(events))
         logger.debug("diagnose_quic: si not points_order -> retour findings={}", summarize(findings, "findings"))
         return findings
 
@@ -460,6 +534,7 @@ def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None
         if not with_sni:
             continue
         sni = per_point[with_sni[0]].sni
+        libelle = _libelle(per_point[with_sni[0]])
         missing = [p for p in points_order if p not in present]
         if missing and present:
             last_seen = present[-1]
@@ -468,7 +543,7 @@ def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None
                     "a_surveiller",
                     "QUIC",
                     last_seen,
-                    f"ClientHello QUIC (SNI {sni}) vu jusqu'a {last_seen}, absent ensuite "
+                    f"ClientHello {libelle} (SNI {sni}) vu jusqu'a {last_seen}, absent ensuite "
                     f"-- QUIC/UDP-443 potentiellement bloque ou filtre au-dela (bascule "
                     f"TCP probable cote client si le blocage persiste)",
                 )
@@ -479,7 +554,7 @@ def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None
                     "info",
                     "QUIC",
                     present[-1],
-                    f"ClientHello QUIC (SNI {sni}) vu a tous les points captures ({', '.join(present)})",
+                    f"ClientHello {libelle} (SNI {sni}) vu a tous les points captures ({', '.join(present)})",
                 )
             )
 
@@ -493,6 +568,7 @@ def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None
             )
         )
 
+    findings.extend(_constats_v2(events))
     logger.debug("diagnose_quic: {} constat(s)", len(findings))
     return findings
 
@@ -500,10 +576,10 @@ def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None
 def print_quic_diagnostics(findings) -> None:
     logger.debug("print_quic_diagnostics: {} constat(s)", len(findings))
     print("=" * 70)
-    print("DIAGNOSTIC QUIC/HTTP3 -- ClientHello vus par point (SNI)")
+    print("DIAGNOSTIC QUIC/HTTP3 -- ClientHello vus par point (SNI, QUIC v1 et v2)")
     print("=" * 70)
     if not findings:
-        print("  aucun trafic QUIC Initial v1 detecte")
+        print("  aucun trafic QUIC Initial (v1 ou v2) detecte")
         logger.debug("print_quic_diagnostics: si not findings -> retour")
         return
     sev_label = {
