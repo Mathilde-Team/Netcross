@@ -221,7 +221,8 @@ résumé porte `history_error`. `history=true` sans `NETCROSS_HISTORY_DB`, ou
 
 Table de correspondance (équivalent de `--redact-map`, issue #876) :
 `GET /analyses/{id}/redact-map` et `GET /comparisons/{id}/redact-map`
-rendent le CSV `adresse_reelle,pseudonyme,type` de `--redact-map`. Une
+rendent le CSV `adresse_reelle,pseudonyme,type` de `--redact-map` (lignes
+`nom`/`domaine` en plus pour la table des noms, issue #1151). Une
 comparaison anonymise baseline et courant avec la même table : une adresse
 garde le même pseudonyme des deux côtés. La table n'existe qu'en mémoire du
 serveur (jamais en SQLite : 409 après redémarrage), 404 sans `redact`.

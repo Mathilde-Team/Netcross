@@ -589,7 +589,11 @@ Options utiles :
   adresses réelles indépendamment de cette anonymisation (relecture de
   fichier ou argument direct). `--redact-map chemin.csv` conserve la
   correspondance adresse réelle ↔ pseudonyme dans un fichier **local, à
-  ne jamais transmettre avec le rapport**.
+  ne jamais transmettre avec le rapport** ; il porte aussi la table des
+  noms (types `nom` et `domaine` : `host-N.domain-M.example.invalid`,
+  même suffixe pour un même domaine parent, module commun
+  `netcross_core/pseudonyms.py`, issue #1151), remplie dès que des noms
+  sont pseudonymisés (#1153).
 - `--history-db chemin.db` : enregistre un résumé de ce run (score de
   santé, nombre de constats par sévérité) dans une base SQLite locale,
   créée si absente — pour suivre une tendance dans le temps sur des runs
