@@ -1,0 +1,618 @@
+openapi: 3.1.0
+info:
+  title: API agent netcross-probe <-> collecteur Netcross
+  version: 1.0.0
+  summary: Contrat v1 entre une sonde de capture distribuée et le collecteur central (issue #1098, chantier #1002).
+  description: |
+    Contrat FIGÉ avant l'écriture de l'agent (#1099) et du collecteur (#1105).
+    Spécification lisible : `docs/probe-api.md`.
+
+    Deux serveurs distincts partagent ce contrat :
+
+    - le **collecteur** (`netcross_api`) expose l'enrôlement (tag `collecteur`) ;
+    - l'**agent** (`netcross-probe`) expose santé, métadonnées et fenêtres de trafic (tag `agent`).
+
+    Toute route de l'agent exige le mTLS (`securitySchemes.mtls`). Seule
+    l'inscription auprès du collecteur s'authentifie par un jeton d'enrôlement
+    à usage unique, sur TLS serveur, avant que la sonde ne possède son certificat.
+
+    Versionnement : semver dans `info.version` ; le majeur figure dans le
+    chemin (`/probe/v1`) et chaque réponse porte l'en-tête `Netcross-Probe-Api`.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: https://{collecteur}:8443
+    description: Collecteur Netcross (routes taguées collecteur)
+    variables:
+      collecteur:
+        default: collecteur.example.net
+  - url: https://{sonde}:9443
+    description: Agent netcross-probe (routes taguées agent)
+    variables:
+      sonde:
+        default: sonde-routeur.example.net
+tags:
+  - name: collecteur
+    description: Routes servies par le collecteur central.
+  - name: agent
+    description: Routes servies par chaque sonde ; mTLS obligatoire.
+security:
+  - mtls: []
+paths:
+  /probe/v1/enrollments:
+    post:
+      tags: [collecteur]
+      operationId: enroll_probe
+      summary: Inscription d'une sonde (jeton d'enrôlement à usage unique)
+      description: |
+        La sonde présente le jeton d'enrôlement remis par l'administrateur et une
+        demande de signature (CSR PKCS#10). Le collecteur consomme le jeton (un
+        second usage répond 401), signe un certificat client dont le SAN URI vaut
+        `urn:netcross:probe:<probe_id>` et renvoie la chaîne de l'autorité de
+        confiance. Seule route sans certificat client.
+      security:
+        - enrollmentToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollmentRequest'
+            examples:
+              routeur:
+                $ref: '#/components/examples/EnrollmentRequest'
+      responses:
+        '201':
+          description: Sonde inscrite, certificat client signé.
+          headers:
+            Netcross-Probe-Api:
+              $ref: '#/components/headers/NetcrossProbeApi'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollmentResponse'
+              examples:
+                routeur:
+                  $ref: '#/components/examples/EnrollmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Nom de sonde déjà inscrit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '426':
+          $ref: '#/components/responses/IncompatibleVersion'
+  /probe/v1/health:
+    get:
+      tags: [agent]
+      operationId: probe_health
+      summary: Santé de la sonde (capture, tampon, horloge)
+      responses:
+        '200':
+          description: État courant.
+          headers:
+            Netcross-Probe-Api:
+              $ref: '#/components/headers/NetcrossProbeApi'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              examples:
+                nominal:
+                  $ref: '#/components/examples/Health'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /probe/v1/metadata:
+    get:
+      tags: [agent]
+      operationId: probe_metadata
+      summary: Métadonnées statiques de la sonde
+      responses:
+        '200':
+          description: Identité, interfaces, configuration du tampon et capacités.
+          headers:
+            Netcross-Probe-Api:
+              $ref: '#/components/headers/NetcrossProbeApi'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProbeMetadata'
+              examples:
+                routeur:
+                  $ref: '#/components/examples/ProbeMetadata'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /probe/v1/windows:
+    post:
+      tags: [agent]
+      operationId: request_window
+      summary: Demande d'une fenêtre de trafic [t1, t2] filtrée par BPF
+      description: |
+        L'agent sélectionne les fichiers du tampon qui couvrent [start, end]
+        (bornes incluses), applique le filtre BPF et prépare un pcapng. La
+        réponse décrit la fenêtre (intervalle réellement couvert, pertes de
+        capture, état d'horloge) ; le pcapng se télécharge ensuite par
+        `GET /probe/v1/windows/{window_id}/pcapng`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WindowRequest'
+            examples:
+              incident:
+                $ref: '#/components/examples/WindowRequest'
+      responses:
+        '201':
+          description: Fenêtre préparée.
+          headers:
+            Netcross-Probe-Api:
+              $ref: '#/components/headers/NetcrossProbeApi'
+            Location:
+              description: URL de la fenêtre créée.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Window'
+              examples:
+                incident:
+                  $ref: '#/components/examples/Window'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Aucune donnée du tampon ne couvre la fenêtre (trop ancienne ou future).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: La fenêtre filtrée dépasse `max_bytes` ou la limite de la sonde.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /probe/v1/windows/{window_id}:
+    parameters:
+      - $ref: '#/components/parameters/WindowId'
+    get:
+      tags: [agent]
+      operationId: get_window
+      summary: Métadonnées d'une fenêtre préparée
+      responses:
+        '200':
+          description: Description de la fenêtre.
+          headers:
+            Netcross-Probe-Api:
+              $ref: '#/components/headers/NetcrossProbeApi'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Window'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [agent]
+      operationId: delete_window
+      summary: Libère une fenêtre préparée (le tampon n'est pas touché)
+      responses:
+        '204':
+          description: Fenêtre supprimée.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /probe/v1/windows/{window_id}/pcapng:
+    parameters:
+      - $ref: '#/components/parameters/WindowId'
+    get:
+      tags: [agent]
+      operationId: download_window
+      summary: Téléchargement du pcapng de la fenêtre
+      responses:
+        '200':
+          description: |
+            Fichier pcapng. Les blocs Interface Statistics (ISB) portent les
+            compteurs `ifdrop`/`osdrop` de dumpcap, repris dans `Window.capture_loss`.
+          headers:
+            Netcross-Probe-Api:
+              $ref: '#/components/headers/NetcrossProbeApi'
+            Digest:
+              description: Empreinte SHA-256 du corps (`sha-256=<base64>`), identique à `Window.sha256`.
+              schema:
+                type: string
+          content:
+            application/x-pcapng:
+              schema:
+                type: string
+                contentMediaType: application/x-pcapng
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    mtls:
+      type: mutualTLS
+      description: |
+        TLS 1.3, certificat client signé par l'autorité du collecteur ; SAN URI
+        `urn:netcross:probe:<probe_id>` (agent) ou `urn:netcross:collector:<id>`
+        (collecteur). Toute connexion sans certificat valide est refusée pendant
+        la poignée de main TLS.
+    enrollmentToken:
+      type: http
+      scheme: bearer
+      bearerFormat: netcross-enrollment-token
+      description: |
+        Jeton d'enrôlement à usage unique (au moins 128 bits d'entropie, durée de
+        vie limitée, stocké haché côté collecteur). Utilisé uniquement par
+        `POST /probe/v1/enrollments`.
+  headers:
+    NetcrossProbeApi:
+      description: Version de contrat (majeur.mineur) appliquée par le serveur.
+      required: true
+      schema:
+        type: string
+        pattern: '^[0-9]+\.[0-9]+$'
+        examples: ['1.0']
+  parameters:
+    WindowId:
+      name: window_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/WindowId'
+  responses:
+    BadRequest:
+      description: Requête invalide (champ manquant, fenêtre inversée, filtre BPF refusé par dumpcap).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentification refusée (jeton consommé, expiré ou inconnu ; certificat révoqué).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Fenêtre inconnue ou expirée.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    IncompatibleVersion:
+      description: Aucune version majeure commune entre la sonde et le collecteur.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    ProbeId:
+      type: string
+      description: Identifiant attribué par le collecteur à l'inscription.
+      pattern: '^prb_[a-z0-9]{12,32}$'
+    WindowId:
+      type: string
+      pattern: '^win_[a-z0-9]{12,32}$'
+    ApiVersion:
+      type: string
+      description: Version majeur.mineur du contrat.
+      pattern: '^[0-9]+\.[0-9]+$'
+    Timestamp:
+      type: number
+      description: Secondes depuis l'époque Unix (UTC), fraction possible (µs).
+      minimum: 0
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Code stable, en snake_case (ex. `token_consumed`, `window_not_buffered`, `invalid_bpf`).
+          pattern: '^[a-z][a-z0-9_]*$'
+        message:
+          type: string
+          description: Message lisible ; ne contient jamais de secret.
+      additionalProperties: true
+    Capability:
+      type: string
+      description: Capacité annoncée ; une valeur inconnue est ignorée par le pair.
+      examples: [bpf, pcapng_isb, clock_status, compression_zstd]
+    EnrollmentRequest:
+      type: object
+      required: [probe_name, csr_pem, agent_version, api_versions]
+      properties:
+        probe_name:
+          type: string
+          description: Nom du point de capture (ex. `ROUTEUR`), unique chez le collecteur.
+          pattern: '^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$'
+        csr_pem:
+          type: string
+          description: Demande de signature PKCS#10 (PEM) ; la clé privée ne quitte jamais la sonde.
+          pattern: '^-----BEGIN CERTIFICATE REQUEST-----'
+        agent_version:
+          type: string
+          description: Version logicielle de netcross-probe.
+        api_versions:
+          type: array
+          description: Versions de contrat supportées par la sonde.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ApiVersion'
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+          default: []
+      additionalProperties: true
+    EnrollmentResponse:
+      type: object
+      required: [probe_id, api_version, client_certificate_pem, ca_chain_pem, certificate_expires_at]
+      properties:
+        probe_id:
+          $ref: '#/components/schemas/ProbeId'
+        api_version:
+          $ref: '#/components/schemas/ApiVersion'
+        client_certificate_pem:
+          type: string
+          pattern: '^-----BEGIN CERTIFICATE-----'
+        ca_chain_pem:
+          type: string
+          description: Autorité de confiance du collecteur, à épingler par la sonde.
+          pattern: '^-----BEGIN CERTIFICATE-----'
+        certificate_expires_at:
+          $ref: '#/components/schemas/Timestamp'
+      additionalProperties: true
+    ClockSource:
+      type: string
+      description: Source de synchronisation horaire au moment de la mesure.
+      enum: [ptp, chrony, ntpd, systemd-timesyncd, none, unknown]
+    ClockStatus:
+      type: object
+      required: [source, synchronized]
+      properties:
+        source:
+          $ref: '#/components/schemas/ClockSource'
+        synchronized:
+          type: boolean
+        offset_ms:
+          type: [number, 'null']
+          description: Décalage annoncé par la source par rapport à sa référence.
+        dispersion_ms:
+          type: [number, 'null']
+          description: Dispersion (ou erreur maximale estimée) annoncée.
+          minimum: 0
+        reference:
+          type: [string, 'null']
+          description: Référence (serveur NTP, grand maître PTP) ; jamais d'identifiant secret.
+        measured_at:
+          $ref: '#/components/schemas/Timestamp'
+      additionalProperties: true
+    CaptureLoss:
+      type: object
+      description: Pertes déclarées au point de capture (dumpcap, noyau, blocs ISB pcapng).
+      required: [packets_received, packets_dropped]
+      properties:
+        packets_received:
+          type: integer
+          minimum: 0
+        packets_dropped:
+          type: integer
+          minimum: 0
+          description: ifdrop + osdrop sur l'intervalle.
+        ifdrop:
+          type: [integer, 'null']
+          minimum: 0
+        osdrop:
+          type: [integer, 'null']
+          minimum: 0
+      additionalProperties: true
+    BufferStatus:
+      type: object
+      required: [files, bytes]
+      properties:
+        files:
+          type: integer
+          minimum: 0
+        bytes:
+          type: integer
+          minimum: 0
+        oldest:
+          $ref: '#/components/schemas/Timestamp'
+        newest:
+          $ref: '#/components/schemas/Timestamp'
+      additionalProperties: true
+    Health:
+      type: object
+      required: [status, api_version, capturing, buffer, clock]
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, failing]
+        api_version:
+          $ref: '#/components/schemas/ApiVersion'
+        uptime_s:
+          type: number
+          minimum: 0
+        capturing:
+          type: boolean
+        buffer:
+          $ref: '#/components/schemas/BufferStatus'
+        clock:
+          $ref: '#/components/schemas/ClockStatus'
+        capture_loss:
+          $ref: '#/components/schemas/CaptureLoss'
+      additionalProperties: true
+    InterfaceInfo:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        link_type:
+          type: [string, 'null']
+        snaplen:
+          type: [integer, 'null']
+          minimum: 0
+      additionalProperties: true
+    ProbeMetadata:
+      type: object
+      required: [probe_id, probe_name, agent_version, api_versions, interfaces, buffer, capabilities]
+      properties:
+        probe_id:
+          $ref: '#/components/schemas/ProbeId'
+        probe_name:
+          type: string
+        agent_version:
+          type: string
+        api_versions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ApiVersion'
+        interfaces:
+          type: array
+          items:
+            $ref: '#/components/schemas/InterfaceInfo'
+        buffer:
+          type: object
+          required: [max_files, file_duration_s]
+          properties:
+            max_files:
+              type: integer
+              minimum: 1
+            file_duration_s:
+              type: integer
+              minimum: 1
+            max_bytes:
+              type: [integer, 'null']
+              minimum: 1
+          additionalProperties: true
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+      additionalProperties: true
+    WindowRequest:
+      type: object
+      required: [start, end]
+      properties:
+        start:
+          $ref: '#/components/schemas/Timestamp'
+        end:
+          $ref: '#/components/schemas/Timestamp'
+        bpf:
+          type: [string, 'null']
+          description: Filtre BPF (syntaxe pcap-filter) appliqué à l'extraction ; compilé par la sonde.
+          maxLength: 4096
+        max_bytes:
+          type: [integer, 'null']
+          minimum: 1
+          description: Taille maximale acceptée par le collecteur ; au-delà, 413.
+        include_unknown:
+          type: boolean
+          default: false
+          description: Inclure les fichiers du tampon d'intervalle inconnu (fichier en cours d'écriture).
+      additionalProperties: true
+    Window:
+      type: object
+      required: [window_id, probe_id, requested, covered, packet_count, bytes, sha256, capture_loss, clock, expires_at]
+      properties:
+        window_id:
+          $ref: '#/components/schemas/WindowId'
+        probe_id:
+          $ref: '#/components/schemas/ProbeId'
+        requested:
+          $ref: '#/components/schemas/Interval'
+        covered:
+          $ref: '#/components/schemas/Interval'
+        bpf:
+          type: [string, 'null']
+        packet_count:
+          type: integer
+          minimum: 0
+        bytes:
+          type: integer
+          minimum: 0
+        sha256:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+        capture_loss:
+          $ref: '#/components/schemas/CaptureLoss'
+        clock:
+          $ref: '#/components/schemas/ClockStatus'
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+      additionalProperties: true
+    Interval:
+      type: object
+      required: [start, end]
+      properties:
+        start:
+          $ref: '#/components/schemas/Timestamp'
+        end:
+          $ref: '#/components/schemas/Timestamp'
+      additionalProperties: false
+  examples:
+    EnrollmentRequest:
+      value:
+        probe_name: ROUTEUR
+        csr_pem: "-----BEGIN CERTIFICATE REQUEST-----\nMIIB...\n-----END CERTIFICATE REQUEST-----\n"
+        agent_version: 0.1.0
+        api_versions: ['1.0']
+        capabilities: [bpf, pcapng_isb, clock_status]
+    EnrollmentResponse:
+      value:
+        probe_id: prb_7f3k2m9q4x1z
+        api_version: '1.0'
+        client_certificate_pem: "-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----\n"
+        ca_chain_pem: "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----\n"
+        certificate_expires_at: 1824000000
+    Health:
+      value:
+        status: ok
+        api_version: '1.0'
+        uptime_s: 86400
+        capturing: true
+        buffer: {files: 12, bytes: 1203741824, oldest: 1793350000.0, newest: 1793353600.0}
+        clock: {source: chrony, synchronized: true, offset_ms: 0.042, dispersion_ms: 0.31, reference: ntp1.example.net, measured_at: 1793353600.0}
+        capture_loss: {packets_received: 1834201, packets_dropped: 12, ifdrop: 0, osdrop: 12}
+    ProbeMetadata:
+      value:
+        probe_id: prb_7f3k2m9q4x1z
+        probe_name: ROUTEUR
+        agent_version: 0.1.0
+        api_versions: ['1.0']
+        interfaces: [{name: eth1, link_type: EN10MB, snaplen: 262144}]
+        buffer: {max_files: 12, file_duration_s: 300, max_bytes: 2147483648}
+        capabilities: [bpf, pcapng_isb, clock_status]
+    WindowRequest:
+      value:
+        start: 1793353000.0
+        end: 1793353060.0
+        bpf: tcp port 443 and host 192.0.2.10
+        max_bytes: 104857600
+    Window:
+      value:
+        window_id: win_a81c0e5d92b4
+        probe_id: prb_7f3k2m9q4x1z
+        requested: {start: 1793353000.0, end: 1793353060.0}
+        covered: {start: 1793353000.0, end: 1793353060.0}
+        bpf: tcp port 443 and host 192.0.2.10
+        packet_count: 4821
+        bytes: 3911022
+        sha256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+        capture_loss: {packets_received: 4833, packets_dropped: 12, ifdrop: 0, osdrop: 12}
+        clock: {source: chrony, synchronized: true, offset_ms: 0.042, dispersion_ms: 0.31, measured_at: 1793353060.0}
+        expires_at: 1793356660.0
