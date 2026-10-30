@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+203 modules · 293 classes · 726 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -32,7 +32,7 @@ flowchart TD
     netcross_ai["netcross_ai"]
     netcross_core["netcross_core"]
     pcap_parser["pcap_parser"]
-    CLI -->|"24 imports"| netcross_report
+    CLI -->|"25 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
     CLI -->|"50 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
@@ -44,7 +44,7 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"54 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"41 imports"| netcross_core
+    netcross_report -->|"43 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"19 imports"| pcap_parser
 ```
@@ -3484,6 +3484,7 @@ classDiagram
 | `netcross_report.stix_export` | export STIX 2.1 des constats de securite (issue #279, sous-issue de #170). |
 | `netcross_report.synthesis` | transforme un Report en une liste de constats (Finding) via des regles et seuils explicites. |
 | `netcross_report.triage` | agrege les Finding (ou DiffFinding) produits par ailleurs pour repondre a une question que synthesis.py ne pose pas : "par ou je commence a regarder ?" |
+| `netcross_report.zeek_export` | journaux de flux au format Zeek ``conn.log`` (issue #1115, chantier #1003). |
 
 ### Diagramme
 
@@ -3960,6 +3961,47 @@ classDiagram
         +health_score(ranked, scale) int
         +health_label(score) str
         +format_health_line(score) str
+    }
+
+    %% ===== netcross_report.zeek_export =====
+    class ZeekConn {
+        <<dataclass>>
+        +str point
+        +str proto
+        +str orig_h
+        +int? orig_p
+        +str resp_h
+        +int? resp_p
+        +float ts
+        +float last_ts
+        +str uid
+        +str? service
+        +int orig_bytes
+        +int resp_bytes
+        +int orig_pkts
+        +int resp_pkts
+        +int orig_ip_bytes
+        +int resp_ip_bytes
+        +str conn_state
+        +str history
+        +tuple~str, ...~ points_seen
+        +str? segment
+        +float? segment_delay_ms
+        +int? segment_lost_pkts
+        +str? loss_segment
+        -set~str~ _orig_flags
+        -set~str~ _resp_flags
+        -bool _orig_data
+        -bool _resp_data
+        +values() dict~str, object~
+    }
+    class mod_netcross_report_zeek_export["netcross_report.zeek_export"] {
+        <<module>>
+        +tcp_flag_names(flags) frozenset~str~
+        +build_conn_records(packets, points, points_order) list~ZeekConn~
+        +to_tsv(records) str
+        +to_json_lines(records) str
+        +write_zeek_conn(records, output_path, fmt) str
     }
 
     %% ===== relations =====

@@ -7,6 +7,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Ajouté
+- Journaux de flux au format Zeek `conn.log` (#1115) : `--zeek-conn FICHIER` écrit une ligne par connexion et par point, colonnes Zeek standard (`#fields`/`#types`, lisible par `zeek-cut`) puis colonnes `netcross_*` (segment, latence et pertes par segment avec `--order`) ; `--zeek-format json` pour un objet par ligne. Respecte `--redact`. Voir docs/zeek-export.md.
+
 ### Modifié
 - CI (#966) : un nouveau commit sur une PR annule le run du commit précédent (`concurrency`), dans `ci.yml` et `pr-coverage.yml`. Les runs `push` sur dev et main ne sont jamais annulés.
 - Seuil de couverture bloquant porté à 95 % (#953, règle Mathilde-Team/.github#9) :

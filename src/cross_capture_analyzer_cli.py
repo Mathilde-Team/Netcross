@@ -174,6 +174,7 @@ from netcross_core.support import (
 )
 from netcross_report.comm_map import build_comm_map, write_comm_map
 from netcross_report.security_report import build_security_report, print_security_report
+from netcross_report.zeek_export import ZEEK_FORMATS, build_conn_records, write_zeek_conn
 from pcap_parser.capture import split_by_interface
 from pcap_parser.ek_source import TsharkError, TsharkNotFoundError
 from pcap_parser.remote import CaptureSourceError, parse_source, split_live_target
@@ -1939,6 +1940,20 @@ def main():
         metavar="FICHIER",
         help="Fichier de sortie de --siem-export.",
     )
+    ap.add_argument(
+        "--zeek-conn",
+        metavar="FICHIER",
+        help="Ecrit les journaux de flux au format Zeek conn.log (issue #1115) : une ligne par connexion "
+        "et par point, colonnes Zeek standard puis colonnes netcross_* (segment, latence et pertes par "
+        "segment avec --order). Respecte --redact. Voir docs/zeek-export.md.",
+    )
+    ap.add_argument(
+        "--zeek-format",
+        choices=ZEEK_FORMATS,
+        default="tsv",
+        help="Format de --zeek-conn : `tsv` (defaut, en-tetes #fields/#types, lisible par zeek-cut) ou "
+        "`json` (un objet par ligne, comme LogAscii::use_json).",
+    )
     plug = ap.add_argument_group(
         "plugins (issue #284)",
         "Detecteurs et sorties tierces. Chargement EXPLICITE : un plugin installe n'est execute que "
@@ -2584,6 +2599,7 @@ def main():
                 ("--tshark-stats", args.tshark_stats),
                 ("--forensic-search", args.forensic_search),
                 ("--detail-csv", args.detail_csv),
+                ("--zeek-conn", args.zeek_conn),
                 ("--history-db", args.history_db),
                 ("--client-group", args.client_group),
                 ("--redact", args.redact),
@@ -2627,6 +2643,7 @@ def main():
                 ("--tshark-stats", args.tshark_stats),
                 ("--forensic-search", args.forensic_search),
                 ("--detail-csv", args.detail_csv),
+                ("--zeek-conn", args.zeek_conn),
                 ("--history-db", args.history_db),
                 ("--client-group", args.client_group),
                 ("--redact", args.redact),
@@ -2735,6 +2752,7 @@ def main():
                 ("--tshark-stats", args.tshark_stats),
                 ("--forensic-search", args.forensic_search),
                 ("--detail-csv", args.detail_csv),
+                ("--zeek-conn", args.zeek_conn),
                 ("--history-db", args.history_db),
                 ("--client-group", args.client_group),
                 ("--redact", args.redact),
@@ -3289,6 +3307,12 @@ def main():
     if args.detail_csv:
         write_detail_csv(args.detail_csv, flows, r.points, names=names)
         print(f"\nDetail par flux ecrit dans {args.detail_csv}")
+    if args.zeek_conn:
+        # Paquets DEJA pseudonymises si --redact (redact_packets plus haut) :
+        # adresses et uid du conn.log n'exposent rien de reel.
+        zeek_records = build_conn_records(all_packets, r.points, points_order)
+        write_zeek_conn(zeek_records, args.zeek_conn, args.zeek_format)
+        print(f"\nJournal Zeek conn.log ({args.zeek_format}, {len(zeek_records)} ligne(s)) ecrit dans {args.zeek_conn}")
     if args.dashboard:
         import json as _json
 
