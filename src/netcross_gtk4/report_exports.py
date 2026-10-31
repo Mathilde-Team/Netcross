@@ -63,6 +63,7 @@ def record_history(report, settings: HistorySettings, *, findings=None, tls=None
         label=settings.label,
     )
     label_txt = f" (etiquette: {settings.label})" if settings.label else ""
+    logger.debug("record_history: retour chaîne formatée")
     return f"Resume de ce run enregistre dans l'historique {settings.db_path}{label_txt}."
 
 
@@ -80,6 +81,7 @@ def record_diff_history(findings, baseline, current, settings: HistorySettings, 
         label=settings.label,
     )
     label_txt = f" (etiquette: {settings.label})" if settings.label else ""
+    logger.debug("record_diff_history: retour chaîne formatée")
     return f"Resume de ce diff enregistre dans l'historique {settings.db_path}{label_txt}."
 
 
@@ -92,15 +94,18 @@ def history_text(db_path: str, limit: int | None, label: str | None, run_type: s
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         print_history(entries)
+    logger.debug("history_text: retour buf.getvalue(…)")
     return buf.getvalue()
 
 
 def sequence_views(flows, max_flows: int, flow_objects=None) -> list | None:
     """``--sequence-diagram N`` pour l'export PDF ; None si 0."""
     if not max_flows or not flows:
+        logger.debug("sequence_views: si not max_flows or not flows -> retour None")
         return None
     from netcross_report.sequence_view import top_flow_views
 
+    logger.debug("sequence_views: retour top_flow_views(…)")
     return top_flow_views(flows, flow_objects=flow_objects, max_flows=max_flows)
 
 
@@ -108,6 +113,7 @@ def export_siem(report, path: str, fmt: str, context: ReportContext) -> str:
     """``--siem-export FMT --siem-output PATH``."""
     from netcross_report.siem_export import write_siem
 
+    logger.debug("export_siem: retour write_siem(…)")
     return write_siem(report, path, fmt, observed_from=context.observed_from, observed_until=context.observed_until)
 
 
@@ -141,10 +147,12 @@ def check_support_scopes(scopes) -> tuple[str, ...]:
     demandees = tuple(scopes)
     inconnues = [s for s in demandees if s not in SCOPES]
     if inconnues:
+        logger.debug("check_support_scopes: si inconnues -> levée SupportTicketError")
         raise SupportTicketError(
             f"--support-scope : portee(s) inconnue(s) {', '.join(inconnues)} (attendu parmi : {', '.join(SCOPES)})."
         )
     if not demandees:
+        logger.debug("check_support_scopes: si not demandees -> levée SupportTicketError")
         raise SupportTicketError("--support-scope : cochez au moins une portee du ticket.")
     retenues = tuple(s for s in SCOPES if s in demandees)
     logger.debug("check_support_scopes: retour {}", retenues)
@@ -177,6 +185,7 @@ def write_support_ticket(
 
     logger.debug("write_support_ticket: path={} scopes={} markers={}", path, scopes, markers)
     if not consent:
+        logger.debug("write_support_ticket: si not consent -> levée ConsentRequiredError")
         raise ConsentRequiredError("ticket refuse : cochez d'abord le consentement a la remontee (--support-consent)")
     retenues = SCOPES if scopes is None else check_support_scopes(scopes)
     scrubber = TextScrubber()
@@ -213,6 +222,7 @@ def write_support_map(scrubber, path: str) -> str:
 
     logger.debug("write_support_map: path={}", path)
     if scrubber is None:
+        logger.debug("write_support_map: si scrubber is None -> levée ValueError")
         raise ValueError("aucun ticket ecrit : la correspondance suit le ticket de support")
     written = write_support_map_csv(scrubber, path)
     logger.debug("write_support_map: retour {}", written)
