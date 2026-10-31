@@ -14,7 +14,7 @@ ici fait donc échouer la CI.
 
 | Surface | Points d'entrée | Capacités |
 |---|---|---|
-| CLI | `cross_capture_analyzer_cli.py` (123 options), `cross_capture_diff_cli.py` (27), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
+| CLI | `cross_capture_analyzer_cli.py` (125 options), `cross_capture_diff_cli.py` (27), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 3 pages, 44 cases à cocher, 31 réglages numériques | Analyse interactive et exploration visuelle |
 | API | 62 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) |
 
@@ -188,6 +188,7 @@ fenêtre « Outils de capture » (bouton de la barre de titre).
 | Historique des runs (analyses et comparaisons) | fenêtre « Historique des runs » (bouton de la barre de titre) : base, type, étiquette, nombre (issue #874) | `cross_history_cli.py` : `--db`, `--label`, `--run-type`, `--limit` | `GET /history` : `run_type`, `label`, `limit` (base du serveur `NETCROSS_HISTORY_DB`, issue #874) |
 | Historique des analyses | oui (fenêtre « Historique des runs », type « Analyses (analyse) » ; enregistrement par « Historique... » / « Etiquette », issues #674, #874) | `cross_history_cli.py` : `--db`, `--label`, `--run-type`, `--limit` | `GET /history?run_type=…` ; enregistrement par `history`/`history_label` de `POST /captures` (issue #890) ; `GET /analyses` liste les analyses du serveur |
 | Mode debug | `--debug` au lancement | `--debug` (toutes les CLI) | `NETCROSS_DEBUG=1` |
+| Mesure des performances par étape (lecture, corrélation, détecteurs, rapport : durées, RSS max, pic tracemalloc ; issue #1016, banc #994) | non (outil de banc, voir PR de #1016) | `--profile-steps`, `--profile-tracemalloc` | non (outil de banc, voir PR de #1016) |
 
 ## Annotations et signets
 
