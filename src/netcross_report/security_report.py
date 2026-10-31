@@ -293,6 +293,7 @@ def _opt_int(value) -> int | None:
         return int(value)
     except (TypeError, ValueError) as exc:
         logger.warning("_opt_int: valeur {!r} non convertible ({}) -> None", value, exc)
+        logger.debug("_opt_int: except (TypeError, ValueError) -> retour None")
         return None
 
 
@@ -306,6 +307,7 @@ def _opt_float(value) -> float | None:
         return float(value)
     except (TypeError, ValueError) as exc:
         logger.warning("_opt_float: valeur {!r} non convertible ({}) -> None", value, exc)
+        logger.debug("_opt_float: except (TypeError, ValueError) -> retour None")
         return None
 
 
