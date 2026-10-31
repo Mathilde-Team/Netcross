@@ -41,6 +41,7 @@ from pcap_parser.protocols import (
     extract_tls_certificate,
     extract_tls_handshake,
 )
+from pcap_parser.radio import RadioInfo, extract_radio
 from pcap_parser.tunnels import detect_encapsulation, select_innermost_layers
 
 # pcap_parser reste independant de netcross_core (contrat import-linter) :
@@ -301,6 +302,9 @@ class RawPacket:
     # Adresses A/AAAA de la reponse DNS (issue #344) : tuple vide hors
     # reponse DNS. Voir protocols._dns_answers.
     dns_answers: tuple[str, ...] = ()
+    # Metadonnees radio 802.11 (RSSI, MCS, debit, retry, canal -- issue
+    # #1142) : None hors capture 802.11. Voir pcap_parser.radio.
+    radio: RadioInfo | None = None
     # Commentaire de paquet pcapng (Enhanced Packet Block, option
     # opt_comment -- Job 39, issue #159). None sur un pcap classique (le
     # format ne porte aucune notion de commentaire) ou sur un paquet
@@ -868,6 +872,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
         expert_details=expert_details,
         tcp_len=tcp_len,
         dns_answers=dns_answers,
+        radio=extract_radio(layers),
         ip_checksum=ip_checksum,
         ip_checksum_bad=ip_checksum_bad,
         tcp_checksum=tcp_checksum,
