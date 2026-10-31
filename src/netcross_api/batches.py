@@ -59,6 +59,7 @@ def unique_path(directory: str, name: str) -> str:
     while os.path.exists(path):
         path = os.path.join(directory, f"{stem}_{n}{dot}{ext}")
         n += 1
+    logger.debug("unique_path: retour path={}", summarize(path, "path"))
     return path
 
 
@@ -76,6 +77,7 @@ def extract_archive(archive: str, directory: str, max_bytes: int) -> list[str]:
             members = [m for m in zf.infolist() if not m.is_dir()]
             total = sum(m.file_size for m in members)
             if total > max_bytes:
+                logger.debug("extract_archive: si total > max_bytes -> levée BatchInputError")
                 raise BatchInputError(
                     f"archive trop volumineuse une fois décompressée ({total // 1024 // 1024} Mo, "
                     f"max {max_bytes // 1024 // 1024} Mo)"
@@ -98,11 +100,14 @@ class BatchStore:
     """Lots en mémoire, bornés à ``MAX_BATCHES`` (thread-safe)."""
 
     def __init__(self, max_batches: int = MAX_BATCHES) -> None:
+        logger.debug("BatchStore.__init__: entrée")
         self._lock = threading.Lock()
         self._batches: OrderedDict[str, dict] = OrderedDict()
         self.max_batches = max(1, max_batches)
+        logger.debug("BatchStore.__init__: fin")
 
     def create(self, options: BatchOptions, files: list[str], workdir: str) -> str:
+        logger.debug("BatchStore.create: entrée")
         batch_id = uuid.uuid4().hex[:12]
         with self._lock:
             self._batches[batch_id] = {
@@ -130,6 +135,7 @@ class BatchStore:
 
     def _evict(self) -> None:
         """Supprime les plus anciens lots terminés au-delà de la limite."""
+        logger.debug("BatchStore._evict: entrée")
         while len(self._batches) > self.max_batches:
             victim = next(
                 (k for k, v in self._batches.items() if v["status"] in (COMPLETED, FAILED)),
@@ -140,24 +146,29 @@ class BatchStore:
             entry = self._batches.pop(victim)
             shutil.rmtree(entry["workdir"], ignore_errors=True)
             logger.debug("BatchStore._evict: lot {} évincé", victim)
+        logger.debug("BatchStore._evict: fin")
 
     def get(self, batch_id: str) -> dict | None:
         with self._lock:
             entry = self._batches.get(batch_id)
+            logger.debug("BatchStore.get: retour dict(entry, progress=list(entry['progress'])) if …")
             return dict(entry, progress=list(entry["progress"])) if entry else None
 
     def update(self, batch_id: str, **changes) -> None:
         with self._lock:
             if batch_id in self._batches:
                 self._batches[batch_id].update(changes)
+        logger.debug("BatchStore.update: fin")
 
     def progress(self, batch_id: str, message: str) -> None:
         with self._lock:
             if batch_id in self._batches:
                 self._batches[batch_id]["progress"].append(message)
+        logger.debug("BatchStore.progress: fin")
 
     def list(self) -> list[dict]:
         with self._lock:
+            logger.debug("BatchStore.list: retour liste")
             return [{"batch_id": k, "status": v["status"], "files": len(v["files"])} for k, v in self._batches.items()]
 
     def clear(self) -> None:
@@ -165,6 +176,7 @@ class BatchStore:
             for entry in self._batches.values():
                 shutil.rmtree(entry["workdir"], ignore_errors=True)
             self._batches.clear()
+        logger.debug("BatchStore.clear: fin")
 
 
 batch_store = BatchStore()
@@ -175,6 +187,7 @@ def run_batch_job(batch_id: str, options: BatchOptions, ignored: list[str]) -> N
     """Tâche de fond : lot complet, puis completed/failed. Ne lève jamais."""
     entry = batch_store.get(batch_id)
     if entry is None:
+        logger.debug("run_batch_job: si entry is None -> retour")
         return
     workdir = entry["workdir"]
     input_dir = os.path.join(workdir, "captures")
@@ -185,6 +198,7 @@ def run_batch_job(batch_id: str, options: BatchOptions, ignored: list[str]) -> N
 
         captures, more_ignored = list_captures(input_dir, options.recursive)
         if not captures:
+            logger.debug("run_batch_job: si not captures -> levée BatchInputError")
             raise BatchInputError(f"aucune capture ({', '.join(CAPTURE_EXTENSIONS)}) reçue")
         result = run_batch(
             captures,
@@ -197,6 +211,7 @@ def run_batch_job(batch_id: str, options: BatchOptions, ignored: list[str]) -> N
     except Exception as exc:  # noqa: BLE001 -- un lot ne doit jamais rester running
         logger.exception("lot {} en échec", batch_id)
         batch_store.update(batch_id, status=FAILED, error=str(exc) or type(exc).__name__)
+        logger.debug("run_batch_job: except Exception -> retour")
         return
     batch_store.update(
         batch_id,
@@ -213,14 +228,18 @@ def report_path(entry: dict, name: str) -> Path | None:
     known = set((result.get("capture_reports") or {}).values())
     known |= {g["report"] for g in result.get("groups", []) if g.get("report")}
     if name not in known:
+        logger.debug("report_path: si name not in known -> retour None")
         return None
     path = Path(entry["workdir"]) / "rapports" / name
+    logger.debug("report_path: retour path if path.is_file() else None")
     return path if path.is_file() else None
 
 
 def new_workdir() -> tuple[str, str]:
     """(répertoire du lot, sous-répertoire des captures reçues)."""
+    logger.debug("new_workdir: entrée")
     workdir = tempfile.mkdtemp(prefix="netcross-api-batch-")
     captures = os.path.join(workdir, "captures")
     os.makedirs(captures)
+    logger.debug("new_workdir: retour tuple de 2")
     return workdir, captures
