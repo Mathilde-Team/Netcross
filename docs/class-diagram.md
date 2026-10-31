@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+204 modules · 295 classes · 725 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -3101,6 +3101,59 @@ classDiagram
 
     %% ===== relations =====
     SupportTicket --> Consent : consent
+```
+
+## `netcross_core.testing`
+
+| Module | Rôle |
+|---|---|
+| `netcross_core.testing` | Outils de test réutilisables (jeux synthétiques du banc #994). |
+| `netcross_core.testing.synth` | Jeux synthétiques multi-points déterministes (issue #1015, banc #994). |
+
+### Diagramme
+
+```mermaid
+classDiagram
+    direction LR
+
+    %% ===== netcross_core.testing.synth =====
+    class Configuration {
+        <<dataclass>>
+        +int points
+        +int paquets
+        +int graine
+        +int debit_pps
+        +float delai_segment_ms
+        +float gigue_ms
+        +dict~str, float~ melange
+        +int? segment_perte
+        +float taux_perte
+        +str sens_perte
+        +int? segment_retard
+        +float retard_ms
+        +list~float~ decalages_ms
+        +valider() None
+    }
+    class _Message {
+        <<dataclass>>
+        +bool aller
+        +int proto
+        +bytes charge_l4
+        +bool perdable
+        +int pause_ns
+    }
+    class _Generateur {
+        +emettre(type_flux, messages, hotes, debut_ns, fenetre) int
+        +vider(jusqu_a_ns) None
+        +fermer() None
+    }
+    class mod_netcross_core_testing_synth["netcross_core.testing.synth"] {
+        <<module>>
+        +entete_pcapng(nom_point) bytes
+        +generer(cfg, dossier) dict
+        +construire_parseur()
+        +main(argv) int
+    }
 ```
 
 ## `netcross_core.tshark_stats`
