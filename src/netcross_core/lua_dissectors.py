@@ -113,6 +113,7 @@ class CatalogueError(ValueError):
 
 def _entier(valeur: str) -> int:
     valeur = (valeur or "").strip()
+    logger.debug("_entier: retour int(valeur) if valeur.isdigit() else 0")
     return int(valeur) if valeur.isdigit() else 0
 
 
@@ -125,6 +126,7 @@ def parse_row(row: dict[str, str]) -> dict[str, Any]:
         raise CatalogueError(f"URL de dépôt invalide : {url!r}")
     natif_brut = (row.get("natif_wireshark_4_6_4") or "").strip()
     natif = natif_brut.lower().startswith("oui")
+    logger.debug("parse_row: retour dictionnaire")
     return {
         "url": url,
         "depot": "/".join(morceaux[3:5]),
@@ -160,6 +162,7 @@ def read_csv(texte: str) -> list[dict[str, Any]]:
             logger.debug("read_csv: ligne {} invalide", numero)
             raise CatalogueError(f"ligne {numero} : {exc}") from exc
         lignes.setdefault(ligne["url"].lower(), ligne)
+    logger.debug("read_csv: retour list(…)")
     return list(lignes.values())
 
 
@@ -190,6 +193,7 @@ def load_csv(conn: sqlite3.Connection, texte: str) -> int:
             (_META_SHA, hashlib.sha256(texte.encode("utf-8")).hexdigest()),
         )
     logger.info("catalogue des dissecteurs Lua : {} entrées chargées", len(lignes))
+    logger.debug("load_csv: retour len(…)")
     return len(lignes)
 
 
@@ -217,6 +221,7 @@ def ensure_catalogue(conn: sqlite3.Connection, csv_path: str | Path | None = Non
     conn.executescript(_SCHEMA)
     if chemin is None or not chemin.is_file():
         logger.warning("catalogue des dissecteurs Lua : CSV introuvable ({})", ", ".join(map(str, csv_candidates())))
+        logger.debug("ensure_catalogue: si chemin is None or not chemin.is_file() -> retour False")
         return False
     texte = chemin.read_text(encoding="utf-8")
     attendu = hashlib.sha256(texte.encode("utf-8")).hexdigest()
@@ -230,6 +235,7 @@ def ensure_catalogue(conn: sqlite3.Connection, csv_path: str | Path | None = Non
 def _depuis_ligne(row: sqlite3.Row | tuple) -> Dissecteur:
     d = Dissecteur(*row)
     d.archive, d.natif = bool(d.archive), bool(d.natif)
+    logger.debug("_depuis_ligne: retour d={}", summarize(d, "d"))
     return d
 
 
@@ -242,11 +248,13 @@ _CHAMPS = (
 def _plier(texte: str) -> str:
     """Minuscules sans accents (``Énergie`` -> ``energie``)."""
     decompose = unicodedata.normalize("NFKD", texte.casefold())
+    logger.debug("_plier: retour ''.join(…)")
     return "".join(c for c in decompose if not unicodedata.combining(c))
 
 
 def _fts(terme: str) -> str:
     mots = [m.replace('"', "") for m in terme.split() if m.replace('"', "")]
+    logger.debug("_fts: retour ' '.join(…)")
     return " ".join(f'"{m}"*' for m in mots)
 
 
@@ -289,6 +297,7 @@ def search(
     total = conn.execute(f"SELECT count(*) {base}", params).fetchone()[0]  # noqa: S608
     champs = ", ".join(f"d.{c.strip()}" for c in _CHAMPS.split(","))
     rows = conn.execute(f"SELECT {champs} {base} ORDER BY {ordre} LIMIT ?", [*params, limit]).fetchall()  # noqa: S608
+    logger.debug("search: retour tuple de 2")
     return total, [_depuis_ligne(r) for r in rows]
 
 
