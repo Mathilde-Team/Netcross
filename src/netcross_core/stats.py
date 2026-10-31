@@ -441,9 +441,12 @@ def explore_stats(
     ``flows`` : dict de ``correlate()`` ou liste de ``Flow`` deja construite.
     ``top_n`` : None ou <= 0 = toutes les lignes. ValueError si ``group_by``
     ou ``sort_by`` sont inconnus."""
+    logger.debug("explore_stats: entrée")
     if group_by not in GROUP_BY:
+        logger.debug("explore_stats: si group_by not in GROUP_BY -> levée ValueError")
         raise ValueError(f"regroupement inconnu : {group_by} (attendu : {', '.join(GROUP_BY)})")
     if sort_by not in SORT_BY:
+        logger.debug("explore_stats: si sort_by not in SORT_BY -> levée ValueError")
         raise ValueError(f"tri inconnu : {sort_by} (attendu : {', '.join(SORT_BY)})")
     if isinstance(flows, dict):
         from netcross_core.correlate import build_flows
@@ -454,25 +457,33 @@ def explore_stats(
         logger.debug("explore_stats: aucun flux ou rapport -> []")
         return []
     query = StatsQuery(group_by=group_by, sort_by=sort_by, top_n=top_n if top_n and top_n > 0 else None)
+    logger.debug("explore_stats: retour compute_stats(…)")
     return compute_stats(flows, report, [], query, build_events_by_segment(findings))
 
 
 def stats_format_for(path: str, fmt: str | None = None) -> str:
     """Format d'export : ``fmt`` s'il est donne, sinon d'apres l'extension
     (``.csv`` -> csv, tout le reste -> json)."""
+    logger.debug("stats_format_for: entrée")
     if fmt is not None:
         if fmt not in EXPORT_FORMATS:
+            logger.debug("stats_format_for: si fmt not in EXPORT_FORMATS -> levée ValueError")
             raise ValueError(f"format inconnu : {fmt} (attendu : csv ou json)")
+        logger.debug("stats_format_for: si fmt is not None -> retour fmt={}", summarize(fmt, "fmt"))
         return fmt
+    logger.debug("stats_format_for: retour 'csv' if str(path).lower().endswith('.csv') else …")
     return "csv" if str(path).lower().endswith(".csv") else "json"
 
 
 def render_stats(rows: list[StatRow], fmt: str) -> str:
     """Texte de l'export ``csv`` ou ``json`` (memes colonnes que la GUI)."""
+    logger.debug("render_stats: entrée")
     import json
 
     if fmt == "csv":
+        logger.debug("render_stats: si fmt == 'csv' -> retour export_csv(…)")
         return export_csv(rows)
+    logger.debug("render_stats: retour json.dumps(…)")
     return json.dumps(export_json(rows), ensure_ascii=False, indent=2)
 
 
