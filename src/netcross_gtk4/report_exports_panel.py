@@ -23,7 +23,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gio, Gtk  # noqa: E402
 
-from netcross_core.logging_config import get_logger  # noqa: E402
+from netcross_core.logging_config import get_logger, summarize  # noqa: E402
 from netcross_gtk4.report_exports import (  # noqa: E402
     HISTORY_SHOW_MAX,
     SIEM_EXTENSIONS,
@@ -140,6 +140,7 @@ class ReportExportsPanel(Gtk.Box):
         ):
             self.append(widget)
         self._sync()
+        logger.debug("ReportExportsPanel.__init__: fin")
 
     # -- etat --
 
@@ -160,8 +161,10 @@ class ReportExportsPanel(Gtk.Box):
         """Table d'anonymisation seule (comparaison : pas de contexte)."""
         self.redaction_map = tuple(entries or ())
         self._sync()
+        logger.debug("ReportExportsPanel.set_redaction_map: fin")
 
     def _has_history(self) -> bool:
+        logger.debug("ReportExportsPanel._has_history: retour self.context is not None and bool(self.context.hi…")
         return self.context is not None and bool(self.context.history.db_path)
 
     def _sync(self) -> None:
@@ -172,24 +175,30 @@ class ReportExportsPanel(Gtk.Box):
         self.support_map_btn.set_sensitive(self.last_ticket is not None)
         self.history_btn.set_sensitive(self._has_history())
         self.redact_map_btn.set_sensitive(bool(self.redaction_map))
+        logger.debug("ReportExportsPanel._sync: fin")
 
     def selected_scopes(self) -> tuple[str, ...]:
+        logger.debug("ReportExportsPanel.selected_scopes: retour tuple(…)")
         return tuple(scope for scope, check in self.scope_checks.items() if check.get_active())
 
     def selected_siem_format(self) -> str:
+        logger.debug("ReportExportsPanel.selected_siem_format: retour SIEM_FORMATS[self.siem_format.get_selected()]")
         return SIEM_FORMATS[self.siem_format.get_selected()]
 
     # -- actions (exposees pour les tests) --
 
     def export_siem_to(self, path) -> str:
         if self.security_report is None:
+            logger.debug("ReportExportsPanel.export_siem_to: si self.security_report is None -> levée ValueError")
             raise ValueError("rien a exporter : relancez l'analyse avec « Rapport de securite »")
         written = export_siem(self.report, str(path), self.selected_siem_format(), self.context)
         self.status_label.set_text(f"Export SIEM ({self.selected_siem_format()}) ecrit dans {written}")
+        logger.debug("ReportExportsPanel.export_siem_to: retour written={}", summarize(written, "written"))
         return written
 
     def write_ticket_to(self, path) -> str:
         if self.context is None:
+            logger.debug("ReportExportsPanel.write_ticket_to: si self.context is None -> levée ValueError")
             raise ValueError("aucune analyse de fichiers terminee")
         logger.debug("ReportExportsPanel.write_ticket_to: {}", path)
         markers = parse_support_markers(self.markers_entry.get_text())
@@ -206,6 +215,7 @@ class ReportExportsPanel(Gtk.Box):
             f"Ticket de support anonymise ecrit : {result.path} (diagnostic, portees {', '.join(result.scopes)}, "
             f"{result.occurrences} occurrence(s) redigee(s))"
         )
+        logger.debug("ReportExportsPanel.write_ticket_to: retour result.path={}", summarize(result.path, "path"))
         return result.path
 
     def write_support_map_to(self, path) -> str:
@@ -215,6 +225,7 @@ class ReportExportsPanel(Gtk.Box):
         self.status_label.set_text(
             f"Correspondance privee du ticket ecrite dans {written} (a NE PAS transmettre avec le ticket)."
         )
+        logger.debug("ReportExportsPanel.write_support_map_to: retour written={}", summarize(written, "written"))
         return written
 
     def write_redaction_map_to(self, path) -> str:
@@ -222,6 +233,7 @@ class ReportExportsPanel(Gtk.Box):
         from netcross_core.redact import redaction_map_csv
 
         if not self.redaction_map:
+            logger.debug("ReportExportsPanel.write_redaction_map_to: si not self.redaction_map -> levée ValueError")
             raise ValueError("aucune table : relancez l'analyse avec « Anonymiser les adresses IP/MAC (--redact) »")
         with open(path, "w", newline="", encoding="utf-8") as fh:
             fh.write(redaction_map_csv(self.redaction_map))
@@ -229,12 +241,14 @@ class ReportExportsPanel(Gtk.Box):
             f"Correspondance adresse reelle <-> pseudonyme ecrite dans {path} "
             "(a conserver en prive, ne pas transmettre avec le rapport)."
         )
+        logger.debug("ReportExportsPanel.write_redaction_map_to: retour str(…)")
         return str(path)
 
     def show_history(self) -> str:
         from netcross_report import HistoryDatabaseError
 
         if not self._has_history():
+            logger.debug("ReportExportsPanel.show_history: si not self._has_history() -> levée ValueError")
             raise ValueError("aucun historique choisi dans la configuration")
         history = self.context.history
         try:
@@ -243,6 +257,7 @@ class ReportExportsPanel(Gtk.Box):
             logger.warning("ReportExportsPanel: historique illisible ({})", exc)
             text = str(exc)
         self.history_view.get_buffer().set_text(text)
+        logger.debug("ReportExportsPanel.show_history: retour text={}", summarize(text, "text"))
         return text
 
     # -- dialogues --
@@ -260,6 +275,7 @@ class ReportExportsPanel(Gtk.Box):
             dialog.set_initial_name("netcross-ticket-support.json")
         root = self.get_root()
         dialog.save(root if isinstance(root, Gtk.Window) else None, None, lambda d, res: self._on_chosen(d, res, what))
+        logger.debug("ReportExportsPanel._choose: fin")
 
     def _on_chosen(self, dialog, result, what: str) -> None:
         try:
@@ -283,3 +299,4 @@ class ReportExportsPanel(Gtk.Box):
         except (OSError, ValueError, RuntimeError, SupportTicketError) as exc:
             logger.warning("ReportExportsPanel: export impossible ({})", exc)
             self.status_label.set_text(f"Export impossible : {exc}")
+        logger.debug("ReportExportsPanel._on_chosen: fin")
