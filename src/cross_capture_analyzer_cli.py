@@ -212,16 +212,20 @@ def _parse_ring_buffer_spec(spec):
     Retourne (None, None) si spec est vide ; leve SystemExit sur format invalide.
     """
     if not spec:
+        logger.debug("_parse_ring_buffer_spec: si not spec -> retour tuple de 2")
         return None, None
     try:
         parts = spec.split(":")
         if len(parts) != 2:
+            logger.debug("_parse_ring_buffer_spec: si len(parts) != 2 -> levée ValueError")
             raise ValueError("format attendu N:SECONDES")
         max_files = int(parts[0])
         max_duration = float(parts[1])
         if max_files < 1:
+            logger.debug("_parse_ring_buffer_spec: si max_files < 1 -> levée ValueError")
             raise ValueError("N doit etre >= 1")
         if max_duration <= 0:
+            logger.debug("_parse_ring_buffer_spec: si max_duration <= 0 -> levée ValueError")
             raise ValueError("SECONDES doit etre > 0")
     except ValueError as exc:
         logger.warning("_parse_ring_buffer_spec: format invalide {} ({})", spec, exc)
@@ -238,6 +242,7 @@ def _load_bpf_from_library(name):
     Leve SystemExit si le filtre n'est pas trouve.
     """
     if not name:
+        logger.debug("_load_bpf_from_library: si not name -> retour None")
         return None
     from netcross_core.bpf_filters import available_bpf_filters
 
@@ -249,6 +254,7 @@ def _load_bpf_from_library(name):
     print(f"Filtre BPF '{name}' introuvable dans la bibliotheque.", file=sys.stderr)
     print(f"Filtres disponibles: {', '.join(f.name for f in filters)}", file=sys.stderr)
     sys.exit(1)
+    logger.debug("_load_bpf_from_library: fin")
 
 
 def _check_single_stdin(points):
@@ -348,6 +354,7 @@ def _collect_tshark_stats(captures) -> dict:
 
     def _report(label, path, exc):
         print(f"--tshark-stats {label} ({path}) : {exc}", file=sys.stderr)
+        logger.debug("_collect_tshark_stats._report: fin")
 
     result = collect_capture_stats(captures, on_error=_report)
     logger.debug("_collect_tshark_stats: retour result={}", summarize(result, "result"))
@@ -648,6 +655,7 @@ def _parse_size(text):
     """Voir netcross_core.capture_tools.parse_size (partage GUI/API, #869)."""
     from netcross_core.capture_tools import parse_size
 
+    logger.debug("_parse_size: retour parse_size(…)")
     return parse_size(text)
 
 
@@ -657,11 +665,13 @@ def _parse_split_spec(spec):
     from netcross_core.capture_tools import parse_split_spec
 
     try:
+        logger.debug("_parse_split_spec: retour parse_split_spec(…)")
         return parse_split_spec(spec)
     except ValueError as e:
         logger.exception(f"échec dans _parse_split_spec: {e}")
         print(e, file=sys.stderr)
         sys.exit(1)
+    logger.debug("_parse_split_spec: fin")
 
 
 def _run_split(capture_specs, split_spec, output_dir):
@@ -811,6 +821,7 @@ def _start_ring_recorders(points, ring_buffer):
 def _stop_ring_recorders(recorders):
     """Arrete les enregistreurs et affiche les fichiers conserves par point."""
     if not recorders:
+        logger.debug("_stop_ring_recorders: si not recorders -> retour")
         return
     from pcap_parser.capture import stop_ring_recorder
 
@@ -1150,6 +1161,7 @@ def _apply_packet_limits(all_packets, max_packets, sample_n):
     partage avec la GUI (issue #672). Renvoie ``(paquets_retenus, note)``."""
     from netcross_core.packet_limits import apply_packet_limits
 
+    logger.debug("_apply_packet_limits: retour apply_packet_limits(…)")
     return apply_packet_limits(all_packets, max_packets, sample_n)
 
 
@@ -1324,6 +1336,7 @@ def _check_stats_args(args) -> None:
 def comm_map_protocols(values) -> list[str] | None:
     """Protocoles de --comm-map-protocol (repetable, virgules acceptees)."""
     protos = [p.strip() for v in values or [] for p in v.split(",") if p.strip()]
+    logger.debug("comm_map_protocols: retour protos or None")
     return protos or None
 
 

@@ -37,5 +37,7 @@ def apply_packet_limits(all_packets, max_packets, sample_n):
         kept = kept[:max_packets]
         notes.append(f"analyse limitee aux {max_packets:,} premiers paquets sur {before:,}".replace(",", " "))
     if not notes:
+        logger.debug("apply_packet_limits: si not notes -> retour tuple de 2")
         return kept, None
+    logger.debug("apply_packet_limits: retour tuple de 2")
     return kept, "analyse tronquee -- " + " ; ".join(notes) + " -- les constats ne couvrent pas la capture entiere."

@@ -261,6 +261,7 @@ def comm_map_to_dict(cmap) -> dict:
 def _dot_id(text: str) -> str:
     """Chaine DOT entre guillemets ; ``\\n`` (deux caracteres) reste le
     saut de ligne de Graphviz, les guillemets sont echappes."""
+    logger.debug("_dot_id: retour '\"' + str(text).replace('\"', '\\\\\"') + '\"'")
     return '"' + str(text).replace('"', '\\"') + '"'
 
 
@@ -279,6 +280,7 @@ def comm_map_to_dot(cmap) -> str:
         couleur = ", color=red, fontcolor=red, penwidth=2" if e.anomalies else ""
         lignes.append(f"  {_dot_id(e.src)} -> {_dot_id(e.dst)} [label={_dot_id(libelle)}{couleur}];")
     lignes.append("}")
+    logger.debug("comm_map_to_dot: retour '\\n'.join(lignes) + '\\n'")
     return "\n".join(lignes) + "\n"
 
 

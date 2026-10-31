@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import PacketAnnotation
 
 logger = get_logger(__name__)
@@ -44,6 +44,7 @@ def parse_frame_number(value: object) -> int:
     if number < 1:
         logger.debug("parse_frame_number: si number < 1 -> levée ValueError")
         raise ValueError("le numero de trame commence a 1")
+    logger.debug("parse_frame_number: retour number={}", summarize(number, "number"))
     return number
 
 
@@ -60,6 +61,7 @@ def make_annotation(frame: object, tag: str, comment: str = "", color: str | Non
     if color is not None and (not isinstance(color, str) or not color.strip()):
         logger.debug("make_annotation: couleur invalide -> levée ValueError")
         raise ValueError("la couleur doit etre une chaine non vide (ou absente)")
+    logger.debug("make_annotation: retour PacketAnnotation(…)")
     return PacketAnnotation(
         frame_number=parse_frame_number(frame),
         tag=tag.strip(),
@@ -97,11 +99,13 @@ def remove_annotation(annotations: list[PacketAnnotation], frame: object, tag: s
 
 def sort_annotations(annotations: list[PacketAnnotation]) -> list[PacketAnnotation]:
     """Ordre d'affichage : trame croissante puis etiquette."""
+    logger.debug("sort_annotations: retour sorted(…)")
     return sorted(annotations, key=lambda a: (a.frame_number, a.tag))
 
 
 def annotation_to_dict(annotation: PacketAnnotation) -> dict[str, Any]:
     """Format JSON du sidecar (memes cles que ``write_annotations``)."""
+    logger.debug("annotation_to_dict: retour dictionnaire")
     return {
         "frame_number": annotation.frame_number,
         "tag": annotation.tag,
@@ -115,4 +119,5 @@ def annotation_from_dict(item: object) -> PacketAnnotation:
     if not isinstance(item, dict):
         logger.debug("annotation_from_dict: objet attendu -> levée ValueError")
         raise ValueError(f"objet JSON attendu, pas {type(item).__name__}")
+    logger.debug("annotation_from_dict: retour make_annotation(…)")
     return make_annotation(item.get("frame_number"), item.get("tag", ""), item.get("comment", ""), item.get("color"))
