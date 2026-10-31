@@ -21,7 +21,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from netcross_core.live_report import LiveReporter, LiveReportWriter
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 
 logger = get_logger(__name__)
 
@@ -42,6 +42,7 @@ class _QuietHandler(SimpleHTTPRequestHandler):
 def _default_render() -> Callable:
     from netcross_report.live_html import render_live_html
 
+    logger.debug("_default_render: retour render_live_html={}", summarize(render_live_html, "render_live_html"))
     return render_live_html
 
 
@@ -50,21 +51,30 @@ class LiveReportSession:
     ``point_stopped`` a la fin de chaque point, ``stop`` a l'arret."""
 
     def __init__(self, reporter: LiveReporter, server: ThreadingHTTPServer | None) -> None:
+        logger.debug("LiveReportSession.__init__: entrée")
         self.reporter = reporter
         self.server = server
+        logger.debug("LiveReportSession.__init__: fin")
 
     @property
     def html_path(self) -> Path:
+        logger.debug(
+            "LiveReportSession.html_path: retour self.reporter.writer.html_path={}",
+            summarize(self.reporter.writer.html_path, "html_path"),
+        )
         return self.reporter.writer.html_path
 
     @property
     def url(self) -> str | None:
         if self.server is None:
+            logger.debug("LiveReportSession.url: si self.server is None -> retour None")
             return None
+        logger.debug("LiveReportSession.url: retour chaîne formatée")
         return f"http://127.0.0.1:{self.server.server_address[1]}/"
 
     def add(self, pkt) -> None:
         self.reporter.add(pkt)
+        logger.debug("LiveReportSession.add: fin")
 
     def point_stopped(self, label: str, error: str | None = None) -> None:
         """Etat du point dans la page : ``arrete`` ou ``erreur`` (message)."""
@@ -72,6 +82,7 @@ class LiveReportSession:
             self.reporter.aggregator.set_status(label, "arrete")
         else:
             self.reporter.aggregator.set_status(label, "erreur", error)
+        logger.debug("LiveReportSession.point_stopped: fin")
 
     def stop(self) -> list[str]:
         """Derniere publication (``final``), arret du serveur ; messages pour
@@ -106,12 +117,19 @@ def start_live_report(
     sinon port fixe (127.0.0.1 uniquement). Leve ``LiveReportError`` si le
     repertoire ou le port est inutilisable."""
     if interval < 1:
+        logger.debug("start_live_report: si interval < 1 -> levée LiveReportError")
         raise LiveReportError(f"intervalle de rafraichissement trop court ({interval:g} s, minimum 1 s)")
     if serve_port is not None and not 0 <= serve_port <= 65535:
+        logger.debug(
+            "start_live_report: si serve_port is not None and (not 0 <= serve_port <= 65535) -> levée LiveReportError"
+        )
         raise LiveReportError(f"port invalide : {serve_port}")
     try:
         directory = out_dir or mkdtemp(prefix="netcross-live-report-")
         if Path(directory).exists() and not Path(directory).is_dir():
+            logger.debug(
+                "start_live_report: si Path(directory).exists() and (not Path(directory).is_dir()) -> levée LiveRepor…"
+            )
             raise LiveReportError(f"{directory} n'est pas un repertoire")
         writer = LiveReportWriter(directory, render or _default_render(), interval)
     except OSError as exc:
