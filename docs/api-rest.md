@@ -234,6 +234,22 @@ curl -X POST "http://localhost:8000/captures/multi?wait=true" \
   -F "nat_tolerant=true" -F "tls=true"
 ```
 
+Fichiers de clés TLS (équivalent de `--tls-keylog`, issue #1040) : un ou
+plusieurs fichiers `tls_keylog` (format `SSLKEYLOGFILE`) et, en option,
+`tls_keylog_labels` (un point par fichier, séparés par des virgules, `*` =
+tous les points ; absent = le fichier vaut pour tous les points). Chaque
+fichier est copié dans un fichier temporaire en 0600, transmis à tshark puis
+supprimé à la fin de l'analyse ; ni son contenu ni son chemin ne sont
+enregistrés (seuls les noms de points figurent dans `options.tls_keylogs`).
+400 avec `redact=true`, sur un point inconnu ou si le nombre de points ne
+correspond pas au nombre de fichiers.
+
+```bash
+curl -X POST "http://localhost:8000/captures/multi?wait=true" \
+  -F "files=@client.pcap" -F "files=@serveur.pcap" -F "labels=CLIENT,SERVEUR" \
+  -F "tls_keylog=@keys.txt" -F "tls_keylog_labels=CLIENT"
+```
+
 ### Récupérer le rapport structuré (issue #330)
 
 ```bash

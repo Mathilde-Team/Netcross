@@ -590,6 +590,16 @@ Options utiles :
   fichier ou argument direct). `--redact-map chemin.csv` conserve la
   correspondance adresse réelle ↔ pseudonyme dans un fichier **local, à
   ne jamais transmettre avec le rapport**.
+- `--tls-keylog keys.txt` (tous les points) ou `--tls-keylog CLIENT=keys.txt`
+  (un point, prioritaire ; option répétable) : fichier de clés TLS au
+  format `SSLKEYLOGFILE` (navigateur, `curl`, `openssl s_client -keylogfile`)
+  transmis à tshark (`-o tls.keylog_file:...`) pour déchiffrer les sessions
+  TLS des captures : HTTP et objets transportés redeviennent visibles.
+  Le fichier doit exister et être lisible ; nom de point inconnu refusé.
+  Refusé avec `--redact` tant que l'interaction déchiffrement/anonymisation
+  n'est pas définie, et sans objet en direct (`--live`). Le contenu du
+  fichier n'est jamais lu ni journalisé par Netcross. Sans l'option,
+  comportement inchangé (issue #1040, chantier #997).
 - `--history-db chemin.db` : enregistre un résumé de ce run (score de
   santé, nombre de constats par sévérité) dans une base SQLite locale,
   créée si absente — pour suivre une tendance dans le temps sur des runs
@@ -694,6 +704,9 @@ Options supplémentaires (parité avec `cross_capture_analyzer_cli.py`) :
   présente des deux côtés garde le même pseudonyme, sans quoi la
   comparaison perdrait son sens. Même exclusion mutuelle avec
   `--tls`/`--quic` (pas de `--client-group` sur ce CLI).
+- `--tls-keylog [NOM=]FICHIER` : même option que sur
+  `cross_capture_analyzer_cli.py`, appliquée aux captures `--baseline` et
+  `--current` (mêmes noms de points des deux côtés) ; refusée avec `--redact`.
 - `--history-db` / `--history-label` / `--history-show` : même mécanisme
   que sur `cross_capture_analyzer_cli.py` (voir ci-dessus) — un même
   fichier `.db` peut mélanger des runs d'analyse et de comparaison

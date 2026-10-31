@@ -44,6 +44,7 @@ Options principales :
 | Lecture parallèle des captures | Plus rapide sur une machine multicœur | `--parallel` |
 | Détecter / Exclure les doublons inter-captures | Repère les paquets vus deux fois (miroir mal configuré) | `--detect-duplicates`, `--exclude-duplicates` |
 | Anonymiser les adresses IP/MAC | Rapport partageable sans adresses réelles | `--redact` |
+| Cles TLS... | Fichier de clés TLS (format `SSLKEYLOGFILE`) transmis à tshark pour déchiffrer les sessions TLS de toutes les captures. Un fichier absent ou combiné à l'anonymisation bloque le lancement | `--tls-keylog` |
 | Diagnostic TLS, Diagnostic QUIC/HTTP3 | Certificats, négociations, QUIC | `--tls`, `--quic` |
 | Rapport de sécurité | Vulnérabilités et tentatives d'attaque | `--security-report` |
 | Notifier si, webhook, Slack, courriel, Détail complet | Envoie un résumé du rapport de sécurité quand son pire constat atteint le seuil choisi (voir [Notifications](../notifications.md)). Nécessite « Rapport de sécurité » ; une URL invalide bloque le lancement. Le résultat de chaque canal s'affiche au journal | `--notify-on`, `--notify-webhook`, `--notify-slack`, `--notify-email`, `--notify-detail` |

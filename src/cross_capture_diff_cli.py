@@ -91,6 +91,14 @@ from netcross_core import (
 )
 from netcross_core.baseline_diff import diff_reports, print_diff_report, write_diff_csv
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
+from netcross_core.tls_keylog import (
+    TlsKeylogError,
+    options_lecture,
+    options_lecture_parallele,
+    resoudre_keylogs,
+    resume_keylogs,
+    verifier_compatibilite,
+)
 from pcap_parser.ek_source import TsharkError, TsharkNotFoundError
 from pcap_parser.remote import CaptureSourceError, parse_source, split_live_target
 
@@ -134,7 +142,8 @@ def _parse_capture_args(raw_list, flag_name):
     return captures
 
 
-def _load_packets(scenario_name, captures, parallel, parallel_workers):
+def _load_packets(scenario_name, captures, parallel, parallel_workers, tls_keylogs=None):
+    tls_keylogs = tls_keylogs or {}
     if parallel:
         cpu_count = os.cpu_count() or 1
         effective_workers = parallel_workers or cpu_count
@@ -158,7 +167,9 @@ def _load_packets(scenario_name, captures, parallel, parallel_workers):
                 "s'executer reellement en parallele, ce qui peut ralentir la lecture "
                 "de chaque fichier individuellement plutot que l'accelerer."
             )
-        all_packets, per_file_stats = parse_captures_parallel(captures, parallel_workers)
+        all_packets, per_file_stats = parse_captures_parallel(
+            captures, parallel_workers, **options_lecture_parallele(tls_keylogs, captures)
+        )
         any_error = False
         for s in per_file_stats:
             if s["error"]:
@@ -192,7 +203,7 @@ def _load_packets(scenario_name, captures, parallel, parallel_workers):
     any_error = False
     for label, path in captures:
         try:
-            pkts = parse_capture(label, path, raise_on_error=True)
+            pkts = parse_capture(label, path, raise_on_error=True, **options_lecture(tls_keylogs, label))
         except (TsharkNotFoundError, TsharkError) as exc:
             logger.exception(f"échec dans _load_packets: {exc}")
             any_error = True
@@ -364,7 +375,12 @@ def _run_scenario(name, captures, points_order, args, redactor=None):
         summarize(args, "args"),
         summarize(redactor, "redactor"),
     )
-    all_packets = _load_packets(name, captures, args.parallel, args.parallel_workers)
+    tls_keylogs = getattr(args, "tls_keylogs_resolus", None)
+    all_packets = (
+        _load_packets(name, captures, args.parallel, args.parallel_workers, tls_keylogs)
+        if tls_keylogs
+        else _load_packets(name, captures, args.parallel, args.parallel_workers)
+    )
     if redactor is not None:
         # meme objet redactor pour baseline ET courant (voir main()) : une
         # adresse reelle presente des deux cotes doit obtenir le meme
@@ -522,6 +538,15 @@ def main():
         "redaction.",
     )
     ap.add_argument(
+        "--tls-keylog",
+        action="append",
+        metavar="[NOM=]FICHIER",
+        help="Fichier de cles TLS (format SSLKEYLOGFILE) transmis a tshark pour "
+        "dechiffrer les sessions TLS des captures --baseline/--current : FICHIER "
+        "vaut pour tous les points, NOM=FICHIER pour un seul point (prioritaire). "
+        "Repetable. Refuse avec --redact (issue #1040).",
+    )
+    ap.add_argument(
         "--redact-map",
         metavar="CHEMIN",
         help="Avec --redact : ecrit la correspondance adresse reelle <-> "
@@ -614,6 +639,19 @@ def main():
     baseline_captures = _parse_capture_args(args.baseline, "--baseline")
     current_captures = _parse_capture_args(args.current, "--current") if args.current else []
     points_order = args.order.split(",") if args.order else None
+    try:
+        verifier_compatibilite(args.tls_keylog, redact=args.redact)
+        points = [label for label, _ in (*baseline_captures, *current_captures)]
+        args.tls_keylogs_resolus = resoudre_keylogs(args.tls_keylog, points)
+    except TlsKeylogError as exc:
+        logger.debug("main: --tls-keylog refusé ({})", exc)
+        print(exc, file=sys.stderr)
+        sys.exit(1)
+    if args.tls_keylogs_resolus:
+        print(
+            f"Fichier(s) de cles TLS transmis a tshark pour : {resume_keylogs(args.tls_keylogs_resolus)}",
+            file=sys.stderr,
+        )
     redactor = AddressRedactor() if args.redact else None
 
     print("=" * 70)
