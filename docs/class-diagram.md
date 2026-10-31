@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+203 modules · 292 classes · 724 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -469,6 +469,7 @@ classDiagram
 | `netcross_core.capture_tools` | manipulation de fichiers de capture partagee par la CLI, la GUI et l'API (issues #868, #869, #870, #886, #887). |
 | `netcross_core.causality` | moteur de correlation causale (Session 3 de la section 13.3 de FEATURES.md, Job 4/issue #4). |
 | `netcross_core.client_diff` | comparaison "client vs client" : meme capture, memes points, seule la source (l'IP du poste) change. |
+| `netcross_core.clock_sync` | Estimation du décalage d'horloge entre points de capture (issue #1026, chantier #996). |
 | `netcross_core.compliance` | evaluateur de conformite, huitieme et neuvieme objets de contrat de la Session 0 (FEATURES.md section 13.3) : `ReferenceProfile`/`ComplianceResult` (netcross_core.expert_model). |
 | `netcross_core.config` | chargement de configuration depuis .netcross.toml (issue #170). |
 | `netcross_core.content` | Extraction des objets applicatifs HTTP/1.x sans conservation du corps. |
@@ -725,6 +726,14 @@ classDiagram
         +compare_clients(all_packets, client_group, reference, points_order, bucket_seconds, nat_tolerant, nat_window_ms, rtp_clock_rate, loss_min_pp, latency_min_ms)
         +print_client_comparison(result) None
         +write_client_diff_csv(result, path) None
+    }
+
+    %% ===== netcross_core.clock_sync =====
+    class mod_netcross_core_clock_sync["netcross_core.clock_sync"] {
+        <<module>>
+        +echantillon_ntp_ms(t1, t2, t3, t4) float
+        +estimer_decalage(echantillons) Estimation
+        +estimer_decalages(echantillons_par_paire) dict
     }
 
     %% ===== netcross_core.compliance =====
@@ -1714,29 +1723,6 @@ classDiagram
         +detect_encapsulation(layers)
     }
 
-    %% ===== netcross_core.quic_diagnostics =====
-    class QuicEvent {
-        <<dataclass>>
-        +str point
-        +float ts
-        +str src
-        +str dst
-        +int sport
-        +int dport
-        +bytes dcid
-        +bool decryptable
-        +str? sni
-        +str? tls_version
-    }
-    class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
-        <<module>>
-        +derive_initial_secrets(dcid) tuple~bytes, bytes~
-        +derive_packet_protection_keys(secret) tuple~bytes, bytes, bytes~
-        +parse_quic_capture(label, path) list~QuicEvent~
-        +diagnose_quic(events, points_order)
-        +print_quic_diagnostics(findings) None
-    }
-
     %% ===== relations =====
     DiffFinding --> EvidenceLink : evidence
     CaptureGroup --> CaptureInventory : members
@@ -1780,6 +1766,29 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_core.quic_diagnostics =====
+    class QuicEvent {
+        <<dataclass>>
+        +str point
+        +float ts
+        +str src
+        +str dst
+        +int sport
+        +int dport
+        +bytes dcid
+        +bool decryptable
+        +str? sni
+        +str? tls_version
+    }
+    class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
+        <<module>>
+        +derive_initial_secrets(dcid) tuple~bytes, bytes~
+        +derive_packet_protection_keys(secret) tuple~bytes, bytes, bytes~
+        +parse_quic_capture(label, path) list~QuicEvent~
+        +diagnose_quic(events, points_order)
+        +print_quic_diagnostics(findings) None
+    }
 
     %% ===== netcross_core.redact =====
     class AddressRedactor {
