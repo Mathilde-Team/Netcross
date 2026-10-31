@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.beaconing -- issue #147 (SCENARIO-1, parent #141) :
 detection de beaconing C2 (communications periodiques d'un hote interne

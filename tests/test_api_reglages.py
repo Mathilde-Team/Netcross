@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Issue #330 (suite de l'écart 2) : réglages d'analyse de l'API déjà
 présents en GUI et en CLI -- bucket_ms, rtp_clock_rate,

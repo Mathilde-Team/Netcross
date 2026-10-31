@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Netcross — image Docker pour déploiement rapide (issue #170)
 #
 # Construction :

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_gtk4.row_labels -- libelles et cles de tri des lignes affichees
 par la GUI (issue #285, premier lot d'extraction de `app.py`).

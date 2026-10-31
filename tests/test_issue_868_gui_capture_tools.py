@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issues #868, #869, #870, #886, #887 : fenêtre « Outils de capture » de
 la GUI, mêmes fichiers et mêmes refus que la CLI."""
 

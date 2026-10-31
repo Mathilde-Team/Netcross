@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from netcross_core.content import extract_http_objects
 from netcross_core.models import Pkt
 

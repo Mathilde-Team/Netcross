@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #274 : rapport temps reel du mode --live (dictionnaire structure,
 instantane + journal, page a relecture successive ou completive)."""
 

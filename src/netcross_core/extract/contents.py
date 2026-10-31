@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.extract.contents -- issue #278 : extraction des contenus
 (audio, video, documents) a titre d'analyse qualitative, avec rappel de

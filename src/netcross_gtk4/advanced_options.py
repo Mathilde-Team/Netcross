@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.advanced_options -- options d'analyse avancees de la GUI
 (issue #672), sans GTK.
 

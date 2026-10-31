@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 cross_capture_analyzer_cli.py -- interface en ligne de commande pour
 netcross_core. Le moteur d'analyse lui-meme (parsing, correlation,

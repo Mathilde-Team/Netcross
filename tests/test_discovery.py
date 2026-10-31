@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.discovery -- tests de l'inventaire passif des actifs
 reseau (assets.py) et de l'empreinte OS passive (os_detect.py), issue

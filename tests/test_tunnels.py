@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.tunnels -- detection de la pile d'encapsulation et choix de
 la couche IP/TCP/UDP/ICMP la plus interne. Le format textuel des tags

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_gtk4.diff_pipeline -- pipeline de comparaison baseline/courant
 extrait de MainWindow._run_diff_thread (issue #246, #285 -- lot supplémentaire).

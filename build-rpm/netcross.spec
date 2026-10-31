@@ -2,7 +2,7 @@ Name:           netcross
 Version:        1.1.0
 Release:        1%{?dist}
 Summary:        Analyse croisee de captures Wireshark multi-points
-License:        MIT
+License:        GPL-3.0-or-later
 URL:            https://github.com/Mathilde-Team/Netcross
 BuildArch:      noarch
 
@@ -67,6 +67,8 @@ cp cross_capture_batch_cli.py %{buildroot}%{_datadir}/netcross/
 cp netcross_ai_models_cli.py %{buildroot}%{_datadir}/netcross/
 cp netcross_lua_doc_cli.py %{buildroot}%{_datadir}/netcross/
 cp netcross_annotations_cli.py %{buildroot}%{_datadir}/netcross/
+mkdir -p %{buildroot}%{_licensedir}/%{name}
+cp LICENSE %{buildroot}%{_licensedir}/%{name}/LICENSE
 mkdir -p %{buildroot}%{_datadir}/netcross/data
 cp data/lua_api.json %{buildroot}%{_datadir}/netcross/data/
 cp data/lua_dissectors.csv %{buildroot}%{_datadir}/netcross/data/
@@ -82,6 +84,7 @@ install -m 755 netcross-ai-models-wrapper %{buildroot}%{_bindir}/netcross-ai-mod
 install -m 755 netcross-lua-doc-wrapper %{buildroot}%{_bindir}/netcross-lua-doc
 
 %files
+%license %{_licensedir}/%{name}/LICENSE
 %{_datadir}/netcross/
 %{_bindir}/netcross
 %{_bindir}/netcross-gui

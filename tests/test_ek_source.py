@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.ek_source -- couche 1 (subprocess tshark). tshark n'etant
 disponible dans aucun des environnements ou ce projet a ete developpe

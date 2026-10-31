@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """#441, lot 7 : journalisation de netcross_report (moteur de règles, rapport sécurité)."""
 
 from __future__ import annotations

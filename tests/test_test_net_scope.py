@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #365 : plages TEST-NET (RFC 5737) internes par defaut, externes sur demande.
 
 Documente le comportement : `ipaddress` range 192.0.2.0/24, 198.51.100.0/24

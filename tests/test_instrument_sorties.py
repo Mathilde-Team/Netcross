@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Outil d'instrumentation « un logger.debug() à chaque sortie » (suite #441)."""
 
 from __future__ import annotations

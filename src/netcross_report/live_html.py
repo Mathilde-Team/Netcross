@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ruff: noqa: E501 -- gabarits HTML/JS en ligne, lisibles tels quels
 """
 netcross_report.live_html -- issue #274 : page de presentation du rapport

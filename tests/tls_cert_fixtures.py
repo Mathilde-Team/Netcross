@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Certificats X.509 auto-signes a algorithme FAIBLE, generes avec openssl 3.0
 (issue #153) : `cryptography` refuse de SIGNER en SHA-1/MD5, ces deux cas ne

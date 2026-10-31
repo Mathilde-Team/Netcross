@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Job 41/issue #161 -- detection de doublons inter-captures (multi-point) :
 netcross_core.forensic.detect_cross_capture_duplicates(), Pkt.is_duplicate,

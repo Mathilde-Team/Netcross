@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.stix_export -- export STIX 2.1 des constats de securite
 (issue #279, sous-issue de #170).

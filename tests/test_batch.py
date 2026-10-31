@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Mode batch (issue #277) : regroupement conservateur, justification ecrite,
 invariant entrees = groupees + isolees + echecs, et CLI de lot.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.lua_doc_view -- logique sans GTK de la fenetre
 « Documentation Lua » (issue #873), equivalent de ``netcross-lua-doc``.
 

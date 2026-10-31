@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.extract.carver -- tests (issue #150, SCENARIO-4).
 

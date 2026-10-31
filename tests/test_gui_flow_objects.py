@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de regression de l'issue #453 : les flux d'un run existent sous deux
 formes dans la GUI, et chaque vue consomme celle qu'elle attend.

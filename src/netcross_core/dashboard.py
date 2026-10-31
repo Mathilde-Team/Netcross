@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.dashboard -- contexte d'analyse partage pour le
 dashboard analytique interactif (issue #18, section 6.17).

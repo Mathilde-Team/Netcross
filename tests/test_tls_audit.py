@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.tls_audit -- issue #153 (SCENARIO-7) : audit des
 certificats TLS. Paquets synthetiques (make_pkt) portant les champs

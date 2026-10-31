@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """AnnotationStore : persistance GUI des annotations par capture (issue #363).
 
 Logique sans GTK du panneau `netcross_gtk4.annotations_panel` : chargement

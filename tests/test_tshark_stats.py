@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.tshark_stats -- tests des adaptateurs de statistiques tshark -z
 (Job 19 / issue #20, section 6.19).

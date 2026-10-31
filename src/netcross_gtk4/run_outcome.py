@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_gtk4.run_outcome -- etat de resultat et decisions d'affichage a la
 fin d'une analyse ou d'une comparaison (issue #285, deuxieme lot).

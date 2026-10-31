@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.notify.summary -- resume d'analyse a notifier (issue #280).
 

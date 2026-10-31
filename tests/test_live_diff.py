@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """tests/test_live_diff.py — Capture en continu + diff en direct (Job 33, issue #33).
 
 Tests du module netcross_core.live_diff : conversion DiffFinding -> AlarmSignal,

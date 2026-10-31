@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Extraction des objets applicatifs HTTP/1.x sans conservation du corps.
 
 Le module travaille uniquement sur les metadonnees deja extraites par tshark.

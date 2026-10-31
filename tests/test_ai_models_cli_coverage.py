@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #696 (suite de #665) : branches restantes de ``netcross_ai_models_cli``.
 
 Complete ``tests/test_ai_model_pack.py`` (parcours nominal) : description du

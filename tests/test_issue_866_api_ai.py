@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #866 (API) : module IA local sur une analyse terminée.
 
 ``POST /analyses/{analysis_id}/ai`` est l'équivalent des options ``--ai-*`` :

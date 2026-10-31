@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests d'intégration du Job 38/issue #158 : metadonnees de capture dans le
 Report (champ capture_infos), affichage dans print_report, et fonction

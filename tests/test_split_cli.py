@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 --split / --split-output-dir de cross_capture_analyzer_cli.py -- Job 35,
 issue #155. split_capture est monkeypatche (son comportement reel est

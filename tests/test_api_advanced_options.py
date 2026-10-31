@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests des options d'analyse avancées de l'API (issue #672).
 

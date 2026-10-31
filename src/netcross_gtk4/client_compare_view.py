@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.client_compare_view -- comparaison de postes dans la GUI
 (issue #675).
 

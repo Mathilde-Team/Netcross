@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_api.annotations_routes -- annotations (etiquettes / signets sur
 des trames) d'une analyse (issue #910), équivalent API du panneau
 « Annotations / signets » de la GUI et de ``netcross annotations``.

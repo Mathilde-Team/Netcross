@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.exfiltration -- issue #148 (SCENARIO-2, parent #141) :
 detection d'exfiltration de donnees (transferts sortants anormaux).

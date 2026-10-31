@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.compliance -- evaluateur de conformite, huitieme et
 neuvieme objets de contrat de la Session 0 (FEATURES.md section 13.3) :

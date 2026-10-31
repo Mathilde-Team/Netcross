@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_lua_doc_cli -- consultation hors ligne de l'API Lua Wireshark
 (issue #388, rattachee a #331).
 

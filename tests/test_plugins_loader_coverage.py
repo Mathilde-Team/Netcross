@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #699 (suite de #665) : branches restantes de ``netcross_core.plugins.loader``.
 
 Complete ``tests/test_plugins.py`` : sources non lisibles ou non Python,

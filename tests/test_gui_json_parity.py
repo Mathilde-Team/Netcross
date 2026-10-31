@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Parite du JSON produit par la GUI et par la CLI (Job 5/issue #14).
 

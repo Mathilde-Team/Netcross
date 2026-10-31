@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.analysis -- coeur analytique : construit un Report a partir
 des flux correles (pertes, latence, TTL/topologie, QoS, fragmentation,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_api.lua_doc_routes -- documentation hors ligne de l'API Lua
 Wireshark (issue #873), équivalent de ``netcross-lua-doc --json``.
 

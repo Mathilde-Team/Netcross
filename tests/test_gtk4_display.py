@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Garde commune des tests GTK4 (tests/gtk4_display.py).
 
 Sans serveur graphique, un module de test GTK4 doit être SAUTÉ, pas faire

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests pour l'issue #673 : sections d'expertise dans l'API."""
 
 from __future__ import annotations

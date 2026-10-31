@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de netcross_report.sequence_view, du diagramme matplotlib et de la
 section PDF "Sequence des echanges" (Job 14/issue #11).
 

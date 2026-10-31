@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.redact -- champs presents mais NON redigeables (issue #735,
 suite de #665).

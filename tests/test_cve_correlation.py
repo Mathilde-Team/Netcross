@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_cve_correlation.py -- tests de la base CVE locale et de la
 correlation de versions (netcross_core.security, issue #138 / CVE-4).

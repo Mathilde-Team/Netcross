@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Normalise le recensement des dissecteurs Lua (dépôt Mathilde-Team/wireshark-lua,
 CSV joint à l'issue #559) en ``data/lua_dissectors.csv`` (issue #917).
 

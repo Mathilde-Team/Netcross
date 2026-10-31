@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #912 : exploration statistique en CLI (--stats) et dans l'API
 (GET /analyses/{analysis_id}/stats), même calcul que la vue GUI."""
 

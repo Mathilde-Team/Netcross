@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.tshark_stats.io_stat -- adaptateur ``tshark -z io,stat``.
 

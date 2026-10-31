@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #867 (API) : plugins côté serveur.
 
 - ``GET /plugins`` : équivalent de ``--list-plugins`` (installés + fichiers de

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Fake sklearn module injected into sys.modules for coverage of the
 ML-dependent code paths (anomaly.py, flow_classifier.py) when scikit-learn
 is not installed in the test environment.

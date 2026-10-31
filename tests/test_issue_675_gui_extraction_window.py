@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #675 : panneau « Contenus (extraction) » de la page Resultats.
 
 Ignore sans GTK4 ou sans affichage, meme garde que test_app_gtk4_lot4.py.

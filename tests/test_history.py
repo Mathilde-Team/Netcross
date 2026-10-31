@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.history -- verifie l'enregistrement (record_run/
 record_diff_run) et la lecture (list_history/print_history) de

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.stats_view -- logique de presentation pour la vue
 d'exploration statistique (Job 27 / issue #22, section 6.8).
 

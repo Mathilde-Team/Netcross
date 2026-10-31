@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.cpe_match -- conversion d'une banniere de service
 ("Apache/2.4.41") en identifiant CPE 2.3 et comparaison de versions avec

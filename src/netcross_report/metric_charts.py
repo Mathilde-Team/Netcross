@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.metric_charts -- API generique de graphiques : tout
 module d'analyse peut produire un graphique a partir d'une MetricSeries

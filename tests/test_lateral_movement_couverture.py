@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.lateral_movement -- couverture des chemins limites
 (issue #715, suite de #665).

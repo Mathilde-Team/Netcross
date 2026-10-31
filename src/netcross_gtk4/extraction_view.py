@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.extraction_view -- extraction des contenus depuis la GUI
 (issue #675).
 

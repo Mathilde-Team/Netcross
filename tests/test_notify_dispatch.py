@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.notify.dispatch -- chemins d'erreur et cas limites (issue #720,
 suite de #665).

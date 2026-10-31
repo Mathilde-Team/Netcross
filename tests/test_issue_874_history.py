@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #874 : historique des comparaisons et consultation filtrée en GUI
 et en API (équivalents de ``--history-db``/``--history-label`` de
 ``cross_capture_diff_cli.py`` et de ``netcross-history``)."""

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Extraction des details du certificat TLS feuille (issue #153) : emetteur,
 sujet, algorithme de signature, cle publique, IP du SAN, longueur de chaine,

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Wrapper installe dans /usr/bin/netcross-lua-doc par le paquet Debian/RPM.
 # Documentation hors ligne de l'API Lua Wireshark (issue #388) ; la banque
 # SQLite est construite dans ~/.cache/netcross depuis /usr/share/netcross/data/lua_api.json.

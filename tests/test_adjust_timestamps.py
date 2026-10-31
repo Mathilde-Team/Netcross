@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de pcap_parser.capture.adjust_timestamps / first_timestamp (Job 45,
 issue #165) et de la CLI --adjust-time-output.

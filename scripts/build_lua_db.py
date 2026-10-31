@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 scripts/build_lua_db.py -- charge le JSON de l'API Lua Wireshark (#386)
 dans la banque SQLite locale (netcross_core.lua_doc), issue #387.

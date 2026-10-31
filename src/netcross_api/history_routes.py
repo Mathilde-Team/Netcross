@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_api.history_routes -- historique SQLite des runs (issue #874).
 
 Équivalent de ``--history-db`` / ``netcross-history`` : la base est fixée

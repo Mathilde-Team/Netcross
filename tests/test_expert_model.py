@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.expert_model -- verifie uniquement la forme du contrat (les
 neuf objets de la Session 0 exposent bien les champs decrits par leur

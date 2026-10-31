@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from conftest import make_pkt
 
 from netcross_core.correlate import (

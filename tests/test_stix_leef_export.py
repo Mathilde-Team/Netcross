@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Exports LEEF 2.0 et STIX 2.1 (issue #279).
 """

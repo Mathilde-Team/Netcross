@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Resume d'un export NetFlow (issue #362) : volumes, protocoles, principaux
 emetteurs, conversations et ports de destination.

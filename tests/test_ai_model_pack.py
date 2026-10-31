@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #271 : paquets de modeles partageables (ZIP anonyme, verifie) et
 boite d'envoi hors connexion. Aucun test ne necessite scikit-learn ni le
 reseau (is_online est simule)."""

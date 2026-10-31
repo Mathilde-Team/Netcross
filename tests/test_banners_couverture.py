@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de couverture de netcross_core/application/banners.py (issue #712, suite #665).
 
 Complète tests/test_banners.py par les chemins rares, tous synthétiques

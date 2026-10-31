@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests des exports texte, PDF et CSV de l'API (issue #670).
 

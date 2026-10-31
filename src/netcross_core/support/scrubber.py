@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.support.scrubber -- anonymisation de TEXTE LIBRE (issue #269).
 

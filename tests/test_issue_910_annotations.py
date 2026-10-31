@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #910 : annotations et signets en CLI (`netcross annotations`, même
 sidecar que la GUI), dans le rapport texte et dans l'API
 (`/analyses/{analysis_id}/annotations`)."""

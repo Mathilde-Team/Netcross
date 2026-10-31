@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #864 : export Markdown (--md-report) en GUI et en API."""
 
 from __future__ import annotations

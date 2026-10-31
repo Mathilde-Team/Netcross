@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.ring_recorders -- rotation de capture (ring buffer) de la
 GUI en capture en direct (issue #676).
 

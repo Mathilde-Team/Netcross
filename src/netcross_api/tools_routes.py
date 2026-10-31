@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_api.tools_routes -- manipulation de captures (issues #868,
 #869, #870, #886, #887), équivalents des modes utilitaires de la CLI :
 

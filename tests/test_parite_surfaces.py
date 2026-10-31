@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #330 : la matrice de parité GUI / CLI / API reste fidèle au code.
 
 ``docs/parite-surfaces.md`` répond à la question « toutes les fonctions sont-

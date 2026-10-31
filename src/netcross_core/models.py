@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.models -- structures de donnees partagees : un paquet
 normalise (Pkt) et le resultat d'analyse consolide (Report).

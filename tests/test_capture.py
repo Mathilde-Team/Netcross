@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.capture -- couche d'orchestration. On monkeypatch
 iter_ek_records (jamais tshark lui-meme, cf. les autres fichiers de

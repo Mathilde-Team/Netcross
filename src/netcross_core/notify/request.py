@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_core.notify.request -- notifications d'une analyse terminee,
 reglages et envoi partages par la GUI (issue #676) et l'API (issue #875).
 

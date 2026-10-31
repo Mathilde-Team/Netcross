@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 scripts/import_nvd.py -- import (periodique) du flux NVD dans la base
 CVE locale SQLite (netcross_core.security.cve_db), issue #138 (CVE-4).

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.findings -- alimentation de
 `Report.service_fingerprints` et `Report.security_findings` a partir des

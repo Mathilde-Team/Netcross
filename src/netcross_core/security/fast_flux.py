@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.fast_flux -- issue #152 (SCENARIO-6, parent #141) :
 detection d'infrastructures a flux rapide (fast flux) utilisees par les

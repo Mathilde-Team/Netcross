@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.extract -- extraction et reconstruction de fichiers (issue #150).
 """

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #676 : CLI ring buffer, BPF library, et parite GUI/CLI.
 
 Tests unitaires des nouvelles options CLI --ring-buffer et --bpf-library,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Fusion de captures (Job 34, issue #154) : pcap_parser.capture.merge_captures
 et le flag --merge de cross_capture_analyzer_cli.py.

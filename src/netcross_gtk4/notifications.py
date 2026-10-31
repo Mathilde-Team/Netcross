@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.notifications -- notifications sortantes (webhook, Slack,
 courriel) apres une analyse de la GUI (issue #676).
 

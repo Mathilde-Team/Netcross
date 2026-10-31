@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.ek_fields -- couche la plus basse, aucune connaissance
 protocolaire. Couvre la normalisation couche-unique vs couche-empilee

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.analysis.analyse -- coeur analytique. On construit des
 flux synthetiques a 2 ou 3 points de capture et on verifie les

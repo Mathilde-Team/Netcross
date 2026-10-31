@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Base CVE minimale embarquee (issue #353).
 
 Sans --cve-db, un Apache 2.4.49 n'etait pas qualifie vulnerable. La base

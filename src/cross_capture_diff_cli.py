@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 cross_capture_diff_cli.py -- compare deux jeux de captures (avant/apres
 un correctif, site A / site B...) et remonte les regressions et

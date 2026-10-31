@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Decisions du panneau de filtres BPF de la capture live, sorties de
 ``netcross_gtk4/app.py`` (issue #285, quatrieme lot).

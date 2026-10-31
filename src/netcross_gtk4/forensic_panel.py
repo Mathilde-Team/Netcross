@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.forensic_panel -- panneau GTK « Recherche forensic » de la
 page Resultats (issue #675).
 

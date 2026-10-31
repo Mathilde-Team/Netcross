@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.security_html -- rendu HTML du rapport de securite
 (issue #218, troisieme sortie apres le texte et le JSON).

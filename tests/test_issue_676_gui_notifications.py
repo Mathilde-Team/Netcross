@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #676 : notifications (webhook, Slack, courriel) apres une analyse de
 la GUI, equivalent de --notify-on / --notify-webhook / --notify-slack /
 --notify-email / --notify-detail. Partie sans GTK : module et pipeline."""
