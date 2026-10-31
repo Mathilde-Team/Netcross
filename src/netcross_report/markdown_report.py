@@ -25,6 +25,7 @@ logger = get_logger(__name__)
 
 
 def _now_iso() -> str:
+    logger.debug("_now_iso: retour datetime.now(timezone.utc).strftime(…)")
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
@@ -33,13 +34,16 @@ def _cell(value) -> str:
     ligne dans une description (CVE, message d'expertise) casserait le
     tableau Markdown."""
     if value is None or value == "":
+        logger.debug("_cell: si value is None or value == '' -> retour '—'")
         return "—"
+    logger.debug("_cell: retour str(value).replace('\\\\', '\\\\\\\\').replac…(…)")
     return str(value).replace("\\", "\\\\").replace("|", "\\|").replace("\r", " ").replace("\n", " ")
 
 
 def _finding_row(f: Finding) -> str:
     """Ligne de tableau pour un Finding."""
     sample = f" ({f.sample_size} échantillons)" if f.sample_size else ""
+    logger.debug("_finding_row: retour chaîne formatée")
     return f"| {f.severity} | {f.category} | {f.segment} | {f.message}{sample} |"
 
 
@@ -47,6 +51,7 @@ def _triage_row(seg) -> str:
     """Ligne de tableau pour un SegmentScore."""
     confidence = "faible" if seg.low_confidence else "normale"
     convergence = " ✓" if seg.convergent else ""
+    logger.debug("_triage_row: retour chaîne formatée")
     return f"| {seg.segment} | {seg.score:.1f} | {confidence}{convergence} | {', '.join(seg.categories)} |"
 
 
@@ -64,6 +69,7 @@ def _metrics_table(r) -> str:
         zero_w = r.zero_window.get(p, 0)
         ttl_unstable = r.ttl_unstable.get(p, 0)
         lines.append(f"| {p} | {seen} | {loss} | {retrans} | {rst} | {zero_w} | {ttl_unstable} |")
+    logger.debug("_metrics_table: retour '\\n'.join(…)")
     return "\n".join(lines)
 
 
@@ -87,12 +93,14 @@ def _topology_section(r) -> str:
     if r.topology_ambiguous:
         lines.append("\n**Relations ambiguës** :\n")
         lines.extend(f"- {pair[0]} <-> {pair[1]}" for pair in r.topology_ambiguous)
+    logger.debug("_topology_section: retour '\\n'.join(…)")
     return "\n".join(lines)
 
 
 def _checksum_section(r) -> str:
     """Section checksums IP/TCP/UDP invalides (issue #762)."""
     if not r.checksum_errors:
+        logger.debug("_checksum_section: si not r.checksum_errors -> retour ''")
         return ""
     lines = ["## Intégrité de capture : checksums IP/TCP/UDP\n"]
     lines.append("| Point | Trame | Protocole | Checksum |")
@@ -101,6 +109,7 @@ def _checksum_section(r) -> str:
         f"| {err.point} | {err.frame_number} | {err.protocol} | `{err.checksum}` |" for err in r.checksum_errors
     )
     lines.append(f"\n**Total : {len(r.checksum_errors)} checksum(s) invalide(s)**")
+    logger.debug("_checksum_section: retour '\\n'.join(…)")
     return "\n".join(lines)
 
 
@@ -120,6 +129,7 @@ def _security_section(security_report) -> str:
     (``format_security_report``).
     """
     if security_report is None:
+        logger.debug("_security_section: si security_report is None -> retour ''")
         return ""
     from netcross_report.security_report import security_report_to_dict
 
@@ -161,6 +171,7 @@ def _security_section(security_report) -> str:
                 f"| {label} | {_cell(item['severity'])} | {_cell(target)} | {_cell(item['point'])} | {_cell(detail)} |"
             )
 
+    logger.debug("_security_section: retour '\\n'.join(lines).rstrip(…)")
     return "\n".join(lines).rstrip("\n")
 
 
@@ -170,6 +181,7 @@ def _session_objects_section(session_objects, top_n=20) -> str:
     ``_compliance_table``), lues sur les dataclasses de
     ``netcross_core.expert_model``."""
     if session_objects is None:
+        logger.debug("_session_objects_section: si session_objects is None -> retour ''")
         return ""
     lines = ["## Expertise — objets enrichis\n"]
 
@@ -206,6 +218,7 @@ def _session_objects_section(session_objects, top_n=20) -> str:
             mesure = f"{ref.metric} : {observed} (seuil {ref.operator} {ref.threshold:g} {ref.unit})".replace(" )", ")")
             lines.append(f"| {_cell(res.status)} | {_cell(ref.id)} | {_cell(mesure)} | {_cell(ref.source)} |")
 
+    logger.debug("_session_objects_section: retour '\\n'.join(…)")
     return "\n".join(lines)
 
 
@@ -379,6 +392,7 @@ def build_markdown_report_document(
         lines.extend(f"- [paquet] {c}" for c in r.packet_comments)
         lines.append("")
 
+    logger.debug("build_markdown_report_document: retour '\\n'.join(…)")
     return "\n".join(lines)
 
 
