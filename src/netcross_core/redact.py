@@ -9,7 +9,8 @@ Perimetre assume, volontairement etroit (nom du flag CLI : --redact,
 
 - adresses IP (Pkt.src/dst -- SAUF sur un paquet STP, ou ces deux champs
   portent en realite une adresse MAC Ethernet, pas une IP, voir
-  pcap_parser.packet ; et Pkt.dhcp_server_id) -> plage de documentation
+  pcap_parser.packet ; Pkt.dhcp_server_id ; et les adresses media SDP
+  de Pkt.sip_sdp_media, issue #1120) -> plage de documentation
   RFC 5737 (IPv4, TEST-NET-1/2/3) ou RFC 3849 (IPv6, 2001:db8::/32) --
   jamais routable sur le vrai Internet, signal univoque que la donnee a
   ete anonymisee (convention deja largement utilisee par les outils de
@@ -199,6 +200,15 @@ class AddressRedactor:
             kind = _ip_kind(pk.dhcp_server_id)
             if kind is not None:
                 pk.dhcp_server_id = self._pseudonym(pk.dhcp_server_id, kind)
+
+        sdp_media = getattr(pk, "sip_sdp_media", ())
+        if sdp_media:
+            # Issue #1120 : meme pseudonyme que src/dst, pour que
+            # l'association SIP/RTP par SDP reste exacte apres --redact.
+            pk.sip_sdp_media = tuple(
+                (self._pseudonym(addr, kind) if (kind := _ip_kind(addr)) is not None else addr, port)
+                for addr, port in sdp_media
+            )
 
         if pk.stp_root_id is not None and "/" in pk.stp_root_id:
             prio, _sep, mac = pk.stp_root_id.partition("/")

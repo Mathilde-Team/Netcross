@@ -1550,6 +1550,12 @@ def _analyse_rtp(r: Report, all_packets, points, points_order, clock_rate):
         r.rtp_streams.append(
             {
                 "label": f"{src}:{sport} -> {dst}:{dport} (SSRC=0x{ssrc:08x})",
+                # Extremites du flux, lues par voip.build_calls pour
+                # l'association SIP/RTP par SDP (issue #1120).
+                "src": src,
+                "sport": sport,
+                "dst": dst,
+                "dport": dport,
                 "loss_pct": loss_pct,
                 "jitter_ms": jitter_ms,
                 "delay_ms": delay_ms,
