@@ -29,7 +29,7 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from netcross_core import capture_tools
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 from pcap_parser.capture import TcpreplayNotFoundError, TsharkNotFoundError
 
 logger = get_logger(__name__)
@@ -72,6 +72,7 @@ SaveUpload = Callable[[UploadFile, str], Awaitable[str]]
 async def _run(work: Callable[[], Any]) -> Any:
     """Exécute l'outil hors de la boucle ; erreurs -> codes HTTP."""
     try:
+        logger.debug("_run: retour await run_in_threadpool(work)")
         return await run_in_threadpool(work)
     except (TsharkNotFoundError, TcpreplayNotFoundError) as exc:
         logger.warning("outils de capture : {}", exc)
@@ -85,13 +86,17 @@ async def _run(work: Callable[[], Any]) -> Any:
 
 
 def _check_format(fmt: str, allowed: tuple[str, ...]) -> str:
+    logger.debug("_check_format: entrée")
     fmt = fmt.strip().lower()
     if fmt not in allowed:
+        logger.debug("_check_format: si fmt not in allowed -> levée HTTPException")
         raise HTTPException(status_code=400, detail=f"format inconnu : {fmt} (attendu : {', '.join(allowed)})")
+    logger.debug("_check_format: retour fmt={}", summarize(fmt, "fmt"))
     return fmt
 
 
 def _file_response(workdir: str, path: str, filename: str, fmt: str, message: str) -> FileResponse:
+    logger.debug("_file_response: retour FileResponse(…)")
     return FileResponse(
         path,
         media_type=_MEDIA.get(fmt, "application/octet-stream"),
@@ -111,11 +116,14 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
         name = Path(upload.filename or label).name or label
         dest = Path(workdir) / "in" / f"{len(list((Path(workdir) / 'in').glob('*')))}-{name}"
         shutil.move(tmp, dest)
+        logger.debug("register._saved: retour str(…)")
         return str(dest)
 
     def _workdir() -> str:
+        logger.debug("register._workdir: entrée")
         workdir = tempfile.mkdtemp(prefix="netcross-tools-")
         (Path(workdir) / "in").mkdir()
+        logger.debug("register._workdir: retour workdir")
         return workdir
 
     @app.post("/tools/merge", tags=["tools"], responses=_RESPONSES, dependencies=deps)
@@ -127,6 +135,7 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
         """Fusion ordonnée par horodatage (équivalent de ``--merge``)."""
         fmt = _check_format(format, _CAPTURE_FORMATS)
         if len(files) > max_files():
+            logger.debug("register.merge_captures_route: si len(files) > max_files() -> levée HTTPException")
             raise HTTPException(status_code=413, detail=f"Trop de fichiers (max {max_files()})")
         workdir = _workdir()
         try:
@@ -136,7 +145,9 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
         except BaseException:
             logger.debug("outils de capture : echec, {} supprime", workdir)
             shutil.rmtree(workdir, True)
+            logger.debug("register.merge_captures_route: except BaseException -> relance de l'exception en cours")
             raise
+        logger.debug("register.merge_captures_route: retour _file_response(…)")
         return _file_response(workdir, out, f"netcross-merge.{fmt}", fmt, message)
 
     @app.post("/tools/split", tags=["tools"], responses=_RESPONSES, dependencies=deps)
@@ -157,6 +168,7 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
             segdir = str(Path(workdir) / "segments")
             segments = await _run(lambda: capture_tools.split(path, segdir, split))
             if not segments:
+                logger.debug("register.split_capture_route: si not segments -> levée HTTPException")
                 raise HTTPException(status_code=422, detail="aucun paquet a decouper -- aucun segment cree")
             archive = str(Path(workdir) / "netcross-split.zip")
             with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -165,7 +177,9 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
         except BaseException:
             logger.debug("outils de capture : echec, {} supprime", workdir)
             shutil.rmtree(workdir, True)
+            logger.debug("register.split_capture_route: except BaseException -> relance de l'exception en cours")
             raise
+        logger.debug("register.split_capture_route: retour _file_response(…)")
         return _file_response(workdir, archive, "netcross-split.zip", "zip", f"{len(segments)} segment(s)")
 
     @app.post("/tools/convert", tags=["tools"], responses=_RESPONSES, dependencies=deps)
@@ -183,7 +197,9 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
         except BaseException:
             logger.debug("outils de capture : echec, {} supprime", workdir)
             shutil.rmtree(workdir, True)
+            logger.debug("register.convert_capture_route: except BaseException -> relance de l'exception en cours")
             raise
+        logger.debug("register.convert_capture_route: retour _file_response(…)")
         return _file_response(workdir, out, Path(out).name, fmt, message)
 
     @app.post("/tools/export", tags=["tools"], responses=_RESPONSES, dependencies=deps)
@@ -210,7 +226,9 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
         except BaseException:
             logger.debug("outils de capture : echec, {} supprime", workdir)
             shutil.rmtree(workdir, True)
+            logger.debug("register.export_subset_route: except BaseException -> relance de l'exception en cours")
             raise
+        logger.debug("register.export_subset_route: retour _file_response(…)")
         return _file_response(workdir, out, f"netcross-export.{fmt}", fmt, message)
 
     @app.post("/tools/adjust-time", tags=["tools"], responses=_RESPONSES, dependencies=deps)
@@ -235,7 +253,9 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
         except BaseException:
             logger.debug("outils de capture : echec, {} supprime", workdir)
             shutil.rmtree(workdir, True)
+            logger.debug("register.adjust_time_route: except BaseException -> relance de l'exception en cours")
             raise
+        logger.debug("register.adjust_time_route: retour _file_response(…)")
         return _file_response(workdir, out, f"netcross-adjust.{fmt}", fmt, message)
 
     @app.post("/tools/replay", tags=["tools"], responses=_REPLAY_RESPONSES, dependencies=deps)
@@ -257,6 +277,7 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
                 if allowed
                 else f"rejeu desactive sur ce serveur ({capture_tools.REPLAY_INTERFACES_ENV} vide)"
             )
+            logger.debug("register.replay_capture_route: si interface not in allowed -> levée HTTPException")
             raise HTTPException(status_code=403, detail=detail)
         workdir = _workdir()
         try:
@@ -266,6 +287,7 @@ def register(app: FastAPI, verify: Callable[..., None], save_upload: SaveUpload,
         finally:
             shutil.rmtree(workdir, True)
         logger.info("rejeu de {} sur {} (speed={}, loop={})", name, interface, speed, loop)
+        logger.debug("register.replay_capture_route: retour dictionnaire")
         return {"message": capture_tools.replay_message(name, interface, speed, loop)}
 
     logger.debug("tools_routes.register: 6 routes")

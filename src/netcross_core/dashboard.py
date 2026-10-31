@@ -27,7 +27,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from netcross_core.expert_model import Conversation, Flow
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import Report
 
 logger = get_logger(__name__)
@@ -492,16 +492,28 @@ DASHBOARD_VIEWS: tuple[str, ...] = ("timeline", "segments", "flows", "endpoints"
 def _json_safe(value: Any) -> Any:
     """Tuples -> listes, ensembles -> listes triees, enums et objets -> str."""
     if isinstance(value, dict):
+        logger.debug("_json_safe: si isinstance(value, dict) -> retour dictionnaire")
         return {str(k): _json_safe(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
+        logger.debug("_json_safe: si isinstance(value, (list, tuple)) -> retour liste")
         return [_json_safe(v) for v in value]
     if isinstance(value, (set, frozenset)):
+        logger.debug("_json_safe: si isinstance(value, (set, frozenset)) -> retour sorted(…)")
         return sorted(_json_safe(v) for v in value)
     if value is None or isinstance(value, (bool, int, float, str)):
+        logger.debug(
+            "_json_safe: si value is None or isinstance(value, (bool, int, float, str)) -> retour value={}",
+            summarize(value, "value"),
+        )
         return value
     enum_value = getattr(value, "value", None)
     if isinstance(enum_value, (int, str)):
+        logger.debug(
+            "_json_safe: si isinstance(enum_value, (int, str)) -> retour enum_value={}",
+            summarize(enum_value, "enum_value"),
+        )
         return enum_value
+    logger.debug("_json_safe: retour str(…)")
     return str(value)
 
 
@@ -524,12 +536,16 @@ def dashboard_document(
     une selection dans la GUI) : ``segment`` = point de capture, ``host`` =
     adresse d'endpoint, ``protocol``. ValueError si ``segment`` n'est pas un
     point de l'analyse."""
+    logger.debug("dashboard_document: entrée")
     if isinstance(flows, dict):
         from netcross_core.correlate import build_flows
 
         flows = build_flows(flows)
     points = list(getattr(report, "points", None) or [])
     if segment is not None and points and segment not in points:
+        logger.debug(
+            "dashboard_document: si segment is not None and points and (segment not in points) -> levée ValueError"
+        )
         raise ValueError(f"segment inconnu : {segment} (points : {', '.join(points)})")
     selection = DashboardSelection(point=segment, endpoint=host, protocol=protocol)
     snap = build_dashboard_snapshot(
