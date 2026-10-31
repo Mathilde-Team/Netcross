@@ -291,7 +291,9 @@ def observed_bounds(packets) -> tuple[_dt.datetime | None, _dt.datetime | None]:
     GUI (issue #674) ; ``(None, None)`` sans horodatage."""
     timestamps = [p.ts for p in packets if p.ts]
     if not timestamps:
+        logger.debug("observed_bounds: si not timestamps -> retour tuple de 2")
         return None, None
+    logger.debug("observed_bounds: retour tuple de 2")
     return (
         _dt.datetime.fromtimestamp(min(timestamps), tz=_dt.timezone.utc),
         _dt.datetime.fromtimestamp(max(timestamps), tz=_dt.timezone.utc),

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 
 logger = get_logger(__name__)
 
@@ -35,12 +35,14 @@ def render_dissecteurs(doc: dict[str, Any]) -> list[str]:
             f"  {d['domaine']} -- {natif}",
             f"  {d['protocole']}",
         ]
+    logger.debug("render_dissecteurs: retour lignes={}", summarize(lignes, "lignes"))
     return lignes
 
 
 def render_domaines(doc: dict[str, Any]) -> list[str]:
     logger.debug("render_domaines()")
     largeur = max((len(str(x["dissecteurs"])) for x in doc["domaines"]), default=1)
+    logger.debug("render_domaines: retour liste")
     return [
         f"{len(doc['domaines'])} domaines -- {doc['catalogue']} dissecteurs Lua",
         "",
