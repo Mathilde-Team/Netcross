@@ -139,6 +139,7 @@ def main(argv=None):
 def _progress(message: str) -> None:
     """Avancement : échecs d'analyse sur stderr, le reste sur stdout (comme avant #872)."""
     print(message, file=sys.stderr if " : ECHEC -- " in message and "inventaire" not in message else sys.stdout)
+    logger.debug("_progress: fin")
 
 
 if __name__ == "__main__":
