@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+204 modules · 294 classes · 725 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -1917,6 +1917,51 @@ classDiagram
         <<module>>
         +build_wireshark_expert_events(all_packets) list~ExpertEvent~
     }
+```
+
+## `netcross_core.active`
+
+| Module | Rôle |
+|---|---|
+| `netcross_core.active` | confirmation active du diagnostic passif (chantier #999, parent #993). |
+| `netcross_core.active.planner` | planificateur « constat localise -> mesure active proposee » (issue #1063, sous-issue 1/5 du chantier #999). |
+
+### Diagramme
+
+```mermaid
+classDiagram
+    direction LR
+
+    %% ===== netcross_core.active.planner =====
+    class FiveTuple {
+        <<dataclass, frozen>>
+        +str proto
+        +str src
+        +int? sport
+        +str dst
+        +int? dport
+    }
+    class ProposedMeasurement {
+        <<dataclass>>
+        +str kind
+        +FiveTuple five_tuple
+        +str protocol
+        +int? target_port
+        +str reason
+        +list~str~ rule_ids
+        +list~str~ segments
+        +to_dict() dict
+    }
+    class mod_netcross_core_active_planner["netcross_core.active.planner"] {
+        <<module>>
+        +five_tuple_from_flow_key(key) FiveTuple?
+        +ineligibility_reason(event) str?
+        +plan_measurements(events, max_flows_per_event) list~ProposedMeasurement~
+        +plan_from_diagnoses(diagnoses, max_flows_per_event) list~ProposedMeasurement~
+    }
+
+    %% ===== relations =====
+    ProposedMeasurement --> FiveTuple : five_tuple
 ```
 
 ## `netcross_core.application`
