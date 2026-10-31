@@ -48,6 +48,7 @@ def parse_size(text: str) -> int | None:
         logger.debug("parse_size: format non reconnu {!r}", text)
         return None
     number, unit = m.groups()
+    logger.debug("parse_size: retour int(…)")
     return int(float(number.replace(",", ".")) * _SIZE_FACTORS[unit.lower() if unit else None])
 
 
@@ -60,6 +61,7 @@ def parse_split_spec(spec: str) -> tuple[str, float | int]:
     raw = raw.strip()
     err = f"Format invalide pour --split: {spec} (attendu time:SECONDES, count:PAQUETS ou size:TAILLE, ex: size:100M)"
     if not sep or mode not in SPLIT_MODES or not raw:
+        logger.debug("parse_split_spec: si not sep or mode not in SPLIT_MODES or (not raw) -> levée ValueError")
         raise ValueError(err)
     value: float | int | None
     try:
@@ -74,25 +76,30 @@ def parse_split_spec(spec: str) -> tuple[str, float | int]:
         value = None
     if value is None or value <= 0:
         hint = " (unites decimales k/M/G, ex: 100M ; MiB/Mio non supportes)" if mode == "size" else ""
+        logger.debug("parse_split_spec: si value is None or value <= 0 -> levée ValueError")
         raise ValueError(f"{err} -- la valeur doit etre un nombre > 0{hint}")
+    logger.debug("parse_split_spec: retour tuple de 2")
     return mode, value
 
 
 def parse_endpoints(text: str | None) -> list[str] | None:
     """``--export-endpoints`` : « IP1,IP2 » -> liste (None si vide)."""
     endpoints = [ip.strip() for ip in (text or "").split(",") if ip.strip()]
+    logger.debug("parse_endpoints: retour endpoints or None")
     return endpoints or None
 
 
 def split_label_dir(output_dir: str, label: str) -> str:
     """Sous-repertoire d'un point pour ``--split`` : separateurs de chemin
     neutralises, jamais de « .. »."""
+    logger.debug("split_label_dir: retour os.path.join(…)")
     return os.path.join(output_dir, re.sub(r"[^\w.-]+", "_", label).lstrip(".") or "capture")
 
 
 def merge(paths: Sequence[str], output_path: str, dedup: bool = False) -> str:
     """``--merge`` : message de la CLI."""
     merge_captures(list(paths), output_path, dedup=dedup)
+    logger.debug("merge: retour f'(len(paths)) fichier(s) fusionne(s) dans (outpu…")
     return (
         f"{len(paths)} fichier(s) fusionne(s) dans {output_path}"
         + (" (paquets identiques dedupliques)" if dedup else "")
@@ -103,12 +110,14 @@ def merge(paths: Sequence[str], output_path: str, dedup: bool = False) -> str:
 def split(path: str, output_dir: str, spec: str) -> list[str]:
     """``--split MODE:VALEUR`` d'un fichier : segments crees, dans l'ordre."""
     mode, value = parse_split_spec(spec)
+    logger.debug("split: retour split_capture(…)")
     return split_capture(path, output_dir, mode, value)
 
 
 def convert(path_in: str, path_out: str, fmt: str) -> str:
     """``--convert`` : pcap, pcapng, erf, ou export structure csv/json."""
     if fmt not in CONVERT_FORMATS:
+        logger.debug("convert: si fmt not in CONVERT_FORMATS -> levée ValueError")
         raise ValueError(f"format non supporte : {fmt!r}. Formats reconnus : {', '.join(CONVERT_FORMATS)}.")
     if fmt == "csv":
         export_csv(path_in, path_out)
@@ -116,6 +125,7 @@ def convert(path_in: str, path_out: str, fmt: str) -> str:
         export_json(path_in, path_out)
     else:
         convert_capture(path_in, path_out, fmt=fmt)
+    logger.debug("convert: retour chaîne formatée")
     return f"Converti {path_in} -> {path_out} (format: {fmt})."
 
 
@@ -137,6 +147,7 @@ def export_subset(
         time_end=time_end,
         endpoints=endpoints,
     )
+    logger.debug("export_subset: retour chaîne formatée")
     return f"{path_out} cree."
 
 
@@ -150,6 +161,7 @@ def adjust_time(
     """``--adjust-time-output`` avec ``--time-offset``, ``--normalize-time``
     ou ``--align-to`` : un seul des trois, comme la CLI."""
     if sum((offset is not None, bool(normalize), bool(align_to))) > 1:
+        logger.debug("adjust_time: si sum((offset is not None, bool(normalize), bool(align_to))) … -> levée ValueError")
         raise ValueError("--time-offset, --normalize-time et --align-to sont mutuellement exclusifs.")
     adjust_timestamps(
         path_in,
@@ -158,6 +170,7 @@ def adjust_time(
         normalize=normalize,
         align_to=align_to or None,
     )
+    logger.debug("adjust_time: retour chaîne formatée")
     return f"{path_out} cree."
 
 
@@ -169,6 +182,7 @@ REPLAY_INTERFACES_ENV = "NETCROSS_REPLAY_INTERFACES"
 def allowed_replay_interfaces(environ: dict[str, str] | None = None) -> frozenset[str]:
     """Interfaces ou l'API peut rejouer (``NETCROSS_REPLAY_INTERFACES``,
     liste separee par des virgules) ; vide = rejeu desactive dans l'API."""
+    logger.debug("allowed_replay_interfaces: entrée")
     raw = (os.environ if environ is None else environ).get(REPLAY_INTERFACES_ENV, "")
     allowed = frozenset(i.strip() for i in raw.split(",") if i.strip())
     logger.debug("allowed_replay_interfaces: {}", sorted(allowed))
@@ -177,6 +191,7 @@ def allowed_replay_interfaces(environ: dict[str, str] | None = None) -> frozense
 
 def replay_message(path: str, interface: str, speed: float | str, loop: int) -> str:
     """Message de fin de la CLI (``--replay``)."""
+    logger.debug("replay_message: retour chaîne formatée")
     return f"{path} rejoue sur {interface} (speed={speed}, loop={loop})."
 
 
@@ -184,4 +199,5 @@ def replay(path: str, interface: str, speed: float | str = "1.0", loop: int = 1)
     """``--replay`` : rejoue ``path`` sur ``interface`` (bloquant) ; memes
     exceptions que ``pcap_parser.capture.replay_capture``."""
     replay_capture(path, interface, speed=speed, loop=loop)
+    logger.debug("replay: retour replay_message(…)")
     return replay_message(path, interface, speed, loop)

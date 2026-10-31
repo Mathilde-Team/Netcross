@@ -49,6 +49,7 @@ _HOT_ITER_RE = re.compile(
 
 
 def _calls_logger(node: ast.AST) -> bool:
+    logger.debug("_calls_logger: retour any(…)")
     return any(
         isinstance(c, ast.Call)
         and isinstance(c.func, ast.Attribute)
@@ -60,9 +61,12 @@ def _calls_logger(node: ast.AST) -> bool:
 
 def _called_name(func: ast.expr) -> str | None:
     if isinstance(func, ast.Name):
+        logger.debug("_called_name: si isinstance(func, ast.Name) -> retour func.id")
         return func.id
     if isinstance(func, ast.Attribute):
+        logger.debug("_called_name: si isinstance(func, ast.Attribute) -> retour func.attr")
         return func.attr
+    logger.debug("_called_name: retour None")
     return None
 
 
@@ -76,11 +80,13 @@ class _Usage(ast.NodeVisitor):
         self.calls: dict[str, set[str]] = {}
         self._loop_depth = 0
         self._func: list[str] = []
+        logger.debug("_Usage.__init__: fin")
 
     def _visit_loop(self, node: ast.AST) -> None:
         self._loop_depth += 1
         self.generic_visit(node)
         self._loop_depth -= 1
+        logger.debug("_Usage._visit_loop: fin")
 
     def _visit_iter(self, node: ast.AST, iters: list[ast.expr]) -> None:
         """Boucle chaude seulement si elle parcourt des unites fines (paquets,
@@ -90,18 +96,23 @@ class _Usage(ast.NodeVisitor):
             self._visit_loop(node)
         else:
             self.generic_visit(node)
+        logger.debug("_Usage._visit_iter: fin")
 
     def visit_For(self, node: ast.For | ast.AsyncFor) -> None:  # noqa: N802
         self._visit_iter(node, [node.iter])
+        logger.debug("_Usage.visit_For: fin")
 
     visit_AsyncFor = visit_For  # noqa: N815
 
     def visit_While(self, node: ast.While) -> None:  # noqa: N802
+        logger.debug("_Usage.visit_While: entrée")
         # boucle de lecture/reception : toujours supposee chaude
         self._visit_loop(node)
+        logger.debug("_Usage.visit_While: fin")
 
     def _visit_comp(self, node: ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp) -> None:
         self._visit_iter(node, [g.iter for g in node.generators])
+        logger.debug("_Usage._visit_comp: fin")
 
     visit_ListComp = visit_SetComp = visit_DictComp = visit_GeneratorExp = _visit_comp  # noqa: N815
 
@@ -112,12 +123,15 @@ class _Usage(ast.NodeVisitor):
         self.generic_visit(node)
         self._loop_depth = depth
         self._func.pop()
+        logger.debug("_Usage._visit_func: fin")
 
     visit_FunctionDef = visit_AsyncFunctionDef = _visit_func  # noqa: N815
 
     def visit_Lambda(self, node: ast.Lambda) -> None:  # noqa: N802
+        logger.debug("_Usage.visit_Lambda: entrée")
         # corps de lambda : rappel potentiellement appelé en boucle
         self._visit_loop(node)
+        logger.debug("_Usage.visit_Lambda: fin")
 
     def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
         name = _called_name(node.func)
@@ -134,27 +148,34 @@ class _Usage(ast.NodeVisitor):
             self.visit(node.func)
         for arg in [*node.args, *(k.value for k in node.keywords)]:
             self.visit(arg)
+        logger.debug("_Usage.visit_Call: fin")
 
     def _reference(self, name: str, ctx: ast.expr_context) -> None:
         # toute reference non appelee (rappel, valeur de dict de dispatch,
         # clé de tri, gestionnaire de signal...) : potentiellement chaude
         if isinstance(ctx, ast.Load):
             self.referenced.add(name)
+        logger.debug("_Usage._reference: fin")
 
     def visit_Name(self, node: ast.Name) -> None:  # noqa: N802
         self._reference(node.id, node.ctx)
+        logger.debug("_Usage.visit_Name: fin")
 
     def visit_Attribute(self, node: ast.Attribute) -> None:  # noqa: N802
+        logger.debug("_Usage.visit_Attribute: entrée")
         self._reference(node.attr, node.ctx)
         self.visit(node.value)
+        logger.debug("_Usage.visit_Attribute: fin")
 
 
 def _parse_or_empty(path: Path) -> ast.Module:
     try:
+        logger.debug("_parse_or_empty: retour ast.parse(…)")
         return ast.parse(path.read_text(encoding="utf-8"))
     except SyntaxError as exc:
         logger.warning("{} : syntaxe invalide, ignore : {}", path, exc)
         print(f"{path}: syntaxe invalide, ignore", file=sys.stderr)
+        logger.debug("_parse_or_empty: except SyntaxError -> retour ast.Module(…)")
         return ast.Module(body=[], type_ignores=[])
 
 
@@ -170,6 +191,7 @@ def hot_names(src: Path = SRC) -> set[str]:
             if callee not in hot:
                 hot.add(callee)
                 frontier.append(callee)
+    logger.debug("hot_names: retour hot")
     return hot
 
 
@@ -180,19 +202,31 @@ def _params(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
         names.append(a.vararg.arg)
     if a.kwarg:
         names.append(a.kwarg.arg)
+    logger.debug("_params: retour liste")
     return [n for n in names if n not in ("self", "cls")]
 
 
 def _is_excluded(fn: ast.FunctionDef | ast.AsyncFunctionDef, hot: set[str]) -> str | None:
     if fn.name.startswith("__") and fn.name.endswith("__") and fn.name != "__init__":
+        logger.debug(
+            "_is_excluded: si fn.name.startswith('__') and fn.name.endswith('__') and (fn… -> retour 'méthode spécial…"
+        )
         return "méthode spéciale"
     for dec in fn.decorator_list:
         if _called_name(dec) in ("property", "setter", "cached_property", "getter"):
+            logger.debug(
+                "_is_excluded: si _called_name(dec) in ('property', 'setter', 'cached_propert… -> retour 'propriété'"
+            )
             return "propriété"
         if isinstance(dec, ast.Call) or _called_name(dec) not in ("staticmethod", "classmethod", None):
+            logger.debug(
+                "_is_excluded: si isinstance(dec, ast.Call) or _called_name(dec) not in ('sta… -> retour 'décorée'"
+            )
             return "décorée"
     if fn.name in hot:
+        logger.debug("_is_excluded: si fn.name in hot -> retour 'chemin chaud'")
         return "chemin chaud"
+    logger.debug("_is_excluded: retour None")
     return None
 
 
@@ -200,7 +234,11 @@ def _body_start(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.stmt | None:
     body = fn.body
     first = body[0]
     if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
+        logger.debug(
+            "_body_start: si isinstance(first, ast.Expr) and isinstance(first.value, ast… -> retour body[1] if len(bo…"
+        )
         return body[1] if len(body) > 1 else None
+    logger.debug("_body_start: retour first")
     return first
 
 
@@ -214,8 +252,10 @@ def _raises(fn: ast.AST) -> list[ast.Raise]:
             if isinstance(child, ast.Raise) and child.exc is not None:
                 found.append(child)
             walk(child)
+        logger.debug("_raises.walk: fin")
 
     walk(fn)
+    logger.debug("_raises: retour found")
     return found
 
 
@@ -223,6 +263,7 @@ def _exc_name(node: ast.Raise) -> str:
     exc = node.exc
     if isinstance(exc, ast.Call):
         exc = exc.func
+    logger.debug("_exc_name: retour _called_name(exc) if isinstance(exc, (ast.Name, a…")
     return _called_name(exc) if isinstance(exc, (ast.Name, ast.Attribute)) else "exception"
 
 
@@ -238,10 +279,12 @@ def _split_message(msg: str, width: int = 90) -> list[str]:
         else:
             current = f"{current} {word}" if current else word
     chunks.append(current)
+    logger.debug("_split_message: retour chunks")
     return chunks
 
 
 def _qualname(stack: list[str], name: str) -> str:
+    logger.debug("_qualname: retour '.'.join(…)")
     return ".".join([*stack, name])
 
 
@@ -256,6 +299,9 @@ def instrument_source(
     ) and not any(
         isinstance(n, ast.ImportFrom) and any((a.asname or a.name) == "logger" for a in n.names) for n in tree.body
     ):
+        logger.debug(
+            "instrument_source: si not any((isinstance(n, ast.Assign) and any((isinstance(t, a… -> retour tuple de 3"
+        )
         return text, [], ["module sans logger"]
 
     inserts: list[tuple[int, str]] = []  # (index de ligne 0-based, texte), inséré avant
@@ -270,9 +316,13 @@ def instrument_source(
             elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 handle(child, stack, nested)
                 visit(child, [*stack, child.name], True)
+        logger.debug("instrument_source.visit: fin")
 
     def handle(fn: ast.FunctionDef | ast.AsyncFunctionDef, stack: list[str], nested: bool) -> None:
         if (fn.end_lineno or fn.lineno) - fn.lineno <= TRIVIAL_LINES or _calls_logger(fn):
+            logger.debug(
+                "instrument_source.handle: si (fn.end_lineno or fn.lineno) - fn.lineno <= TRIVIAL_LINES o… -> retour"
+            )
             return
         qual = _qualname(stack, fn.name)
         forced = bool(force & {fn.name, qual})
@@ -284,17 +334,21 @@ def instrument_source(
             if added:
                 inserts.extend(added)
                 done_hot.append(qual)
+                logger.debug("instrument_source.handle: si added -> retour")
                 return
         if reason:
             skipped.append(f"{qual} ({reason})")
+            logger.debug("instrument_source.handle: si reason -> retour")
             return
         start = _body_start(fn)
         if start is None or start.lineno == fn.lineno:
             skipped.append(f"{qual} (corps sur la ligne du def)")
+            logger.debug("instrument_source.handle: si start is None or start.lineno == fn.lineno -> retour")
             return
         indent = lines[start.lineno - 1][: start.col_offset]
         if indent.strip():
             skipped.append(f"{qual} (indentation non standard)")
+            logger.debug("instrument_source.handle: si indent.strip() -> retour")
             return
         params = _params(fn)
         if params:
@@ -310,6 +364,7 @@ def instrument_source(
         inserts.append((start.lineno - 1, line))
         inserts.extend(_raise_logs(fn, qual, "debug"))
         done.append(qual)
+        logger.debug("instrument_source.handle: fin")
 
     def _raise_logs(fn: ast.AST, qual: str, level: str) -> list[tuple[int, str]]:
         out: list[tuple[int, str]] = []
@@ -319,17 +374,20 @@ def instrument_source(
             if r_indent.strip():
                 continue  # `if x: raise ...` sur une ligne : laisse tel quel
             out.append((r.lineno - 1, f'{r_indent}logger.{level}("{qual}: refus, {_exc_name(r)}")\n'))
+        logger.debug("instrument_source._raise_logs: retour out")
         return out
 
     visit(tree, [], False)
     done.extend(f"{q} (chemin chaud : refus en TRACE seulement)" for q in done_hot)
     if not inserts:
+        logger.debug("instrument_source: si not inserts -> retour tuple de 3")
         return text, done, skipped
     for index, line in sorted(inserts, key=lambda x: x[0], reverse=True):
         lines.insert(index, line)
     out = "".join(lines)
     if IMPORT_LINE not in out and any("summarize(" in line for _i, line in inserts):
         out = _add_import(out)
+    logger.debug("instrument_source: retour tuple de 3")
     return out, done, skipped
 
 
@@ -344,6 +402,7 @@ def _add_import(text: str) -> str:
     lines = text.splitlines(keepends=True)
     at = (last.end_lineno if last else 0) or 0
     lines.insert(at, IMPORT_LINE + "\n")
+    logger.debug("_add_import: retour ''.join(…)")
     return "".join(lines)
 
 
@@ -368,6 +427,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    écartée : {s}")
         if not args.dry_run and new != text:
             path.write_text(new, encoding="utf-8")
+    logger.debug("main: retour 0")
     return 0
 
 
