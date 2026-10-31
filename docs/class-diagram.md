@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+202 modules · 294 classes · 722 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -1964,6 +1964,7 @@ classDiagram
     %% ===== netcross_core.application.http =====
     class mod_netcross_core_application_http["netcross_core.application.http"] {
         <<module>>
+        +http1_transactions(packets) list~HttpTransaction~
         +build_http_transactions(packets, network_signals) list~ApplicationTransaction~
     }
 
@@ -1993,9 +1994,41 @@ classDiagram
         +TransactionClassification classification
         +to_dict() dict
     }
+    class HttpConnection {
+        <<dataclass, frozen, slots>>
+        +str transport
+        +str client
+        +str server
+        +int? client_port
+        +int? server_port
+        +key() FlowKey
+    }
+    class HttpTransaction {
+        <<dataclass, slots>>
+        +str version
+        +str point
+        +HttpConnection connection
+        +int? stream_id
+        +str? method
+        +str? target
+        +str? authority
+        +str? path
+        +int? status
+        +float? request_ts
+        +float? first_byte_ts
+        +float? end_ts
+        +float? server_time_ms
+        +from_target(version, point, connection, target, champs)$
+        +answered() bool
+        +ttfb_ms() float?
+        +total_ms() float?
+        +request_summary() str
+        +to_application_transaction(network_signals)
+    }
 
     %% ===== relations =====
     ApplicationTransaction --> TransactionClassification : classification
+    HttpTransaction --> HttpConnection : connection
 ```
 
 ## `netcross_core.discovery`
