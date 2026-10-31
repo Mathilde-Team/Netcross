@@ -51,6 +51,7 @@ class ForensicSearchPanel(Gtk.Box):
         launcher: Callable[[list[str]], object] | None = None,
         find_program: Callable[[str], str | None] | None = None,
     ):
+        logger.debug("ForensicSearchPanel.__init__: entrée")
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         logger.debug("ForensicSearchPanel: construction du panneau")
         for side in ("top", "bottom", "start", "end"):
@@ -128,6 +129,7 @@ class ForensicSearchPanel(Gtk.Box):
         scroller.set_child(self.list_box)
         self.append(scroller)
         self._sync_sensitivity()
+        logger.debug("ForensicSearchPanel.__init__: fin")
 
     # -- etat --------------------------------------------------------------
 
@@ -152,8 +154,10 @@ class ForensicSearchPanel(Gtk.Box):
         has_frame = self.selected is not None and self.selected.frame_number is not None
         self.annotate_btn.set_sensitive(has_frame and self._on_annotate is not None)
         self.wireshark_btn.set_sensitive(has_frame and self._selected_path() is not None)
+        logger.debug("ForensicSearchPanel._sync_sensitivity: fin")
 
     def _selected_path(self) -> str | None:
+        logger.debug("ForensicSearchPanel._selected_path: retour capture_for_point(self.selected, self.captures) i…")
         return capture_for_point(self.selected, self.captures) if self.selected is not None else None
 
     def _show_rows(self, results) -> None:
@@ -169,6 +173,7 @@ class ForensicSearchPanel(Gtk.Box):
             label.set_selectable(True)
             label.set_wrap(True)
             self.list_box.append(label)
+        logger.debug("ForensicSearchPanel._show_rows: fin")
 
     # -- actions -----------------------------------------------------------
 
@@ -192,6 +197,7 @@ class ForensicSearchPanel(Gtk.Box):
         except SearchInputError as exc:
             logger.debug("ForensicSearchPanel.run_search: saisie refusee ({})", exc)
             self.status_label.set_text(f"Recherche impossible : {exc}.")
+            logger.debug("ForensicSearchPanel.run_search: except SearchInputError -> retour liste vide")
             return []
         results = self.index.search(query)
         self.last_query = query
@@ -204,29 +210,40 @@ class ForensicSearchPanel(Gtk.Box):
 
     def _on_search_clicked(self, *_args):
         self.run_search()
+        logger.debug("ForensicSearchPanel._on_search_clicked: fin")
 
     # -- lien vers le paquet -------------------------------------------------
 
     def select_result(self, position: int) -> None:
         """Choisit le resultat affiche a ``position`` (meme effet qu'un clic)."""
+        logger.debug("ForensicSearchPanel.select_result: entrée")
         row = self.list_box.get_row_at_index(position)
         self.list_box.select_row(row)
+        logger.debug("ForensicSearchPanel.select_result: fin")
 
     def _on_row_selected(self, _box, row) -> None:
         self.selected = self._displayed[row.get_index()] if row is not None else None
         if self.selected is not None:
             self.status_label.set_text(describe_selection(self.selected, self._selected_path()))
         self._sync_sensitivity()
+        logger.debug("ForensicSearchPanel._on_row_selected: fin")
 
     def annotate_selected(self) -> bool:
         if self.selected is None or self.selected.frame_number is None or self._on_annotate is None:
+            logger.debug(
+                "ForensicSearchPanel.annotate_selected: si self.selected is None or self.selected.frame_number is Non…"
+            )
             return False
         self._on_annotate(self.selected.point, self.selected.frame_number)
+        logger.debug("ForensicSearchPanel.annotate_selected: retour True")
         return True
 
     def open_selected_in_wireshark(self) -> bool:
         path = self._selected_path()
         if path is None or self.selected is None or self.selected.frame_number is None:
+            logger.debug(
+                "ForensicSearchPanel.open_selected_in_wireshark: si path is None or self.selected is None or self.sel…"
+            )
             return False
         program = self._find_program("wireshark")
         if program is None:
@@ -234,6 +251,7 @@ class ForensicSearchPanel(Gtk.Box):
             self.status_label.set_text(
                 "Wireshark introuvable dans le PATH : " + describe_selection(self.selected, path)
             )
+            logger.debug("ForensicSearchPanel.open_selected_in_wireshark: si program is None -> retour False")
             return False
         argv = wireshark_command(path, self.selected.frame_number, program)
         try:
@@ -241,21 +259,26 @@ class ForensicSearchPanel(Gtk.Box):
         except OSError as exc:
             logger.warning("ForensicSearchPanel: lancement de Wireshark impossible ({})", exc)
             self.status_label.set_text(f"Lancement de Wireshark impossible : {exc}")
+            logger.debug("ForensicSearchPanel.open_selected_in_wireshark: except OSError -> retour False")
             return False
         self.status_label.set_text("Wireshark ouvert : " + " ".join(argv))
+        logger.debug("ForensicSearchPanel.open_selected_in_wireshark: retour True")
         return True
 
     def export_to(self, path) -> None:
         written = write_search_json(path, self.last_query, self.last_results)
         self.status_label.set_text(f"Recherche forensique ({len(self.last_results)} resultat(s)) ecrite dans {written}")
+        logger.debug("ForensicSearchPanel.export_to: fin")
 
     def _on_export_clicked(self, _btn):
         if self.last_query is None:
+            logger.debug("ForensicSearchPanel._on_export_clicked: si self.last_query is None -> retour")
             return
         dialog = Gtk.FileDialog()
         dialog.set_initial_name("recherche-forensic.json")
         root = self.get_root()
         dialog.save(root if isinstance(root, Gtk.Window) else None, None, self._on_export_chosen)
+        logger.debug("ForensicSearchPanel._on_export_clicked: fin")
 
     def _on_export_chosen(self, dialog, result):
         try:
@@ -272,3 +295,4 @@ class ForensicSearchPanel(Gtk.Box):
         except OSError as exc:
             logger.warning("ForensicSearchPanel: export impossible ({})", exc)
             self.status_label.set_text(f"Export impossible : {exc}")
+        logger.debug("ForensicSearchPanel._on_export_chosen: fin")

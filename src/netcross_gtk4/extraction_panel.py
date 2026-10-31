@@ -31,6 +31,7 @@ logger = get_logger(__name__)
 def _default_runner(captures, *, out_dir, kinds):
     from netcross_core.extract.contents import run_extraction
 
+    logger.debug("_default_runner: retour run_extraction(…)")
     return run_extraction(captures, out_dir=out_dir, kinds=kinds)
 
 
@@ -40,6 +41,7 @@ class ExtractionPanel(Gtk.Box):
         runner: Callable | None = None,
         start_thread: Callable[[Callable[[], None]], None] | None = None,
     ):
+        logger.debug("ExtractionPanel.__init__: entrée")
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         logger.debug("ExtractionPanel: construction du panneau")
         for side in ("top", "bottom", "start", "end"):
@@ -80,6 +82,7 @@ class ExtractionPanel(Gtk.Box):
         self.status_label.set_selectable(True)
         self.append(self.status_label)
         self.set_source(None, False)
+        logger.debug("ExtractionPanel.__init__: fin")
 
     # -- etat --------------------------------------------------------------
 
@@ -98,6 +101,7 @@ class ExtractionPanel(Gtk.Box):
         self.extract_btn.set_sensitive(available and not self.running)
         for check in self.kind_checks.values():
             check.set_sensitive(available and not self.running)
+        logger.debug("ExtractionPanel._sync_sensitivity: fin")
 
     # -- actions -----------------------------------------------------------
 
@@ -114,6 +118,7 @@ class ExtractionPanel(Gtk.Box):
         except (ValueError, OSError) as exc:
             logger.debug("ExtractionPanel.start_extraction: refus ({})", exc)
             self.status_label.set_text(f"Extraction impossible : {exc}.")
+            logger.debug("ExtractionPanel.start_extraction: except (ValueError, OSError) -> retour False")
             return False
         captures = list(self.captures or [])
         logger.warning("extraction de contenus vers {} (types : {})", out_dir, ", ".join(kinds))
@@ -127,10 +132,13 @@ class ExtractionPanel(Gtk.Box):
             except Exception as exc:  # noqa: BLE001 -- thread de fond : l'erreur va au statut
                 logger.exception(f"échec de l'extraction: {exc}")
                 GLib.idle_add(self._on_extraction_done, None, str(exc))
+                logger.debug("ExtractionPanel.start_extraction.work: except Exception -> retour")
                 return
             GLib.idle_add(self._on_extraction_done, result, None)
+            logger.debug("ExtractionPanel.start_extraction.work: fin")
 
         self._start_thread(work)
+        logger.debug("ExtractionPanel.start_extraction: retour True")
         return True
 
     def _on_extraction_done(self, result, error):
@@ -149,6 +157,7 @@ class ExtractionPanel(Gtk.Box):
         dialog.set_title("Dossier d'extraction (vide)")
         root = self.get_root()
         dialog.select_folder(root if isinstance(root, Gtk.Window) else None, None, self._on_folder_chosen)
+        logger.debug("ExtractionPanel._on_extract_clicked: fin")
 
     def _on_folder_chosen(self, dialog, result):
         try:
@@ -159,3 +168,4 @@ class ExtractionPanel(Gtk.Box):
         path = gfile.get_path() if gfile is not None else None
         if path:
             self.start_extraction(path)
+        logger.debug("ExtractionPanel._on_folder_chosen: fin")
