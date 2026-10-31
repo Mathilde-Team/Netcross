@@ -83,6 +83,8 @@ _READ_BUFFER = 1024 * 1024
 # de la mesure) : la lecture est donc toujours faite bloc par bloc.
 _OPT_ENDOFOPT = 0
 _OPT_IF_NAME = 2  # IDB : nom de l'interface
+_OPT_IF_SPEED = 8  # IDB : vitesse de l'interface en bit/s (u64, issue #1132)
+_OPT_IF_TSRESOL = 9  # IDB : resolution d'horodatage (u8, issue #1132)
 _OPT_ISB_IFRECV = 4  # ISB : paquets recus par l'interface
 _OPT_ISB_IFDROP = 5  # ISB : paquets perdus par l'interface (manque de ressources)
 _OPT_ISB_OSDROP = 7  # ISB : paquets perdus par l'OS
@@ -218,6 +220,43 @@ class InterfaceRecord:
     received: int | None = None
     dropped_by_interface: int | None = None
     dropped_by_os: int | None = None
+    # Issue #1132 : option if_speed (bit/s), None si l'IDB ne la porte pas
+    # (ou pcap classique, qui n'a aucune notion de vitesse d'interface).
+    speed_bps: int | None = None
+    # Issue #1132 : duree d'un tick d'horodatage en secondes, lue depuis
+    # if_tsresol (defaut pcapng 1e-6), ou deduite du magic d'un pcap
+    # classique (1e-6, ou 1e-9 pour un pcap nanoseconde).
+    ts_resolution: float = 1e-6
+
+
+def tsresol_seconds(value: int) -> float:
+    """Duree d'un tick pour un octet if_tsresol (pcapng, section 4.2) : bit
+    de poids fort a 0 -> 10^-n s, a 1 -> 2^-n s (n = 7 bits de poids faible).
+    Exemples : 6 -> 1e-6 (us, defaut), 9 -> 1e-9 (ns), 0x8A -> 2^-10 s."""
+    logger.debug("tsresol_seconds: value={}", value)
+    exponent = value & 0x7F
+    result = 2.0**-exponent if value & 0x80 else 10.0**-exponent
+    logger.debug("tsresol_seconds: retour {}", result)
+    return result
+
+
+def _idb_options(raw: bytes, endian: str) -> tuple[str | None, int | None, float]:
+    """(nom, vitesse en bit/s, duree d'un tick) d'un Interface Description
+    Block brut. Une option de taille inattendue est ignoree (valeur par
+    defaut conservee), comme une option tronquee dans _iter_options."""
+    logger.debug("_idb_options: {} octets", len(raw))
+    name: str | None = None
+    speed: int | None = None
+    resolution = 1e-6
+    for code, value in _iter_options(raw[16:-4], endian):
+        if code == _OPT_IF_NAME:
+            name = value.decode("utf-8", "replace") or None
+        elif code == _OPT_IF_SPEED and len(value) == 8:
+            speed = struct.unpack(endian + "Q", value)[0]
+        elif code == _OPT_IF_TSRESOL and len(value) >= 1:
+            resolution = tsresol_seconds(value[0])
+    logger.debug("_idb_options: retour nom={} vitesse={} resolution={}", name, speed, resolution)
+    return name, speed, resolution
 
 
 @dataclass(frozen=True)
@@ -270,11 +309,10 @@ def _read_pcapng_structure(f: BinaryIO) -> CaptureStructure | None:
                 section_base = len(interfaces)
             elif block_type == _BLOCK_IDB:
                 linktype, _reserved, snaplen = struct.unpack_from(endian + "HHI", raw, 8)
-                name = None
-                for code, value in _iter_options(raw[16:-4], endian):
-                    if code == _OPT_IF_NAME:
-                        name = value.decode("utf-8", "replace") or None
-                interfaces.append(InterfaceRecord(len(interfaces), linktype, snaplen, name))
+                name, speed, resolution = _idb_options(raw, endian)
+                interfaces.append(
+                    InterfaceRecord(len(interfaces), linktype, snaplen, name, speed_bps=speed, ts_resolution=resolution)
+                )
             elif block_type == _BLOCK_ISB:
                 slot = section_base + struct.unpack_from(endian + "I", raw, 8)[0]
                 if slot >= len(interfaces):
@@ -329,8 +367,11 @@ def read_structure(path: str) -> CaptureStructure | None:
             return None
         endian = _PCAP_MAGICS[header[:4]][0]
         major, minor, _thiszone, _sigfigs, snaplen, linktype = struct.unpack_from(endian + "HHiIII", header, 4)
+        resolution = 1e-9 if fmt == FORMAT_NSECPCAP else 1e-6
         logger.debug("read_structure: {} {} {}.{} linktype={}", path, fmt, major, minor, linktype)
-        return CaptureStructure(fmt, f"{major}.{minor}", (InterfaceRecord(0, linktype, snaplen),))
+        return CaptureStructure(
+            fmt, f"{major}.{minor}", (InterfaceRecord(0, linktype, snaplen, ts_resolution=resolution),)
+        )
 
 
 class _SegmentSink:
@@ -556,26 +597,29 @@ def _first_timestamp_pcap(f: BinaryIO, endian: str, nsec: bool) -> float:
 def _first_timestamp_pcapng(f: BinaryIO) -> float:
     """Lit le timestamp du premier paquet (Enhanced Packet Block) d'un
     pcapng. f est au debut du fichier. Renvoie un timestamp epoch en
-    secondes (float). Leve ValueError si aucun paquet n'est trouve."""
+    secondes (float). Leve ValueError si aucun paquet n'est trouve.
+
+    Issue #1132 : la resolution est celle de l'interface designee par
+    l'EPB (if_tsresol de SON IDB, defaut 1e-6 s), puissance de 10 ou de 2
+    selon le bit de poids fort (voir tsresol_seconds)."""
+    logger.debug("_first_timestamp_pcapng: debut")
     endian = "<"
-    tsresol_shift = 6  # microsecondes par defaut (2^6 = 64)
+    resolutions: list[float] = []  # par interface, dans la section courante
     for block_type, raw in _iter_pcapng_blocks(f):
         if block_type == _BLOCK_SHB:
             bom = raw[8:12]
             endian = "<" if bom == _BOM_LE else ">"
+            resolutions = []  # les interface_id repartent de 0 a chaque section
         elif block_type == _BLOCK_IDB:
-            # if_tsresol (option 9) : log2 du diviseur. Defaut : 6 (us).
-            for code, value in _iter_options(raw[16:-4], endian):
-                if code == 9 and len(value) >= 1:
-                    tsresol_shift = value[0]
+            resolutions.append(_idb_options(raw, endian)[2])
         elif block_type == _BLOCK_EPB:
-            # EPB : ts_high (4) + ts_low (4) apres interface_id (4)
+            # EPB : interface_id (4) + ts_high (4) + ts_low (4)
             if len(raw) < 20:
                 continue
-            ts_high, ts_low = struct.unpack_from(endian + "II", raw, 12)
+            interface_id, ts_high, ts_low = struct.unpack_from(endian + "III", raw, 8)
+            resolution = resolutions[interface_id] if interface_id < len(resolutions) else 1e-6
             ts_64 = (ts_high << 32) | ts_low
-            divisor = 2**tsresol_shift
-            logger.debug("_first_timestamp_pcapng: résolution 2^-{} s", tsresol_shift)
-            return ts_64 / divisor
+            logger.debug("_first_timestamp_pcapng: interface {}, résolution {} s", interface_id, resolution)
+            return ts_64 * resolution
     logger.debug("_first_timestamp_pcapng: levée ValueError")
     raise ValueError("pcapng sans paquet (aucun Enhanced Packet Block)")

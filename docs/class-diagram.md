@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-202 modules · 292 classes · 721 fonctions publiques de module.
+203 modules · 292 classes · 726 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -34,7 +34,7 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"24 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"50 imports"| netcross_core
+    CLI -->|"52 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"32 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
@@ -46,7 +46,7 @@ flowchart TD
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"41 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"19 imports"| pcap_parser
+    netcross_core -->|"20 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -159,6 +159,8 @@ classDiagram
         +int? received
         +int? dropped_by_interface
         +int? dropped_by_os
+        +int? speed_bps
+        +float ts_resolution
     }
     class CaptureStructure {
         <<dataclass, frozen>>
@@ -178,6 +180,7 @@ classDiagram
         +detect_format(path) str?
         +format_extension(fmt) str
         +has_packets(path) bool
+        +tsresol_seconds(value) float
         +read_structure(path) CaptureStructure?
         +split_by_size(path, out_prefix, max_bytes) list~str~
         +first_timestamp(path) float
@@ -482,6 +485,7 @@ classDiagram
 | `netcross_core.forensic` | index de correlation bidirectionnel evenement ↔ flow ↔ paquet (Job 8/issue #5, §6.3 et §6.14 de FEATURES.md). |
 | `netcross_core.forensic_search` | moteur de recherche analytique post-capture transversal (Job 17 / issue #16, section 6.13 de FEATURES.md). |
 | `netcross_core.i18n` | internationalisation par GNU gettext (issue #299). |
+| `netcross_core.link_speed` | Vitesse de lien et resolution d'horodatage par point (issue #1132). |
 | `netcross_core.live_diff` | Capture en continu + diff en direct (Job 33, issue #33). |
 | `netcross_core.live_report` | issue #274 : export / rapport temps reel du mode ``--live``. |
 | `netcross_core.logging_config` | configuration centrale du logging (issue #245). |
@@ -1188,6 +1192,15 @@ classDiagram
         +N_(message) str
     }
 
+    %% ===== netcross_core.link_speed =====
+    class mod_netcross_core_link_speed["netcross_core.link_speed"] {
+        <<module>>
+        +parse_link_speed(text) int
+        +parse_link_speed_specs(specs, points) dict~str, int~
+        +resolve_link_speeds(captures, overrides) dict~str, dict~
+        +format_speed(bps) str
+    }
+
     %% ===== netcross_core.live_diff =====
     class LiveDiffConfig {
         <<dataclass, frozen>>
@@ -1655,6 +1668,7 @@ classDiagram
         +list~str~ capture_comments
         +list~str~ packet_comments
         +list~dict~ capture_infos
+        +dict~str, dict~ link_speeds
         +list~ChecksumError~ checksum_errors
     }
     class PacketAnnotation {
@@ -1714,29 +1728,6 @@ classDiagram
         +detect_encapsulation(layers)
     }
 
-    %% ===== netcross_core.quic_diagnostics =====
-    class QuicEvent {
-        <<dataclass>>
-        +str point
-        +float ts
-        +str src
-        +str dst
-        +int sport
-        +int dport
-        +bytes dcid
-        +bool decryptable
-        +str? sni
-        +str? tls_version
-    }
-    class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
-        <<module>>
-        +derive_initial_secrets(dcid) tuple~bytes, bytes~
-        +derive_packet_protection_keys(secret) tuple~bytes, bytes, bytes~
-        +parse_quic_capture(label, path) list~QuicEvent~
-        +diagnose_quic(events, points_order)
-        +print_quic_diagnostics(findings) None
-    }
-
     %% ===== relations =====
     DiffFinding --> EvidenceLink : evidence
     CaptureGroup --> CaptureInventory : members
@@ -1780,6 +1771,29 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_core.quic_diagnostics =====
+    class QuicEvent {
+        <<dataclass>>
+        +str point
+        +float ts
+        +str src
+        +str dst
+        +int sport
+        +int dport
+        +bytes dcid
+        +bool decryptable
+        +str? sni
+        +str? tls_version
+    }
+    class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
+        <<module>>
+        +derive_initial_secrets(dcid) tuple~bytes, bytes~
+        +derive_packet_protection_keys(secret) tuple~bytes, bytes, bytes~
+        +parse_quic_capture(label, path) list~QuicEvent~
+        +diagnose_quic(events, points_order)
+        +print_quic_diagnostics(findings) None
+    }
 
     %% ===== netcross_core.redact =====
     class AddressRedactor {

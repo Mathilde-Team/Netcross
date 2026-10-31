@@ -354,6 +354,10 @@ Options utiles :
   microbursts).
 - `--rtp-clock-rate` : cadence d'horloge RTP (8000Hz voix par défaut, 90000
   pour de la vidéo).
+- `--link-speed POINT=VITESSE` (répétable, ex. `A=1G`, `B=2.5G`) : vitesse
+  du lien d'un point, utilisée seulement si le pcapng ne porte pas l'option
+  `if_speed` ; la section « Vitesse des liens » du rapport indique la source
+  retenue et la résolution d'horodatage (`if_tsresol`) de chaque point.
 - `--idle-timeout-seconds` : seuil (en secondes) au-delà duquel un silence
   entre deux paquets consécutifs d'une connexion TCP déjà établie est
   signalé comme un timeout d'inactivité / coupure NAT-FW silencieuse

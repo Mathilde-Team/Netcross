@@ -782,7 +782,10 @@ def test_first_timestamp_pcapng_avec_epb(tmp_path):
     p.write_bytes(shb + idb + epb)
 
     ts = first_timestamp(str(p))
-    assert ts == 1000.0 / 64  # 1000 units / 2^6 (default tsresol)
+    # Issue #1132 : if_tsresol absent -> 10^-6 s par tick (pcapng, 4.2) ;
+    # l'ancienne valeur 1000 / 2^6 lisait a tort le defaut comme une
+    # puissance de 2.
+    assert ts == pytest.approx(1000 * 1e-6)
 
 
 def test_first_timestamp_pcapng_avec_tsresol(tmp_path):
