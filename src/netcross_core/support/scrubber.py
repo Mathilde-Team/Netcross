@@ -68,6 +68,7 @@ import re
 from dataclasses import dataclass, field
 
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.pseudonyms import PseudonymTable
 
 logger = get_logger(__name__)
 
@@ -241,15 +242,12 @@ class TextScrubber:
     """
 
     def __init__(self) -> None:
-        # valeur reelle -> pseudonyme
+        # Issue #1151 : table commune (netcross_core.pseudonyms) -- valeur
+        # reelle -> (pseudonyme, categorie), compteurs par categorie, et
+        # valeurs PRODUITES par ce scrubber, deja anonymes, qui se
+        # traversent elles-memes (idempotence) sans entrer dans le mapping.
         logger.debug("TextScrubber.__init__()")
-        self._map: dict[str, str] = {}
-        # valeur reelle -> categorie (pour l'export du mapping)
-        self._kind: dict[str, str] = {}
-        # valeurs PRODUITES par ce scrubber : deja anonymes, se traversent
-        # elles-memes (idempotence) et n'entrent pas dans le mapping.
-        self._own: set[str] = set()
-        self._counters: dict[str, int] = dict.fromkeys(CATEGORIES, 0)
+        self._table = PseudonymTable(_GENERATORS)
         logger.debug("TextScrubber.__init__: fin")
 
     # -- pseudonymes ------------------------------------------------------
@@ -260,19 +258,8 @@ class TextScrubber:
         Une valeur deja produite par ce scrubber est renvoyee telle quelle :
         rescrubber un texte deja anonymise ne renumerote rien.
         """
-        if real in self._own:
-            logger.debug("TextScrubber._pseudonym: si real in self._own -> retour real={}", summarize(real, "real"))
-            return real
-        known = self._map.get(real)
-        if known is not None:
-            logger.debug("TextScrubber._pseudonym: si known is not None -> retour known={}", summarize(known, "known"))
-            return known
-        idx = self._counters[kind]
-        self._counters[kind] += 1
-        pseudo = _GENERATORS[kind](idx)
-        self._map[real] = pseudo
-        self._kind[real] = kind
-        self._own.add(pseudo)
+        logger.debug("TextScrubber._pseudonym: kind={}", kind)
+        pseudo = self._table.pseudonym(real, kind)
         logger.debug("TextScrubber._pseudonym: retour pseudo={}", summarize(pseudo, "pseudo"))
         return pseudo
 
@@ -283,7 +270,7 @@ class TextScrubber:
         ticket -- il annulerait l'anonymisation.
         """
         logger.debug("TextScrubber.mapping_csv_rows()")
-        return sorted((real, pseudo, self._kind[real]) for real, pseudo in self._map.items())
+        return sorted(self._table.entries())
 
     # -- scrubbing --------------------------------------------------------
 
@@ -338,7 +325,7 @@ class TextScrubber:
             full = f"{base}.{m.group(1)}"
             # La forme complete est aussi "notre" valeur : un second passage
             # la reconnait et ne la renumerote pas.
-            self._own.add(full)
+            self._table.mark_own(full)
             logger.debug("TextScrubber.scrub._capture: retour _emit(…)")
             return _emit(full, "capture")
 
@@ -367,7 +354,7 @@ class TextScrubber:
 
         report.par_categorie = counts
         report.total = sum(counts.values())
-        report.valeurs_distinctes = len(self._map)
+        report.valeurs_distinctes = len(self._table)
         logger.debug("TextScrubber.scrub: retour tuple de 2")
         return out, report
 
@@ -382,7 +369,7 @@ class TextScrubber:
             for kind, n in rep.par_categorie.items():
                 agg.par_categorie[kind] = agg.par_categorie.get(kind, 0) + n
         agg.total = sum(agg.par_categorie.values())
-        agg.valeurs_distinctes = len(self._map)
+        agg.valeurs_distinctes = len(self._table)
         logger.debug("TextScrubber.scrub_lines: retour tuple de 2")
         return out, agg
 
