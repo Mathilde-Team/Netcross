@@ -55,32 +55,40 @@ def lire_seuil(chemin: str = PYPROJECT) -> float | None:
         return None
     section = re.search(r"^\[tool\.coverage\.report\]\s*$(.*?)(?=^\[|\Z)", texte, re.M | re.S)
     if section is None:
+        logger.debug("lire_seuil: si section is None -> retour None")
         return None
     valeur = re.search(r"^fail_under\s*=\s*([0-9.]+)\s*$", section.group(1), re.M)
+    logger.debug("lire_seuil: retour float(valeur.group(1)) if valeur else None")
     return float(valeur.group(1)) if valeur else None
 
 
 def _lire_totaux(chemin: str) -> dict:
     """Extrait les totaux d'un rapport JSON de coverage.py."""
     with open(chemin, encoding="utf-8") as f:
+        logger.debug("_lire_totaux: retour json.load(f)['totals']")
         return json.load(f)["totals"]
 
 
 def _pct(valeur: float) -> str:
     """76.7421... -> '76.7 %'."""
+    logger.debug("_pct: retour chaîne formatée")
     return f"{valeur:.1f} %"
 
 
 def _delta(pr: float, base: float) -> str:
     """Difference en points de pourcentage, signee, 1 decimale."""
+    logger.debug("_delta: retour chaîne formatée")
     return f"{pr - base:+.1f} pt"
 
 
 def _ligne_seuil(pourcentage_pr: float, seuil: float | None) -> str:
     if seuil is None:
+        logger.debug("_ligne_seuil: si seuil is None -> retour 'Aucun seuil bloquant configuré (`fail_…")
         return "Aucun seuil bloquant configuré (`fail_under` absent de pyproject.toml)."
     if pourcentage_pr < seuil:
+        logger.debug("_ligne_seuil: si pourcentage_pr < seuil -> retour chaîne formatée")
         return f"**Sous le seuil bloquant** de {_pct(seuil)} (`fail_under`, #246) : le job Tests de la CI échouera."
+    logger.debug("_ligne_seuil: retour chaîne formatée")
     return f"Seuil bloquant : {_pct(seuil)} (`fail_under`, #246), marge {pourcentage_pr - seuil:.1f} pt."
 
 
@@ -107,6 +115,7 @@ def _construire_commentaire(totaux_pr: dict, totaux_base: dict, seuil: float | N
         "",
         _ligne_seuil(totaux_pr["percent_covered"], seuil),
     ]
+    logger.debug("_construire_commentaire: retour '\\n'.join(…)")
     return "\n".join(lignes)
 
 
@@ -124,6 +133,7 @@ def _appel_api(chemin: str, token: str, methode: str = "GET", corps: str | None 
         },
     )
     with urllib.request.urlopen(requete) as reponse:
+        logger.debug("_appel_api: retour json.loads(…)")
         return json.loads(reponse.read())
 
 
@@ -138,6 +148,7 @@ def _publier(repo: str, pr: int, corps: str, token: str) -> str:
                 methode="PATCH",
                 corps=json.dumps({"body": corps}),
             )
+            logger.debug("_publier: si MARQUEUR in c.get('body', '') -> retour chaîne formatée")
             return f"commentaire existant mis a jour ({c['html_url']})"
     cree = _appel_api(
         f"/repos/{repo}/issues/{pr}/comments",
@@ -145,6 +156,7 @@ def _publier(repo: str, pr: int, corps: str, token: str) -> str:
         methode="POST",
         corps=json.dumps({"body": corps}),
     )
+    logger.debug("_publier: retour chaîne formatée")
     return f"commentaire cree ({cree['html_url']})"
 
 
@@ -159,6 +171,7 @@ def main(argv: list[str]) -> int:
     repo = os.environ.get("GITHUB_REPOSITORY")
     if not token or not repo:
         print("GITHUB_TOKEN et GITHUB_REPOSITORY sont requis", file=sys.stderr)
+        logger.debug("main: si not token or not repo -> retour 2")
         return 2
 
     corps = _construire_commentaire(
@@ -176,6 +189,7 @@ def main(argv: list[str]) -> int:
         print(_publier(repo, arguments.pr_number, corps, token))
     except urllib.error.HTTPError as erreur:
         if erreur.code != 403:
+            logger.debug("main: si erreur.code != 403 -> relance de l'exception en cours")
             raise
         logger.debug("publication depuis un fork ignoree (HTTP 403)")
         # PR ouverte depuis un fork : GitHub fournit un GITHUB_TOKEN en
@@ -187,6 +201,7 @@ def main(argv: list[str]) -> int:
             file=sys.stderr,
         )
         print(corps)
+    logger.debug("main: retour 0")
     return 0
 
 
