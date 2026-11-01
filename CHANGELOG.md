@@ -7,6 +7,12 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Ajouté
+- Image de CI préconstruite (#968, étape 1) : `.github/ci-image/Dockerfile` (paquets apt des jobs `quality`, `gtk4` et
+  `packaging`) et workflow `ci-image.yml`. L'image est construite sur chaque PR qui la modifie, puis poussée vers
+  `ghcr.io/mathilde-team/netcross-ci:26.04` à chaque modification fusionnée dans `dev`, chaque lundi (mises à jour de
+  sécurité) et à la demande. `ci.yml` basculera dessus dans une seconde PR, une fois l'image publiée.
+
 ### Modifié
 - CI (#966) : un nouveau commit sur une PR annule le run du commit précédent (`concurrency`), dans `ci.yml` et `pr-coverage.yml`. Les runs `push` sur dev et main ne sont jamais annulés.
 - Seuil de couverture bloquant porté à 95 % (#953, règle Mathilde-Team/.github#9) :
