@@ -177,6 +177,12 @@ class CaptureInfo:
     operating_system: str | None = None
     application: str | None = None
     interfaces: tuple[InterfaceRecord, ...] = ()
+    # Nombre de blocs DSB (Decryption Secrets Block) embarques dans le
+    # pcapng -- issue #1041. None si le cadrage binaire n'a pas pu etre
+    # lu (fichier compresse) ; 0 pour un pcap classique ou un pcapng sans
+    # DSB. Seul le NOMBRE est expose : le contenu d'un bloc DSB (des
+    # secrets de cle) n'est jamais lu ni journalise.
+    decryption_secrets_blocks: int | None = None
 
     @property
     def dropped_by_interface(self) -> int | None:
@@ -275,7 +281,13 @@ def _build_capture_info(path: str, fields: dict[str, str], structure: CaptureStr
         # set)"), elle est portee par chaque interface.
         limits = [i.snaplen for i in interfaces if i.snaplen]
         snaplen = max(limits) if limits else None
-    logger.debug("_build_capture_info: {} snaplen={} {} interface(s)", path, snaplen, len(interfaces))
+    logger.debug(
+        "_build_capture_info: {} snaplen={} {} interface(s), {} bloc(s) DSB",
+        path,
+        snaplen,
+        len(interfaces),
+        structure.decryption_secrets_blocks if structure else None,
+    )
     return CaptureInfo(
         path=path,
         file_type=_text(fields.get("File type")),
@@ -294,6 +306,7 @@ def _build_capture_info(path: str, fields: dict[str, str], structure: CaptureStr
         operating_system=_text(fields.get("Capture oper-sys")),
         application=_text(fields.get("Capture application")),
         interfaces=tuple(interfaces),
+        decryption_secrets_blocks=structure.decryption_secrets_blocks if structure else None,
     )
 
 
