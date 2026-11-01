@@ -56,6 +56,7 @@ class Entry:
 
 
 def _unquote(text: str) -> str:
+    logger.debug("_unquote: retour ast.literal_eval(text) if text else ''")
     return ast.literal_eval(text) if text else ""
 
 
@@ -72,6 +73,7 @@ def parse_po(text: str) -> list[Entry]:
         if started:
             entries.append(cur)
         cur, started, field_name = Entry(), False, None
+        logger.debug("parse_po.flush: fin")
 
     for raw in text.splitlines():
         line = raw.strip()
@@ -120,6 +122,7 @@ def parse_po(text: str) -> list[Entry]:
                 idx = int(field_name[7:-1])
                 cur.msgstr[idx] += value
     flush()
+    logger.debug("parse_po: retour entries")
     return entries
 
 
@@ -130,6 +133,7 @@ def read_linguas(lang_dir: Path = LANG_DIR) -> list[str]:
         code = line.split("#", 1)[0].strip()
         if code:
             locales.append(code)
+    logger.debug("read_linguas: retour locales")
     return locales
 
 
@@ -150,6 +154,7 @@ def locale_stats(locale: str, po_text: str | None, root: Path = ROOT) -> LocaleS
     stats = LocaleStats(locale)
     if po_text is None:
         stats.missing = True
+        logger.debug("locale_stats: si po_text is None -> retour stats")
         return stats
     stale: set[str] = set()
     for e in parse_po(po_text):
@@ -167,10 +172,12 @@ def locale_stats(locale: str, po_text: str | None, root: Path = ROOT) -> LocaleS
         else:
             stats.untranslated += 1
     stats.stale_references = sorted(stale)
+    logger.debug("locale_stats: retour stats")
     return stats
 
 
 def template_ids(text: str) -> set[str]:
+    logger.debug("template_ids: retour ensemble")
     return {e.msgid for e in parse_po(text) if e.msgid and not e.obsolete}
 
 
@@ -186,6 +193,7 @@ def template_changes(since: str, lang_dir: Path = LANG_DIR) -> tuple[list[str], 
         old = ""
     new = (lang_dir / "messages.pot").read_text(encoding="utf-8")
     before, after = template_ids(old), template_ids(new)
+    logger.debug("template_changes: retour tuple de 2")
     return sorted(after - before), sorted(before - after)
 
 
@@ -197,12 +205,14 @@ def collect(lang_dir: Path = LANG_DIR, compiled: Path | None = None, root: Path 
         if compiled is not None:
             stats.compiled = (compiled / loc / "LC_MESSAGES" / f"{DOMAIN}.mo").exists()
         result.append(stats)
+    logger.debug("collect: retour result")
     return result
 
 
 def summary(stats: list[LocaleStats]) -> dict[str, int]:
     present = [s for s in stats if not s.missing]
     messages = max((s.total for s in present), default=0)
+    logger.debug("summary: retour dictionnaire")
     return {
         "languages": len(stats),
         "messages": messages,
@@ -240,6 +250,7 @@ def render_text(stats: list[LocaleStats], compiled: bool, added: list[str], remo
         pct = 100 * s.translated // s.total if s.total else 100
         lines.append(f"{s.locale:<8}{s.translated:>10}{s.untranslated:>11}{s.fuzzy:>7}{s.obsolete:>8}  {pct}%")
         lines += [f"          reference morte : {ref}" for ref in s.stale_references]
+    logger.debug("render_text: retour '\\n'.join(…)")
     return "\n".join(lines)
 
 
@@ -267,6 +278,7 @@ def render_markdown(stats: list[LocaleStats], compiled: bool, added: list[str], 
         pct = 100 * s.translated // s.total if s.total else 100
         out.append(f"| {s.locale} | {s.translated} | {s.untranslated} | {s.fuzzy} | {pct} % |")
     out += ["", "</details>"]
+    logger.debug("render_markdown: retour '\\n'.join(…)")
     return "\n".join(out)
 
 
@@ -292,9 +304,12 @@ def main(argv: list[str] | None = None) -> int:
         print(render_text(stats, args.compiled is not None, added, removed))
 
     if any(s.missing for s in stats):
+        logger.debug("main: si any((s.missing for s in stats)) -> retour 1")
         return 1
     if args.strict and any(s.stale_references for s in stats):
+        logger.debug("main: si args.strict and any((s.stale_references for s in stats)) -> retour 1")
         return 1
+    logger.debug("main: retour 0")
     return 0
 
 
