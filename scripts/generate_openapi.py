@@ -45,6 +45,7 @@ def _render() -> tuple[Path, str]:
     try:
         import yaml
 
+        logger.debug("_render: retour tuple de 2")
         return output, yaml.dump(spec, default_flow_style=False, sort_keys=False, allow_unicode=True)
     except ImportError as exc:
         # Repli : JSON si pyyaml n'est pas disponible.
@@ -71,6 +72,7 @@ def main(argv=None) -> int:
                 "lancer `python3 scripts/generate_openapi.py`.",
                 file=sys.stderr,
             )
+            logger.debug("main: si not output.exists() -> retour 1")
             return 1
         actuel = output.read_text(encoding="utf-8")
         if actuel != contenu:
@@ -79,13 +81,16 @@ def main(argv=None) -> int:
                 "lancer `python3 scripts/generate_openapi.py` et commiter le resultat.",
                 file=sys.stderr,
             )
+            logger.debug("main: si actuel != contenu -> retour 1")
             return 1
         print(f"{output} est a jour.")
+        logger.debug("main: si args.check -> retour 0")
         return 0
 
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(contenu, encoding="utf-8")
     print(f"OpenAPI spec écrite dans {output}")
+    logger.debug("main: retour 0")
     return 0
 
 
