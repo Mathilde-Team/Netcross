@@ -69,6 +69,7 @@ PORT_SSH = 12222
 
 
 def _requis(*outils: str) -> bool:
+    logger.debug("_requis: retour all(…)")
     return all(shutil.which(o) for o in outils)
 
 
@@ -76,12 +77,14 @@ def _version_outil(commande: list[str]) -> str:
     """Premiere ligne de la sortie de version, ou "?" -- la version est la
     seule chose qui donne un sens a une empreinte : JA4 change d'une
     version de curl a l'autre des que la liste de ciphers bouge."""
+    logger.debug("_version_outil: entrée")
     try:
         proc = subprocess.run(commande, capture_output=True, text=True, timeout=10, check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         logger.debug("version de l'outil indisponible : {}", exc)
         return "?"
     sortie = (proc.stdout or proc.stderr).strip().splitlines()
+    logger.debug("_version_outil: retour sortie[0].strip() if sortie else '?'")
     return sortie[0].strip() if sortie else "?"
 
 
@@ -92,22 +95,27 @@ def _libelle(outil: str, version: str) -> str:
     caracteres de bibliotheques liees) est conservee a part : precieuse
     pour reproduire une empreinte, illisible dans une ligne de rapport.
     """
+    logger.debug("_libelle: entrée")
     import re as _re
 
     trouve = _re.search(r"\d+\.\d+[\w.]*", version or "")
+    logger.debug("_libelle: retour f'(outil) (trouve.group(0))' if trouve else outil")
     return f"{outil} {trouve.group(0)}" if trouve else outil
 
 
 def _attendre_port(port: int, delai: float = 10.0) -> bool:
     """Attend qu'un service ecoute, plutot qu'un sleep fixe : un sleep trop
     court produit une capture vide et un diagnostic trompeur."""
+    logger.debug("_attendre_port: entrée")
     fin = time.monotonic() + delai
     while time.monotonic() < fin:
         with socket.socket() as s:
             s.settimeout(0.3)
             if s.connect_ex(("127.0.0.1", port)) == 0:
+                logger.debug("_attendre_port: si s.connect_ex(('127.0.0.1', port)) == 0 -> retour True")
                 return True
         time.sleep(0.2)
+    logger.debug("_attendre_port: retour False")
     return False
 
 
@@ -115,9 +123,11 @@ class Capture:
     """Capture tshark sur la boucle locale, en gestionnaire de contexte."""
 
     def __init__(self, chemin: Path, filtre: str):
+        logger.debug("__init__: entrée")
         self.chemin = chemin
         self.filtre = filtre
         self.proc: subprocess.Popen | None = None
+        logger.debug("Capture.__init__: fin")
 
     def __enter__(self) -> Capture:
         self.proc = subprocess.Popen(
@@ -129,6 +139,7 @@ class Capture:
         # avant cela perdrait le ClientHello, c'est-a-dire le seul paquet
         # qui nous interesse.
         time.sleep(2.5)
+        logger.debug("Capture.__enter__: retour self")
         return self
 
     def __exit__(self, *_exc) -> None:
@@ -140,15 +151,18 @@ class Capture:
                 logger.debug("arret force du processus (timeout) : {}", exc)
                 self.proc.kill()
         time.sleep(0.5)
+        logger.debug("Capture.__exit__: fin")
 
 
 def _champs(pcap: Path, filtre: str, champs: list[str]) -> list[list[str]]:
+    logger.debug("_champs: entrée")
     args = ["tshark", "-r", str(pcap), "-Y", filtre, "-T", "fields"]
     for c in champs:
         args += ["-e", c]
     proc = subprocess.run(args, capture_output=True, text=True, check=False)
     # Les lignes " ** (tshark:...)" sont des avertissements de dissecteur
     # (ex. KEX post-quantique) melanges a la sortie utile.
+    logger.debug("_champs: retour liste")
     return [ligne.split("\t") for ligne in proc.stdout.splitlines() if ligne.strip() and not ligne.startswith(" **")]
 
 
@@ -158,6 +172,7 @@ def _champs(pcap: Path, filtre: str, champs: list[str]) -> list[list[str]]:
 def _serveur_tls(dossier: Path) -> subprocess.Popen | None:
     """Lance un `openssl s_server` local. Son propre ClientHello n'est
     jamais analyse : on ne veut que celui des clients."""
+    logger.debug("_serveur_tls: entrée")
     cle, cert = dossier / "k.pem", dossier / "c.pem"
     subprocess.run(
         [
@@ -180,12 +195,14 @@ def _serveur_tls(dossier: Path) -> subprocess.Popen | None:
         check=False,
     )
     if not cert.is_file():
+        logger.debug("_serveur_tls: si not cert.is_file() -> retour None")
         return None
     proc = subprocess.Popen(
         ["openssl", "s_server", "-key", str(cle), "-cert", str(cert), "-accept", str(PORT_TLS), "-www", "-quiet"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+    logger.debug("_serveur_tls: retour proc if _attendre_port(PORT_TLS) else None")
     return proc if _attendre_port(PORT_TLS) else None
 
 
@@ -197,6 +214,7 @@ def _clients_tls() -> list[tuple[str, str, list[str]]]:
     la premiere partie du JA4 (`t12...` vs `t13...`), et les deux se
     rencontrent en production.
     """
+    logger.debug("_clients_tls: entrée")
     url = f"https://127.0.0.1:{PORT_TLS}/"
     clients = []
     if _requis("curl"):
@@ -232,12 +250,15 @@ def _clients_tls() -> list[tuple[str, str, list[str]]]:
             ],
         ),
     )
+    logger.debug("_clients_tls: retour clients")
     return clients
 
 
 def _collecter_tls(dossier: Path, rapport: list[str]) -> dict[str, dict]:
+    logger.debug("_collecter_tls: entrée")
     if not _requis("tshark", "openssl"):
         rapport.append("TLS saute : tshark ou openssl absent")
+        logger.debug("_collecter_tls: si not _requis('tshark', 'openssl') -> retour dictionnaire vide")
         return {}
 
     clients = _clients_tls()
@@ -250,6 +271,7 @@ def _collecter_tls(dossier: Path, rapport: list[str]) -> dict[str, dict]:
         serveur = _serveur_tls(dossier)
         if serveur is None:
             rapport.append("TLS saute : impossible de demarrer openssl s_server")
+            logger.debug("_collecter_tls: si serveur is None -> retour dictionnaire vide")
             return {}
         for nom, cmd_version, cmd_client in clients:
             pcap_outil = dossier / f"tls-{abs(hash(nom))}.pcap"
@@ -288,6 +310,7 @@ def _collecter_tls(dossier: Path, rapport: list[str]) -> dict[str, dict]:
     finally:
         if serveur is not None:
             serveur.terminate()
+    logger.debug("_collecter_tls: retour resultats")
     return resultats
 
 
@@ -295,8 +318,12 @@ def _collecter_tls(dossier: Path, rapport: list[str]) -> dict[str, dict]:
 
 
 def _collecter_ssh(dossier: Path, rapport: list[str]) -> dict[str, dict]:
+    logger.debug("_collecter_ssh: entrée")
     if not _requis("tshark", "ssh") or not Path("/usr/sbin/sshd").exists():
         rapport.append("SSH saute : tshark, ssh ou sshd absent")
+        logger.debug(
+            "_collecter_ssh: si not _requis('tshark', 'ssh') or not Path('/usr/sbin/sshd').… -> retour dictionnaire v…"
+        )
         return {}
 
     subprocess.run(["mkdir", "-p", "/run/sshd"], check=False, capture_output=True)
@@ -314,6 +341,7 @@ def _collecter_ssh(dossier: Path, rapport: list[str]) -> dict[str, dict]:
             )
             if not _attendre_port(PORT_SSH):
                 rapport.append("SSH saute : sshd n'ecoute pas")
+                logger.debug("_collecter_ssh: si not _attendre_port(PORT_SSH) -> retour dictionnaire vide")
                 return {}
             # L'authentification echoue volontairement : le KEXINIT est
             # echange AVANT toute authentification, donc l'empreinte est
@@ -375,11 +403,14 @@ def _collecter_ssh(dossier: Path, rapport: list[str]) -> dict[str, dict]:
     finally:
         if sshd is not None:
             sshd.terminate()
+    logger.debug("_collecter_ssh: retour resultats")
     return resultats
 
 
 def _version_tshark() -> str:
+    logger.debug("_version_tshark: entrée")
     premiere = _version_outil(["tshark", "--version"])
+    logger.debug("_version_tshark: retour premiere.replace('TShark (Wireshark) ',…(…)")
     return premiere.replace("TShark (Wireshark) ", "").rstrip(".")
 
 
@@ -387,6 +418,7 @@ def _version_tshark() -> str:
 
 
 def _ecrire(ja4: dict, hassh: dict, rapport: list[str], dry_run: bool) -> int:
+    logger.debug("_ecrire: entrée")
     contenu = {
         "_note": (
             "Base peuplee par scripts/capture_reference_fingerprints.py (issue #259). "
@@ -406,13 +438,16 @@ def _ecrire(ja4: dict, hassh: dict, rapport: list[str], dry_run: bool) -> int:
     rendu = json.dumps(contenu, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
     if dry_run:
         print(rendu)
+        logger.debug("_ecrire: si dry_run -> retour 0")
         return 0
     BASE.write_text(rendu, encoding="utf-8")
     print(f"{BASE} ecrit : {len(ja4)} JA4, {len(hassh)} HASSH.")
+    logger.debug("_ecrire: retour 0")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     parseur = argparse.ArgumentParser(description=__doc__)
     parseur.add_argument("--dry-run", action="store_true", help="affiche le resultat sans ecrire")
     args = parseur.parse_args(argv)
@@ -424,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
             "      python3 scripts/capture_reference_fingerprints.py",
             file=sys.stderr,
         )
+        logger.debug("main: si os.geteuid() != 0 -> retour 2")
         return 2
 
     rapport: list[str] = [f"genere avec tshark {_version_tshark()}"]
@@ -438,7 +474,9 @@ def main(argv: list[str] | None = None) -> int:
         # Regle de tracabilite : un echec total doit etre bruyant, pas
         # ecraser la base par un fichier vide.
         print("\nAucune empreinte collectee : la base n'est PAS modifiee.", file=sys.stderr)
+        logger.debug("main: si not ja4 and (not hassh) -> retour 1")
         return 1
+    logger.debug("main: retour _ecrire(…)")
     return _ecrire(ja4, hassh, rapport, args.dry_run)
 
 
