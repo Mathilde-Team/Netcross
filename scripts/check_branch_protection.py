@@ -75,20 +75,31 @@ def charger_regle(chemin: Path) -> dict:
         raise RegleInvalideError(f"fichier de regle illisible {chemin} : {exc}") from exc
     statuts = regle.get("required_status_checks") if isinstance(regle, dict) else None
     if not isinstance(statuts, dict) or not isinstance(statuts.get("checks"), list):
+        logger.debug(
+            "charger_regle: si not isinstance(statuts, dict) or not isinstance(statuts.get… -> levée RegleInvalideErr…"
+        )
         raise RegleInvalideError(f"{chemin} : required_status_checks.checks absent")
     if not statuts["checks"]:
+        logger.debug("charger_regle: si not statuts['checks'] -> levée RegleInvalideError")
         raise RegleInvalideError(f"{chemin} : aucun check requis -- la regle ne protegerait rien")
     for check in statuts["checks"]:
         if not isinstance(check, dict) or not str(check.get("context", "")).strip():
+            logger.debug(
+                "charger_regle: si not isinstance(check, dict) or not str(check.get('context',… -> levée RegleInvalid…"
+            )
             raise RegleInvalideError(f"{chemin} : check sans 'context' : {check!r}")
     if not isinstance(statuts.get("strict"), bool):
+        logger.debug("charger_regle: si not isinstance(statuts.get('strict'), bool) -> levée RegleInvalideError")
         raise RegleInvalideError(f"{chemin} : required_status_checks.strict doit etre un booleen")
     if not isinstance(regle.get("enforce_admins"), bool):
+        logger.debug("charger_regle: si not isinstance(regle.get('enforce_admins'), bool) -> levée RegleInvalideError")
         raise RegleInvalideError(f"{chemin} : enforce_admins doit etre un booleen")
+    logger.debug("charger_regle: retour regle")
     return regle
 
 
 def contextes_requis(regle: dict) -> set[str]:
+    logger.debug("contextes_requis: retour ensemble")
     return {check["context"] for check in regle["required_status_checks"]["checks"]}
 
 
@@ -99,6 +110,7 @@ def contextes_requis(regle: dict) -> set[str]:
 
 def _declencheurs(workflow: dict) -> object:
     # YAML 1.1 : une cle `on` non quotee est lue comme le booleen True.
+    logger.debug("_declencheurs: retour workflow.get(…)")
     return workflow.get("on", workflow.get(True))
 
 
@@ -108,21 +120,30 @@ def _branches_couvertes(filtre: object, branche: str) -> bool:
     glob ne sont pas utilises dans ce depot, et les accepter sans les
     evaluer risquerait un faux positif)."""
     if not isinstance(filtre, dict):
+        logger.debug("_branches_couvertes: si not isinstance(filtre, dict) -> retour True")
         return True
     branches = filtre.get("branches")
     if branches is None:
+        logger.debug(
+            "_branches_couvertes: si branches is None -> retour 'branches-ignore' not in filtre or branche not in…"
+        )
         return "branches-ignore" not in filtre or branche not in filtre["branches-ignore"]
+    logger.debug("_branches_couvertes: retour branche in branches")
     return branche in branches
 
 
 def tourne_sur_pr(workflow: dict, branche: str) -> bool:
     on = _declencheurs(workflow)
     if on == "pull_request":
+        logger.debug("tourne_sur_pr: si on == 'pull_request' -> retour True")
         return True
     if isinstance(on, list):
+        logger.debug("tourne_sur_pr: si isinstance(on, list) -> retour 'pull_request' in on")
         return "pull_request" in on
     if isinstance(on, dict) and "pull_request" in on:
+        logger.debug("tourne_sur_pr: si isinstance(on, dict) and 'pull_request' in on -> retour _branches_couvertes(…)")
         return _branches_couvertes(on["pull_request"], branche)
+    logger.debug("tourne_sur_pr: retour False")
     return False
 
 
@@ -139,17 +160,20 @@ def jobs_de_pr(workflows: Iterable[dict], branche: str) -> set[str]:
             if not isinstance(job, dict) or "if" in job:
                 continue
             noms.add(str(job.get("name", ident)))
+    logger.debug("jobs_de_pr: retour noms")
     return noms
 
 
 def lire_workflows(dossier: Path) -> list[dict]:
     import yaml  # dependance de dev (pyproject.toml), inutile hors de ce mode
 
+    logger.debug("lire_workflows: retour liste")
     return [yaml.safe_load(p.read_text(encoding="utf-8")) for p in sorted(dossier.glob("*.y*ml"))]
 
 
 def verifier_hors_ligne(regle: dict, workflows: list[dict], branche: str) -> list[str]:
     disponibles = jobs_de_pr(workflows, branche)
+    logger.debug("verifier_hors_ligne: retour liste")
     return [
         f"check requis « {ctx} » : aucun job de ce nom ne tourne sur les PR vers {branche} "
         "(renomme, supprime ou conditionne ?) -- toutes les PR resteraient bloquees"
@@ -174,6 +198,7 @@ def comparer(regle: dict, branche_api: dict, protection_api: dict | None) -> tup
     nom = branche_api.get("name", "?")
     protection = branche_api.get("protection") or {}
     if not branche_api.get("protected") or not protection.get("enabled"):
+        logger.debug("comparer: si not branche_api.get('protected') or not protection.get('ena… -> retour tuple de 2")
         return [f"la branche {nom} n'est pas protegee"], []
 
     statuts = protection.get("required_status_checks") or {}
@@ -206,6 +231,7 @@ def comparer(regle: dict, branche_api: dict, protection_api: dict | None) -> tup
                 if lineaire
                 else "historique lineaire exige : False au lieu de True"
             )
+    logger.debug("comparer: retour tuple de 2")
     return ecarts, non_verifiables
 
 
@@ -218,19 +244,23 @@ def _get(url: str, jeton: str | None) -> dict | None:
         requete.add_header("Authorization", f"Bearer {jeton}")
     try:
         with urllib.request.urlopen(requete, timeout=30) as reponse:
+            logger.debug("_get: retour json.load(…)")
             return json.load(reponse)
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403, 404):
             logger.debug("ressource sans protection lisible (HTTP {})", exc.code)
             return None
+        logger.debug("_get: except urllib.error.HTTPError -> relance de l'exception en cours")
         raise
 
 
 def verifier_en_ligne(regle: dict, depot: str, branche: str, jeton: str | None) -> tuple[list[str], list[str]]:
     branche_api = _get(f"{API}/repos/{depot}/branches/{branche}", jeton)
     if branche_api is None:
+        logger.debug("verifier_en_ligne: si branche_api is None -> levée RuntimeError")
         raise RuntimeError(f"branche {branche} introuvable sur {depot} (ou depot inaccessible)")
     protection_api = _get(f"{API}/repos/{depot}/branches/{branche}/protection", jeton)
+    logger.debug("verifier_en_ligne: retour comparer(…)")
     return comparer(regle, branche_api, protection_api)
 
 
@@ -256,6 +286,7 @@ def main(argv: list[str] | None = None) -> int:
     except (RegleInvalideError, RuntimeError, OSError, urllib.error.URLError) as exc:
         logger.error("verification de la protection impossible : {}", exc)
         print(f"::error::{exc}")
+        logger.debug("main: except (RegleInvalideError, RuntimeError, OSEr… -> retour ERREUR")
         return ERREUR
 
     for message in non_verifiables:
@@ -268,8 +299,10 @@ def main(argv: list[str] | None = None) -> int:
             f"(administrateur du depot) : gh api -X PUT repos/{args.depot}/branches/{args.branche}"
             f"/protection --input .github/branch-protection/{args.regle.name}"
         )
+        logger.debug("main: si ecarts -> retour ECART")
         return ECART
     print(f"Protection de {args.branche} conforme a {args.regle.name}.")
+    logger.debug("main: retour CONFORME")
     return CONFORME
 
 
