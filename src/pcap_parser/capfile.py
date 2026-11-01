@@ -15,7 +15,9 @@ passe en flux (memoire constante, quelle que soit la taille du fichier).
 
 Second usage (Job 38/issue #158) : read_structure() lit la version du format,
 la liste des interfaces et, en pcapng, les compteurs des Interface
-Statistics Blocks (paquets recus/perdus). capinfos 4.2.2 n'expose PAS ces
+Statistics Blocks (paquets recus/perdus) et le nombre de blocs DSB
+(secrets de dechiffrement embarques -- comptes, jamais journalises,
+issue #1041). capinfos 4.2.2 n'expose PAS ces
 compteurs (il n'indique que "Number of stat entries"), verifie
 empiriquement sur un pcapng portant un ISB avec isb_ifdrop non nul.
 
@@ -263,11 +265,19 @@ def _idb_options(raw: bytes, endian: str) -> tuple[str | None, int | None, float
 class CaptureStructure:
     """Ce que le cadrage binaire seul permet de dire d'un fichier de
     capture : format, version ("2.4" pour un pcap, "1.0" pour un pcapng)
-    et interfaces. Aucune donnee de paquet."""
+    et interfaces. Aucune donnee de paquet.
+
+    decryption_secrets_blocks : nombre de blocs DSB (Decryption Secrets
+    Block, 0x0A) embarques dans le fichier -- les secrets injectes par
+    `editcap --inject-secrets`, utilises automatiquement par tshark pour
+    dechiffrer TLS/QUIC. SEUL LE NOMBRE est expose : jamais le contenu
+    d'un bloc DSB (des secrets de cle), ni son type, ni sa longueur --
+    un secret lu n'est pas journalise (issue #1041)."""
 
     fmt: str
     version: str
     interfaces: tuple[InterfaceRecord, ...]
+    decryption_secrets_blocks: int = 0
 
 
 def _iter_options(data: bytes, endian: str) -> Iterator[tuple[int, bytes]]:
@@ -298,11 +308,17 @@ def _iter_options(data: bytes, endian: str) -> Iterator[tuple[int, bytes]]:
 def _read_pcapng_structure(f: BinaryIO) -> CaptureStructure | None:
     interfaces: list[InterfaceRecord] = []
     version: str | None = None
+    dsb_count = 0  # blocs DSB comptes, jamais leur contenu (issue #1041)
     endian = "<"
     section_base = 0  # les interface_id des ISB repartent de 0 a chaque section
     try:
         for block_type, raw in _iter_pcapng_blocks(f):
-            if block_type == _BLOCK_SHB:
+            if block_type == _BLOCK_DSB:
+                # Secrets de dechiffrement embarques (editcap --inject-secrets) :
+                # on les COMPTE pour les signaler, on ne lit ni ne journalise
+                # jamais leur contenu.
+                dsb_count += 1
+            elif block_type == _BLOCK_SHB:
                 endian = "<" if raw[8:12] == _BOM_LE else ">"
                 major, minor = struct.unpack_from(endian + "HH", raw, 12)
                 version = version or f"{major}.{minor}"
@@ -336,12 +352,14 @@ def _read_pcapng_structure(f: BinaryIO) -> CaptureStructure | None:
             "_read_pcapng_structure: bloc corrompu, lecture arrêtée après {} interface(s) ({})", len(interfaces), exc
         )
         # bloc corrompu : on garde les interfaces lues jusque-la (comme une troncature)
-    logger.debug("_read_pcapng_structure: version={} {} interface(s)", version, len(interfaces))
+    logger.debug(
+        "_read_pcapng_structure: version={} {} interface(s), {} bloc(s) DSB", version, len(interfaces), dsb_count
+    )
     if version is None:
         logger.debug("_read_pcapng_structure: si version is None -> retour None")
         return None
     logger.debug("_read_pcapng_structure: retour CaptureStructure(…)")
-    return CaptureStructure(FORMAT_PCAPNG, version, tuple(interfaces))
+    return CaptureStructure(FORMAT_PCAPNG, version, tuple(interfaces), dsb_count)
 
 
 def read_structure(path: str) -> CaptureStructure | None:
