@@ -165,6 +165,7 @@ classDiagram
         +str fmt
         +str version
         +tuple~InterfaceRecord, ...~ interfaces
+        +int decryption_secrets_blocks
     }
     class _SegmentSink {
         +is_open() bool
@@ -203,6 +204,7 @@ classDiagram
         +str? operating_system
         +str? application
         +tuple~InterfaceRecord, ...~ interfaces
+        +int? decryption_secrets_blocks
         +dropped_by_interface() int?
         +dropped_by_os() int?
         +has_drops() bool?
