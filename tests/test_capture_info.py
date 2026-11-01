@@ -143,6 +143,15 @@ def _isb(endian: str = "<", interface: int = 0, recus=None, perdus_interface=Non
     return _bloc(endian, 5, corps)
 
 
+def _dsb(endian: str = "<", secrets: bytes = b"CLIENT_RANDOM f1a2b3c4") -> bytes:
+    """Bloc DSB (issue #1041) : type de secrets TLSKEYLOG (0x544C534B),
+    longueur, secrets -- comme editcap --inject-secrets --secrets-type
+    tlskey. Corps aligne sur 4 octets (regle pcapng). Le CONTENU (les
+    secrets) ne doit jamais etre journalise."""
+    corps = struct.pack(endian + "II", 0x544C534B, len(secrets)) + secrets
+    return _bloc(endian, 0x0A, corps + bytes(-len(corps) % 4))
+
+
 def _ecrire(tmp_path, nom: str, contenu: bytes) -> str:
     chemin = tmp_path / nom
     chemin.write_bytes(contenu)
@@ -346,6 +355,40 @@ def test_read_structure_pcapng_interfaces_et_compteurs(tmp_path, endian):
 def test_read_structure_pcapng_sans_isb(tmp_path):
     structure = read_structure(_ecrire(tmp_path, "a.pcapng", _shb() + _idb() + _epb()))
     assert structure.interfaces[0].dropped_by_interface is None
+
+
+@pytest.mark.parametrize("endian", ["<", ">"])
+def test_read_structure_pcapng_compte_les_blocs_dsb(tmp_path, endian):
+    """Issue #1041 : les blocs DSB (secrets injectes par editcap
+    --inject-secrets) sont comptes pour etre signales ; leur contenu
+    n'est jamais lu ni journalise."""
+    contenu = _shb(endian) + _idb(endian) + _dsb(endian) + _epb(endian) + _dsb(endian)
+    structure = read_structure(_ecrire(tmp_path, "a.pcapng", contenu))
+    assert structure.decryption_secrets_blocks == 2
+
+
+@pytest.mark.parametrize("endian", ["<", ">"])
+def test_read_structure_pcapng_sans_dsb(tmp_path, endian):
+    structure = read_structure(_ecrire(tmp_path, "a.pcapng", _shb(endian) + _idb(endian) + _epb(endian)))
+    assert structure.decryption_secrets_blocks == 0
+
+
+def test_read_structure_pcap_pas_de_dsb(tmp_path):
+    """Un pcap classique ne peut pas porter de DSB : 0, pas None -- c'est
+    une information certaine, pas une absence de lecture."""
+    structure = read_structure(_ecrire(tmp_path, "a.pcap", _pcap()))
+    assert structure.decryption_secrets_blocks == 0
+
+
+def test_build_capture_info_propage_le_nombre_de_dsb():
+    """Issue #1041 : le compte de blocs DSB du cadrage binaire arrive
+    jusqu'au CaptureInfo ; None quand le cadrage n'a pas pu etre lu."""
+    structure = CaptureStructure(FORMAT_PCAPNG, "1.0", (), 3)
+    fields = _parse_table_report(_TABLE_PCAPNG)
+    info = _build_capture_info("a.pcapng", fields, structure)
+    assert info.decryption_secrets_blocks == 3
+    info_sans_cadrage = _build_capture_info("a.pcapng", fields, None)
+    assert info_sans_cadrage.decryption_secrets_blocks is None
 
 
 def test_read_structure_le_dernier_isb_donne_les_totaux(tmp_path):

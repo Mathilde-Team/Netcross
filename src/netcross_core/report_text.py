@@ -285,6 +285,13 @@ def print_report(r: Report):
             app = info.get("application")
             if app:
                 print(f"      application : {app}")
+            # Issue #1041 : signaler les secrets de dechiffrement embarques
+            # (blocs DSB injectes par `editcap --inject-secrets`) -- ils sont
+            # utilises automatiquement par tshark pour dechiffrer TLS/QUIC ;
+            # seul le NOMBRE est affiche, jamais leur contenu.
+            dsb = info.get("decryption_secrets_blocks")
+            if dsb:
+                print(f"      secrets de dechiffrement embarques : {dsb} bloc(s) DSB (utilises automatiquement)")
             dropped_if = info.get("dropped_by_interface")
             dropped_os = info.get("dropped_by_os")
             if dropped_if is not None or dropped_os is not None:
