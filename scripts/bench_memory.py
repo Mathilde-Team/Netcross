@@ -68,18 +68,25 @@ def _neutral_default_for(field: dataclasses.Field) -> object:
     sinon la valeur neutre du type de base (str vide, 0, False, tuple
     vide). Suffisant pour un banc de mesure memoire, qui ne lit jamais le
     CONTENU de ces champs, seulement leur presence en memoire."""
+    logger.debug("_neutral_default_for: entrée")
     annotation = field.type
     text = annotation if isinstance(annotation, str) else str(annotation)
     if "None" in text:
+        logger.debug("_neutral_default_for: si 'None' in text -> retour None")
         return None
     if text.startswith("tuple"):
+        logger.debug("_neutral_default_for: si text.startswith('tuple') -> retour tuple de 0")
         return ()
     if text == "bool":
+        logger.debug("_neutral_default_for: si text == 'bool' -> retour False")
         return False
     if text == "int":
+        logger.debug("_neutral_default_for: si text == 'int' -> retour 0")
         return 0
     if text == "float":
+        logger.debug("_neutral_default_for: si text == 'float' -> retour 0.0")
         return 0.0
+    logger.debug("_neutral_default_for: retour ''")
     return ""
 
 
@@ -94,9 +101,11 @@ def _make_synthetic_packets(count: int) -> list[Pkt]:
     dependre ni de tests/conftest.make_pkt (scripts/ != tests/) ni d'une
     table de valeurs dupliquee et vouee a se desynchroniser du dataclass
     reel a chaque champ ajoute."""
+    logger.debug("_make_synthetic_packets: entrée")
     fields = dataclasses.fields(Pkt)
     varying = {"point", "ts", "proto", "src", "dst", "length", "seq", "key_id", "ip_id"}
     neutral = {f.name: _neutral_default_for(f) for f in fields if f.name not in varying}
+    logger.debug("_make_synthetic_packets: retour liste")
     return [
         Pkt(
             point="A",
@@ -115,6 +124,7 @@ def _make_synthetic_packets(count: int) -> list[Pkt]:
 
 
 def _editcap_path() -> str | None:
+    logger.debug("_editcap_path: retour shutil.which(…)")
     return shutil.which("editcap")
 
 
@@ -122,6 +132,7 @@ def _seed_pcap_bytes(count: int) -> bytes:
     """pcap classique minimal (memes entetes que tests/pcap_builders.py,
     reimplemente ici pour la meme raison que _neutral_default_for ci-dessus :
     pas de dependance a tests/) portant ``count`` paquets UDP factices."""
+    logger.debug("_seed_pcap_bytes: entrée")
     import struct
 
     header = struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1)
@@ -130,14 +141,17 @@ def _seed_pcap_bytes(count: int) -> bytes:
     for i in range(count):
         record = struct.pack("<IIII", i, 0, len(payload), len(payload)) + payload
         body += record
+    logger.debug("_seed_pcap_bytes: retour header + bytes(body)")
     return header + bytes(body)
 
 
 def _make_editcap_capture(count: int, tmpdir: str) -> str:
     """Duplique un pcap graine via ``editcap`` jusqu'a ``count`` paquets et
     renvoie le chemin du fichier resultant."""
+    logger.debug("_make_editcap_capture: entrée")
     editcap = _editcap_path()
     if editcap is None:
+        logger.debug("_make_editcap_capture: si editcap is None -> levée RuntimeError")
         raise RuntimeError("editcap introuvable (paquet tshark/wireshark-cli) -- voir install.sh")
     seed_count = min(count, 1000) or 1
     seed_path = os.path.join(tmpdir, "seed.pcap")
@@ -153,6 +167,7 @@ def _make_editcap_capture(count: int, tmpdir: str) -> str:
     # tronque a `count` paquets avec `editcap -r`.
     mergecap = shutil.which("mergecap")
     if mergecap is None:
+        logger.debug("_make_editcap_capture: si mergecap is None -> levée RuntimeError")
         raise RuntimeError("mergecap introuvable (paquet tshark/wireshark-cli) -- voir install.sh")
     merged_path = os.path.join(tmpdir, f"merged_{count}.pcap")
     subprocess.run(
@@ -168,6 +183,7 @@ def _make_editcap_capture(count: int, tmpdir: str) -> str:
         timeout=120,
     )
     del args
+    logger.debug("_make_editcap_capture: retour out_path")
     return out_path
 
 
@@ -192,6 +208,7 @@ def _run_one(count: int, use_editcap: bool) -> BenchResult:
     fois par taille (jamais en boucle dans le meme processus pour plusieurs
     tailles) evite de fausser les tailles les plus petites avec la RSS
     laissee par une taille precedente plus grande."""
+    logger.debug("_run_one: entrée")
     tmpdir = tempfile.mkdtemp(prefix="netcross_bench_") if use_editcap else None
     try:
         gc.collect()
@@ -232,6 +249,7 @@ def _run_one(count: int, use_editcap: bool) -> BenchResult:
         _current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
         rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss  # KiB sous Linux
+        logger.debug("_run_one: retour BenchResult(…)")
         return BenchResult(
             packet_count=count,
             peak_tracemalloc_bytes=peak,
@@ -245,13 +263,17 @@ def _run_one(count: int, use_editcap: bool) -> BenchResult:
 
 
 def _format_bytes(n: float) -> str:
+    logger.debug("_format_bytes: entrée")
     for unit, factor in (("Go", 1_000_000_000), ("Mo", 1_000_000), ("Ko", 1_000)):
         if n >= factor:
+            logger.debug("_format_bytes: si n >= factor -> retour chaîne formatée")
             return f"{n / factor:.1f} {unit}"
+    logger.debug("_format_bytes: retour chaîne formatée")
     return f"{n:.0f} o"
 
 
 def run_bench(sizes: list[int], use_editcap: bool) -> list[BenchResult]:
+    logger.debug("run_bench: entrée")
     results = []
     for count in sizes:
         print(f"-- {count:,} paquets ({'editcap' if use_editcap else 'synthetique'}) --".replace(",", " "))
@@ -262,10 +284,12 @@ def run_bench(sizes: list[int], use_editcap: bool) -> list[BenchResult]:
             f"duree: {result.duration_seconds:.2f}s"
         )
         results.append(result)
+    logger.debug("run_bench: retour results")
     return results
 
 
 def print_table(results: list[BenchResult]) -> None:
+    logger.debug("print_table: entrée")
     print("\n" + "=" * 78)
     print("Taille de capture -> crete memoire -> duree (issue #283, Etape 1)")
     print("=" * 78)
@@ -277,9 +301,11 @@ def print_table(results: list[BenchResult]) -> None:
             f"{r.packet_count:>12,} | {_format_bytes(r.peak_tracemalloc_bytes):>14} | "
             f"{_format_bytes(r.peak_rss_kib * 1024):>12} | {r.duration_seconds:>7.2f}s"
         )
+    logger.debug("print_table: fin")
 
 
 def main() -> int:
+    logger.debug("main: entrée")
     ap = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0] if __doc__ else "")
     ap.add_argument(
         "--sizes",
@@ -312,10 +338,12 @@ def main() -> int:
         return 1
     if not sizes or any(s <= 0 for s in sizes):
         print("--sizes : toutes les tailles doivent etre des entiers > 0", file=sys.stderr)
+        logger.debug("main: si not sizes or any((s <= 0 for s in sizes)) -> retour 1")
         return 1
 
     if args.editcap and _editcap_path() is None:
         print("--editcap demande mais editcap est introuvable (paquet tshark/wireshark-cli).", file=sys.stderr)
+        logger.debug("main: si args.editcap and _editcap_path() is None -> retour 1")
         return 1
 
     results = run_bench(sizes, args.editcap)
@@ -336,6 +364,7 @@ def main() -> int:
             json.dump(payload, f, indent=2)
         print(f"\nResultats ecrits dans {args.json}")
 
+    logger.debug("main: retour 0")
     return 0
 
 
