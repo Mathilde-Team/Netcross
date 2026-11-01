@@ -98,10 +98,12 @@ def _fetch_cve(cve_id: str, *, attempts: int = 3, pause: float = 60.0) -> list[d
     """Un enregistrement NVD ; la limitation de debit (page vide en HTTP
     200) est geree par import_nvd._fetch_page, puis re-tentee ici apres
     une longue pause (le NVD bride parfois plusieurs minutes)."""
+    logger.debug("_fetch_cve: entrée")
     for attempt in range(attempts):
         if attempt:
             time.sleep(pause)
         try:
+            logger.debug("_fetch_cve: boucle sur range(attempts) -> retour list(…)")
             return list(iter_nvd_items(_fetch_page({"cveId": cve_id})))
         except (OSError, RuntimeError) as exc:  # URLError/HTTPError, timeouts, limitation persistante
             logger.warning("CVE {} non recuperee : {}", cve_id, exc)
@@ -111,25 +113,33 @@ def _fetch_cve(cve_id: str, *, attempts: int = 3, pause: float = 60.0) -> list[d
 
 
 def _cached_items(cve_id: str, cache_dir: Path | None) -> list[dict] | None:
+    logger.debug("_cached_items: entrée")
     if cache_dir is None:
+        logger.debug("_cached_items: si cache_dir is None -> retour None")
         return None
     path = cache_dir / f"{cve_id}.json"
     if not path.is_file():
+        logger.debug("_cached_items: si not path.is_file() -> retour None")
         return None
+    logger.debug("_cached_items: retour json.loads(…)")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _store_items(cve_id: str, items: list[dict], cache_dir: Path | None) -> None:
+    logger.debug("_store_items: entrée")
     if cache_dir is None or not items:
+        logger.debug("_store_items: si cache_dir is None or not items -> retour")
         return
     cache_dir.mkdir(parents=True, exist_ok=True)
     (cache_dir / f"{cve_id}.json").write_text(json.dumps(items), encoding="utf-8")
+    logger.debug("_store_items: fin")
 
 
 def build_seed(cve_ids: tuple[str, ...], *, delay: float, cache_dir: Path | None = None) -> dict:
     """cache_dir : reponses NVD deja obtenues, reutilisees a la relance --
     une generation interrompue par la limitation de debit reprend la ou
     elle s'est arretee au lieu de tout re-telecharger."""
+    logger.debug("build_seed: entrée")
     entries = []
     fetched = 0
     for cve_id in cve_ids:
@@ -141,6 +151,7 @@ def build_seed(cve_ids: tuple[str, ...], *, delay: float, cache_dir: Path | None
             items = _fetch_cve(cve_id)
             _store_items(cve_id, items, cache_dir)
         if not items:
+            logger.debug("build_seed: si not items -> levée SystemExit")
             raise SystemExit(f"{cve_id} : introuvable au NVD -- base non regeneree (aucun fichier partiel)")
         entry = parse_nvd_item(items[0])
         affected = [a for a in entry.affected if (a.vendor, a.product) in _CATALOGUED]
@@ -157,6 +168,7 @@ def build_seed(cve_ids: tuple[str, ...], *, delay: float, cache_dir: Path | None
         record["affected"] = seen
         entries.append(record)
         print(f"{cve_id} : CVSS {entry.cvss_score}, {len(seen)} range(s)")
+    logger.debug("build_seed: retour dictionnaire")
     return {
         "version": SEED_FORMAT_VERSION,
         "source": "NVD API 2.0 (https://services.nvd.nist.gov/rest/json/cves/2.0)",
@@ -166,6 +178,7 @@ def build_seed(cve_ids: tuple[str, ...], *, delay: float, cache_dir: Path | None
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output", type=Path, default=DEFAULT_SEED_PATH)
     parser.add_argument("--only", nargs="+", metavar="CVE_ID", help="sous-ensemble de CVE (tests)")
@@ -185,6 +198,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args.output.write_text(json.dumps(seed, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"{len(seed['cves'])} CVE ecrites dans {args.output}")
+    logger.debug("main: retour 0")
     return 0
 
 
