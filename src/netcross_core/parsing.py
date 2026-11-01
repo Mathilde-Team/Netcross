@@ -304,7 +304,9 @@ def read_capture_infos(captures) -> list[dict]:
     Chaque dict porte les cles : label, path, file_type, version,
     encapsulation, snaplen, packet_count, byte_count, duration_seconds,
     start_time, end_time, hardware, operating_system, application,
-    dropped_by_interface, dropped_by_os, interfaces (liste de dicts
+    dropped_by_interface, dropped_by_os, decryption_secrets_blocks
+    (nombre de blocs DSB embarques, issue #1041 -- contenu jamais lu),
+    interfaces (liste de dicts
     plats avec index, linktype, snaplen, name, received,
     dropped_by_interface, dropped_by_os). Les cles absentes valent None."""
     from pcap_parser.capinfos_source import read_capture_info
@@ -335,6 +337,9 @@ def read_capture_infos(captures) -> list[dict]:
                 "application": info.application,
                 "dropped_by_interface": info.dropped_by_interface,
                 "dropped_by_os": info.dropped_by_os,
+                # Nombre de blocs DSB embarques (issue #1041) -- le contenu
+                # des blocs (secrets) n'est jamais lu ni journalise.
+                "decryption_secrets_blocks": info.decryption_secrets_blocks,
                 "interfaces": [
                     {
                         "index": iface.index,
