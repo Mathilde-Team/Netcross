@@ -33,7 +33,7 @@ from netcross_core.annotations import (
     sort_annotations,
 )
 from netcross_core.forensic import annotations_sidecar_path, read_annotations, write_annotations
-from netcross_core.logging_config import add_debug_argument, apply_debug_argument
+from netcross_core.logging_config import add_debug_argument, apply_debug_argument, summarize
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,19 +64,23 @@ def build_parser() -> argparse.ArgumentParser:
     retirer.add_argument("capture", help="fichier de capture (pcap/pcapng)")
     retirer.add_argument("--frame", required=True, help="numero de trame")
     retirer.add_argument("--tag", required=True, help="etiquette")
+    logger.debug("build_parser: retour parser={}", summarize(parser, "parser"))
     return parser
 
 
 def _print_list(annotations, as_json: bool) -> None:
     if as_json:
         print(json.dumps([annotation_to_dict(a) for a in annotations], ensure_ascii=False, indent=2))
+        logger.debug("_print_list: si as_json -> retour")
         return
     if not annotations:
         print("aucune annotation")
+        logger.debug("_print_list: si not annotations -> retour")
         return
     for ann in annotations:
         suffix = f" -- {ann.comment}" if ann.comment else ""
         print(f"trame #{ann.frame_number} [{ann.tag}]{suffix}")
+    logger.debug("_print_list: fin")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -94,12 +98,14 @@ def main(argv: list[str] | None = None) -> int:
         # sidecar corrompu : jamais reecrit (l'analyste peut vouloir le recuperer)
         logger.warning("annotations: sidecar illisible {} ({})", annotations_sidecar_path(args.capture), exc)
         print(f"Sidecar illisible : {annotations_sidecar_path(args.capture)} ({exc})", file=sys.stderr)
+        logger.debug("main: except (OSError, ValueError, KeyError, TypeErr… -> retour 1")
         return 1
 
     if args.action == "list":
         if args.tag:
             annotations = [a for a in annotations if a.tag == args.tag.strip()]
         _print_list(sort_annotations(annotations), args.json)
+        logger.debug("main: si args.action == 'list' -> retour 0")
         return 0
 
     try:
@@ -114,9 +120,11 @@ def main(argv: list[str] | None = None) -> int:
     except KeyError as exc:
         logger.debug("main: annotation absente ({})", exc)
         print(f"Annotation introuvable : {exc.args[0]}", file=sys.stderr)
+        logger.debug("main: except KeyError -> retour 1")
         return 1
     write_annotations(args.capture, annotations)
     _print_list(sort_annotations(annotations), args.json)
+    logger.debug("main: retour 0")
     return 0
 
 

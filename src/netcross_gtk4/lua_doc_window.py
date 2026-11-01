@@ -95,16 +95,19 @@ class LuaDocWindow(Gtk.Window):
             self._fill_classes(self.browser.classes())
             self._set_text(self.browser.classes_text())
         self._on_mode_changed()
+        logger.debug("LuaDocWindow.__init__: fin")
 
     MODES = ("API Lua", "Dissecteurs Lua")
     ALL_DOMAINS = "Tous les domaines"
 
     def dissectors_mode(self) -> bool:
+        logger.debug("LuaDocWindow.dissectors_mode: retour self.mode_dropdown.get_selected() == 1")
         return self.mode_dropdown.get_selected() == 1
 
     def _domain(self) -> str | None:
         i = self.domain_dropdown.get_selected()
         domaines = getattr(self, "_domains", [self.ALL_DOMAINS])
+        logger.debug("LuaDocWindow._domain: retour domaines[i] if 0 < i < len(domaines) else None")
         return domaines[i] if 0 < i < len(domaines) else None
 
     def _on_mode_changed(self) -> None:
@@ -117,6 +120,7 @@ class LuaDocWindow(Gtk.Window):
             "Rechercher un dissecteur (ex : modbus, drone)" if dissecteurs else "Rechercher (ex : tvb range)"
         )
         if self.browser is None:
+            logger.debug("LuaDocWindow._on_mode_changed: si self.browser is None -> retour")
             return
         self.current_class = None
         if dissecteurs:
@@ -125,20 +129,24 @@ class LuaDocWindow(Gtk.Window):
         else:
             self._fill_classes(self.browser.classes())
             self._set_text(self.browser.classes_text())
+        logger.debug("LuaDocWindow._on_mode_changed: fin")
 
     # -- actions ------------------------------------------------------------
 
     def _set_text(self, text: str) -> None:
         self.text_view.get_buffer().set_text(text)
+        logger.debug("LuaDocWindow._set_text: fin")
 
     def text(self) -> str:
         buf = self.text_view.get_buffer()
+        logger.debug("LuaDocWindow.text: retour buf.get_text(…)")
         return buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
 
     def _fill_classes(self, names: list[str]) -> None:
         self.class_list.remove_all()
         for name in names:
             self.class_list.append(Gtk.Label(label=name, xalign=0.0))
+        logger.debug("LuaDocWindow._fill_classes: fin")
 
     def _on_row_activated(self, _box, row) -> None:
         label = row.get_child().get_label()
@@ -146,17 +154,22 @@ class LuaDocWindow(Gtk.Window):
             # liste de gauche = domaines : on filtre sur celui-ci
             self.domain_dropdown.set_selected(self._domains.index(label) if label in self._domains else 0)
             self.run_search()
+            logger.debug("LuaDocWindow._on_row_activated: si self.dissectors_mode() -> retour")
             return
         self.open_class(label)
+        logger.debug("LuaDocWindow._on_row_activated: fin")
 
     def open_class(self, name: str) -> None:
         if self.browser is None:
+            logger.debug("LuaDocWindow.open_class: si self.browser is None -> retour")
             return
         self.current_class = name
         self._set_text(self.browser.class_text(name))
+        logger.debug("LuaDocWindow.open_class: fin")
 
     def run_search(self) -> None:
         if self.browser is None:
+            logger.debug("LuaDocWindow.run_search: si self.browser is None -> retour")
             return
         terme = self.search_entry.get_text()
         self.current_class = None
@@ -166,18 +179,22 @@ class LuaDocWindow(Gtk.Window):
                     terme, self._domain(), self.native_check.get_active(), self.limit_spin.get_value_as_int()
                 )
             )
+            logger.debug("LuaDocWindow.run_search: si self.dissectors_mode() -> retour")
             return
         if not terme.strip():
             # recherche vide : retour a la liste des classes (--classes)
             self._fill_classes(self.browser.classes())
             self._set_text(self.browser.classes_text())
+            logger.debug("LuaDocWindow.run_search: si not terme.strip() -> retour")
             return
         text, classes = self.browser.search(terme, self.limit_spin.get_value_as_int(), self.full_check.get_active())
         self._fill_classes(classes)
         self._set_text(text)
+        logger.debug("LuaDocWindow.run_search: fin")
 
     def show_json(self) -> None:
         if self.browser is None:
+            logger.debug("LuaDocWindow.show_json: si self.browser is None -> retour")
             return
         if self.dissectors_mode():
             self._set_text(
@@ -188,6 +205,7 @@ class LuaDocWindow(Gtk.Window):
                     self.limit_spin.get_value_as_int(),
                 )
             )
+            logger.debug("LuaDocWindow.show_json: si self.dissectors_mode() -> retour")
             return
         self._set_text(
             self.browser.json_text(
@@ -197,9 +215,11 @@ class LuaDocWindow(Gtk.Window):
                 full=self.full_check.get_active(),
             )
         )
+        logger.debug("LuaDocWindow.show_json: fin")
 
     def _on_close(self, _win) -> bool:
         if self.browser is not None:
             self.browser.close()
             self.browser = None
+        logger.debug("LuaDocWindow._on_close: retour False")
         return False

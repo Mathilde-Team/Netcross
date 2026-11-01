@@ -309,13 +309,20 @@ class BatchOptions:
 def check_options(options: BatchOptions) -> str | None:
     """Motif de refus (même texte que la CLI) ou None si les réglages sont valides."""
     if options.jobs < 1:
+        logger.debug("check_options: si options.jobs < 1 -> retour '--jobs doit etre >= 1.'")
         return "--jobs doit etre >= 1."
     if not 0.0 < options.min_overlap <= 1.0:
+        logger.debug(
+            "check_options: si not 0.0 < options.min_overlap <= 1.0 -> retour '--min-overlap doit etre dans ]0, 1].'"
+        )
         return "--min-overlap doit etre dans ]0, 1]."
     if options.min_common_ips < 1:
+        logger.debug("check_options: si options.min_common_ips < 1 -> retour '--min-common-ips doit etre >= 1.'")
         return "--min-common-ips doit etre >= 1."
     if options.group_window < 0:
+        logger.debug("check_options: si options.group_window < 0 -> retour '--group-window doit etre >= 0.'")
         return "--group-window doit etre >= 0."
+    logger.debug("check_options: retour None")
     return None
 
 
@@ -335,6 +342,7 @@ class BatchResult:
 
     @property
     def has_failures(self) -> bool:
+        logger.debug("BatchResult.has_failures: retour bool(…)")
         return bool(self.plan.failures or self.errors)
 
     def to_dict(self) -> dict:
@@ -358,6 +366,7 @@ class BatchResult:
             for iso in self.plan.isolated
         ]
         failures = [{"label": f.label, "error": f.error} for f in self.plan.failures]
+        logger.debug("BatchResult.to_dict: retour dictionnaire")
         return {
             "groups": groups,
             "isolated": isolated,

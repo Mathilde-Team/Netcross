@@ -40,20 +40,27 @@ def _body_start(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.stmt | None:
     body = fn.body
     first = body[0]
     if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
+        logger.debug(
+            "_body_start: si isinstance(first, ast.Expr) and isinstance(first.value, ast… -> retour body[1] if len(bo…"
+        )
         return body[1] if len(body) > 1 else None
+    logger.debug("_body_start: retour first")
     return first
 
 
 def _is_debug_entry(stmt: ast.stmt | None) -> bool:
     """Vrai si l'instruction est un appel logger.debug(...) (ou logger.opt(...).debug(...))."""
     if not isinstance(stmt, ast.Expr) or not isinstance(stmt.value, ast.Call):
+        logger.debug("_is_debug_entry: si not isinstance(stmt, ast.Expr) or not isinstance(stmt.value… -> retour False")
         return False
     func = stmt.value.func
     if not isinstance(func, ast.Attribute) or func.attr != "debug":
+        logger.debug("_is_debug_entry: si not isinstance(func, ast.Attribute) or func.attr != 'debug' -> retour False")
         return False
     base = func.value
     while isinstance(base, ast.Call) and isinstance(base.func, ast.Attribute):
         base = base.func.value
+    logger.debug("_is_debug_entry: retour isinstance(base, ast.Name) and base.id in instrum…")
     return isinstance(base, ast.Name) and base.id in instrument_loguru.LOGGER_NAMES
 
 
@@ -94,8 +101,10 @@ def main() -> None:
     eligibles, manquantes = audit_entrees()
     if args.total:
         print(manquantes)
+        logger.debug("main: si args.total -> retour")
         return
     print(f"entrées : {eligibles - manquantes}/{eligibles} conformes ({manquantes} sans logger.debug en entrée)")
+    logger.debug("main: fin")
 
 
 if __name__ == "__main__":
