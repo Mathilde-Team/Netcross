@@ -582,6 +582,23 @@ def test_print_report_capture_infos_sans_encap_ni_interfaces(capsys):
     assert "link type : non renseigne" in out
 
 
+def test_print_report_capture_infos_signale_les_blocs_dsb(capsys):
+    """Issue #1041 : les blocs DSB embarques sont signales par point --
+    seul le nombre, jamais le contenu (des secrets de cle)."""
+    r = _r(
+        capture_infos=[
+            {"label": "A", "decryption_secrets_blocks": 2},
+            {"label": "B", "decryption_secrets_blocks": 0},
+        ]
+    )
+    print_report(r)
+    out = capsys.readouterr().out
+    assert "secrets de dechiffrement embarques : 2 bloc(s) DSB (utilises automatiquement)" in out
+    # le point sans DSB ne porte pas la ligne ; le contenu des secrets
+    # n'apparait nulle part dans le rapport
+    assert "CLIENT_RANDOM" not in out
+
+
 def test_print_report_topology_edges_avec_coverage_faible(capsys):
     """Lines 177-197 : topology_edges, coverage < 0.8, branch/merge points."""
     r = _r(
