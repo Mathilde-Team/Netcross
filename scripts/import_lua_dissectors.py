@@ -30,6 +30,7 @@ CIBLE = ROOT / "data" / "lua_dissectors.csv"
 
 
 def normaliser(textes: list[str]) -> str:
+    logger.debug("normaliser: entrée")
     vus: dict[str, dict[str, str]] = {}
     for texte in textes:
         bruts = {r["url"].strip().rstrip("/").lower(): r for r in csv.DictReader(io.StringIO(texte.lstrip("\ufeff")))}
@@ -43,10 +44,12 @@ def normaliser(textes: list[str]) -> str:
     ecrivain.writeheader()
     for ligne in sorted(vus.values(), key=lambda r: (r["domaine"].lower(), r["url"].lower())):
         ecrivain.writerow(ligne)
+    logger.debug("normaliser: retour sortie.getvalue(…)")
     return sortie.getvalue()
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("csv", nargs="*", type=Path, help="CSV du recensement (défaut : le CSV versionné)")
     ap.add_argument("--check", action="store_true", help="vérifie que data/lua_dissectors.csv est normalisé")
@@ -58,15 +61,19 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, CatalogueError) as exc:
         logger.error("Import impossible : {}", exc)
         print(f"Import impossible : {exc}", file=sys.stderr)
+        logger.debug("main: except (OSError, CatalogueError) -> retour 1")
         return 1
     if args.check:
         if CIBLE.read_text(encoding="utf-8") != texte:
             print(f"{CIBLE} n'est pas normalisé : relancer scripts/import_lua_dissectors.py", file=sys.stderr)
+            logger.debug("main: si CIBLE.read_text(encoding='utf-8') != texte -> retour 1")
             return 1
         print(f"{CIBLE} est normalisé ({texte.count(chr(10)) - 1} dissecteurs).")
+        logger.debug("main: si args.check -> retour 0")
         return 0
     args.output.write_text(texte, encoding="utf-8")
     print(f"{args.output} : {texte.count(chr(10)) - 1} dissecteurs.")
+    logger.debug("main: retour 0")
     return 0
 
 
