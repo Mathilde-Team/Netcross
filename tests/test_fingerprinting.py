@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.fingerprint -- tests de l'empreinte JA4 (TLS) et HASSH
 (SSH), issue #143 (FLOW-2, parent #141).

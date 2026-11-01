@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de scripts/generate_class_diagram.py et de docs/class-diagram.md (issue #140).
 
 Le diagramme de classes est GENERE depuis src/ et rafraichi par le hook

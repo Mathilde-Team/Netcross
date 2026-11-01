@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.tls_diagnostics -- parsing bas niveau de messages TLS
 construits a la main (memes principes que la validation manuelle

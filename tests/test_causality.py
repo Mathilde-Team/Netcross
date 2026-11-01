@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_causality.py -- tests du moteur de correlation causale
 (netcross_core.causality, Job 4/issue #4).

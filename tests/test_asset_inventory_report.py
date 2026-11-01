@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Issue #350 : l'inventaire d'actifs (#151) est calcule, compare a la
 baseline d'hotes connus (--known-hosts) et rendu partout -- rapport de

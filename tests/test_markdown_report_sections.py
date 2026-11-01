@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_report.markdown_report -- sections sécurité, expertise et
 optionnelles du rapport Markdown (suite #665 et #761).
 

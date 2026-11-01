@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.report_text -- mise en forme du Report en sortie texte
 console et en CSV de detail. Le rendu PDF (a venir) consommera le meme

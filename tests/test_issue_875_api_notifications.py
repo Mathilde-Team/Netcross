@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #875 : notifications de l'API (notify_on, notify_webhook,
 notify_slack, notify_email, notify_detail), mêmes règles que la CLI et la
 GUI, URL jamais conservées dans les métadonnées."""

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Securite dans la GUI (issue #357) : parite avec --security-report.
 
 Le pipeline de la GUI construit le MEME `SecurityReport` que la CLI

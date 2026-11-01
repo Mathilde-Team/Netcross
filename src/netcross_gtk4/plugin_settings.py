@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.plugin_settings -- plugins tiers dans la GUI (issue #867).
 
 Equivalent GUI de ``--plugins``, ``--plugin-path``, ``--plugin-export`` et

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.live_capture_points -- points de capture en direct de la
 GUI (Job 48, issue #168) : une ligne du panneau de capture live peut
 porter PLUSIEURS interfaces d'une meme machine ("eth0, eth1"), chacune

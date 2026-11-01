@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests complementaires de netcross_core.notify.transports (#682).
 
 `tests/test_notify.py` couvre les chemins nominaux (serveur HTTP local,

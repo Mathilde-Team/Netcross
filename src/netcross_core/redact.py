@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.redact -- anonymisation des adresses (IP/MAC) d'une liste
 de paquets deja chargee, en vue d'un partage externe (ticket support

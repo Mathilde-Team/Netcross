@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.capture -- couche 6 (orchestration) : point d'entree public
 du package. Compose les couches du dessous (ek_source -> packet) pour

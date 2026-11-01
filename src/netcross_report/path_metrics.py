@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.path_metrics -- metriques de qualite par segment du chemin
 observe (Job 16/issue #12, FEATURES.md section 6.7).

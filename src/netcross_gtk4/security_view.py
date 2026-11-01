@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.security_view -- section Securite de la GUI (issue #357).
 
 Logique sans GTK : texte affiche et export du rapport de securite, a partir

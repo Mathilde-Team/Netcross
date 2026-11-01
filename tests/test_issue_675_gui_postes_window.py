@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #675 : comparaison de postes -- champs de la configuration,
 validation avant lancement, panneau « Comparaison de postes » (Resultats).
 

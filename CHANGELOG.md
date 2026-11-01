@@ -8,6 +8,12 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Modifié
+- Licence (#986) : passage de MIT à **GPL-3.0-or-later** — texte officiel
+  GPLv3 dans `LICENSE`, déclaration `license = "GPL-3.0-or-later"` dans
+  `pyproject.toml`, en-têtes `SPDX-License-Identifier` sur tous les
+  fichiers source (Python, scripts shell, Dockerfile), `debian/copyright`
+  ajouté (format machine-readable), spec RPM et README mis à jour
+  (compatibilité des dépendances documentée).
 - CI (#966) : un nouveau commit sur une PR annule le run du commit précédent (`concurrency`), dans `ci.yml` et `pr-coverage.yml`. Les runs `push` sur dev et main ne sont jamais annulés.
 - Seuil de couverture bloquant porté à 95 % (#953, règle Mathilde-Team/.github#9) :
   `fail_under = 95` est la seule déclaration. Le job Qualité l'applique hors

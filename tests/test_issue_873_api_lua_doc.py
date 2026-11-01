@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #873 : documentation Lua dans l'API, mêmes documents JSON que
 ``netcross-lua-doc --json``."""
 

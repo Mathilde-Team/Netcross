@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #871 : rejeu d'une capture depuis la GUI (onglet « Rejeu »,
 interruptible, confirmation obligatoire) et l'API (``POST /tools/replay``,
 interfaces autorisées par l'administrateur seulement)."""

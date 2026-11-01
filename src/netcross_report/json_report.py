@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.json_report -- serialise un Report/DiffFinding en JSON
 structure, pour l'integration externe (dashboard, ticketing, pipeline

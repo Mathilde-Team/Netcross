@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.forensic_view -- recherche forensic de la GUI (issue #675).
 
 Equivalent GUI de ``--forensic-search`` et des criteres ``--search-*`` de

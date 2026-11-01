@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #671 : dans la GUI, deux lignes de meme nom forment un seul point
 (capture en rotation, comme ``--capture NOM=a,b`` de la CLI)."""
 

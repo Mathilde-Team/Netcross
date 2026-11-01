@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Wrapper installe dans /usr/bin/netcross-gui par le paquet RPM.
 # Necessite les paquets python3-gobject + gtk4 -- voir README.md pour la
 # disponibilite selon la version de RHEL/Rocky.

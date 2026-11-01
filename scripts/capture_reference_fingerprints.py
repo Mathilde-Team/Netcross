@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Peuple `known_fingerprints.json` avec de VRAIES empreintes JA4/HASSH
 (issue #259), capturees sur la boucle locale et verifiees contre

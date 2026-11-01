@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 scripts/build_cve_seed.py -- regenere la base CVE minimale embarquee
 (`src/netcross_core/data/cve_seed.json`, issue #353).

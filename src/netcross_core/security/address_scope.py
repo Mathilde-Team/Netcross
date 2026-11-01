@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Portee d'une adresse (interne / externe) pour les detecteurs de securite.
 
 Issue #365 : les plages de documentation TEST-NET (RFC 5737) --

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.plugins.runner -- execution isolee des plugins (issue #284).
 

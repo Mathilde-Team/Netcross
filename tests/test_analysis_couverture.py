@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de couverture de netcross_core/analysis.py (issue #697, suite #665).
 
 Chemins rares, testes directement sur les fonctions internes :

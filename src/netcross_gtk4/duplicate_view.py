@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Presentation helpers for cross-capture duplicate detection (Job 41).
 
 Pure Python: no GTK import, so the formatting logic can be tested without a

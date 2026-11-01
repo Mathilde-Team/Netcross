@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """scripts/i18n_report.py -- etat des traductions (issue #299).
 
 Lit lang/LINGUAS, lang/messages.pot et lang/*.po sans dependance (ni gettext

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.capfile -- cadrage binaire pcap/pcapng et decoupage par
 taille (Job 35, issue #155). Aucun outil externe : les fichiers sont

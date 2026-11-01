@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de la CLI netcross-lua-doc (issue #388) et de lua_doc.ensure_db."""
 
 from __future__ import annotations

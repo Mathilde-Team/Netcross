@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.ai_settings -- module IA local dans la GUI (issue #866).
 
 Equivalent GUI des options ``--ai-*`` de la CLI (issue #146), avec les

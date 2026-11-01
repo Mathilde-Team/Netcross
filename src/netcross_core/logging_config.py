@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.logging_config -- configuration centrale du logging (issue #245).
 

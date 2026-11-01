@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """capfile.py : chemins rares du cadrage binaire pcap/pcapng (issue #747).
 
 Complete `test_capfile.py` : options ou blocs sans rapport avec ce que lit

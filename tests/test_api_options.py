@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Issue #330 (écart 2 de docs/parite-surfaces.md) : options d'analyse de
 l'API, mêmes noms et même sens que la CLI (nat_tolerant, nat_window_ms,

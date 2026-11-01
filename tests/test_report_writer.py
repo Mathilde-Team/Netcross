@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #695 (suite de #665) : branches restantes de ``netcross_ai.report_writer``.
 
 Complete ``tests/test_ai_module.py`` (qui couvre le chemin nominal) avec les

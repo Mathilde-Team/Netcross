@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #877 (API) : portées, marqueurs et table de correspondance du ticket
 de support sur ``POST /analyses/{analysis_id}/support-ticket``.
 

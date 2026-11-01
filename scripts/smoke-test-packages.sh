@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # scripts/smoke-test-packages.sh -- test de fumee des paquets installes (issue #342).
 #
 # La casse du .deb (#336 : sous-paquets et pcap_parser non installes) est

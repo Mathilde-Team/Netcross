@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.expert_events -- construit les vues `ExpertEvent`/
 `Diagnosis` (Session 36, cinquieme et sixieme objets de contrat de la

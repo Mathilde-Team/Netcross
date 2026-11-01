@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests GUI complementaires du panneau d'annotations (#683).
 
 `tests/test_gui_annotations_panel.py` couvre l'ajout, la relecture, la

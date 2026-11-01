@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.plugins -- detecteurs et sorties tierces (issue #284).
 Voir docs/plugins.md : contrat, schema des constats, limites de securite.

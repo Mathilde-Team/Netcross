@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.parsing -- adaptateur entre pcap_parser (decodage via
 tshark -T ek) et le modele Pkt de netcross_core.

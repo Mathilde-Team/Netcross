@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.fingerprint.known -- base de correspondances empreinte ->
 nom d'outil (issue #143, critere d'acceptation "base de fingerprints

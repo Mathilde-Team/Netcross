@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.report_text -- mise en forme texte/CSV d'un Report. On ne
 teste pas la mise en page caractere pres (fragile, sans valeur), mais

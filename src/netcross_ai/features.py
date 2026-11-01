@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Vecteur de caracteristiques d'un flux, calcule a partir des statistiques
 FLOW-4 (``Report.flow_anomalies`` / ``security.flow_stats``) : taille,
 SPLT, entropie, ratio montant/descendant, regularite temporelle.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # build-deb/build.sh -- construit le paquet .deb de netcross.
 #
 # Le code source (src/) vit a la racine du depot, separement de

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.quic_diagnostics -- extraction du SNI des paquets QUIC
 Initial (RFC 9000/9001), pour voir le trafic HTTP/3 moderne (Chrome, Teams,

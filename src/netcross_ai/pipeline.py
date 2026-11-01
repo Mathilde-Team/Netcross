@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Orchestration des trois usages pour la CLI (``--ai-*``) et mise en forme."""
 
 from __future__ import annotations

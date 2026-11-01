@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.session_objects -- extraction du bloc de construction des
 objets enrichis (Job 4/issue #13) et rendu console/PDF.

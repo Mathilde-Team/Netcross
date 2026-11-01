@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Issue #218 -- les constats de securite doivent atteindre les sorties
 machine (JSON), le document partage (PDF) et le rendu consultable (HTML),

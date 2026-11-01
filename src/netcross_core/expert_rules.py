@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.expert_rules -- bibliotheque de regles d'expertise reseau
 DECLARATIVE (FEATURES.md section 6.2), dernier chantier de la Session 2

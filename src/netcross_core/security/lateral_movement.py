@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.lateral_movement -- issue #149 (SCENARIO-3, parent
 #141) : detection de mouvements latéraux internes (scans réseau,
