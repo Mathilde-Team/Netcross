@@ -81,6 +81,7 @@ def clean_inline(text: str) -> str:
     text = re.sub(r"``([^`]+)``", r"`\1`", text)
     text = _ATTR_REF_RE.sub("", text)
     text = _BOLD_RE.sub(r"\1", text)
+    logger.debug("clean_inline: retour _ITALIC_RE.sub(…)")
     return _ITALIC_RE.sub(r"\1", text)
 
 
@@ -88,7 +89,9 @@ def _macro(m: re.Match[str]) -> str:
     """menu:Tools[Lua > Reload] -> 'Tools > Lua > Reload' ; kbd:[Ctrl+L] -> 'Ctrl+L'."""
     cible, contenu = m.group(2).strip(), m.group(3).strip()
     if m.group(1) == "menu":
+        logger.debug("_macro: si m.group(1) == 'menu' -> retour ' > '.join(…)")
         return " > ".join(x for x in (cible, contenu) if x)
+    logger.debug("_macro: retour contenu or cible")
     return contenu or cible
 
 
@@ -98,6 +101,7 @@ def _table(rows: list[str]) -> str:
     width = max((len(r) for r in cells), default=0)
     cells = [r + [""] * (width - len(r)) for r in cells]
     cols = [max(len(r[k]) for r in cells) for k in range(width)]
+    logger.debug("_table: retour '\\n'.join(…)")
     return "\n".join("  " + "  ".join(c.ljust(w) for c, w in zip(r, cols)).rstrip() for r in cells)
 
 
@@ -116,6 +120,7 @@ def render_blocks(lines: list[str]) -> str:
         if courant:
             paragraphes.append("\n".join(clean_inline(c) for c in courant))
             courant.clear()
+        logger.debug("render_blocks.flush: fin")
 
     i = 0
     while i < len(lines):
@@ -185,6 +190,7 @@ def render_blocks(lines: list[str]) -> str:
             courant.append(line)
         i += 1
     flush()
+    logger.debug("render_blocks: retour '\\n\\n'.join(…)")
     return "\n\n".join(p for p in paragraphes if p.strip())
 
 
@@ -232,17 +238,20 @@ def split_description(lines: list[str]) -> tuple[str, list[str]]:
             texte = texte[:k]
             break
     description = render_blocks(texte)
+    logger.debug("split_description: retour tuple de 2")
     return description, exemples
 
 
 def paragraphs(lines: list[str]) -> list[str]:
     """Decoupe des lignes en paragraphes nettoyes."""
+    logger.debug("paragraphs: retour liste")
     return [p for p in split_description(lines)[0].split("\n\n") if p]
 
 
 def extract_version(text: str) -> str:
     """Version Wireshark d'introduction mentionnee dans un texte, ou ''."""
     m = _VERSION_RE.search(text)
+    logger.debug("extract_version: retour m.group(1) if m else ''")
     return m.group(1) if m else ""
 
 
@@ -256,9 +265,12 @@ def _split_name(signature: str) -> tuple[str, str]:
     ident = signature.split("(", 1)[0].strip()
     if ":" in ident:
         nom = ident.rsplit(":", 1)[1]
+        logger.debug("_split_name: si ':' in ident -> retour tuple de 2")
         return nom, "metamethode" if nom.startswith("__") else "methode"
     if "." in ident:
+        logger.debug("_split_name: si '.' in ident -> retour tuple de 2")
         return ident.rsplit(".", 1)[1], "constructeur"
+    logger.debug("_split_name: retour tuple de 2")
     return ident, "fonction"
 
 
@@ -304,6 +316,7 @@ def parse_function(anchor: str, block: list[str]) -> dict[str, Any]:
 
     description, ex_desc = split_description(desc_lines)
     retours = paragraphs(ret_lines)
+    logger.debug("parse_function: retour dictionnaire")
     return {
         "nom": nom,
         "genre": genre,
@@ -327,6 +340,7 @@ def parse_attribute(anchor: str, block: list[str]) -> dict[str, Any]:
     if m:
         mode = {"Retrieve only.": "RO", "Assign only.": "WO", "Retrieve or assign.": "RW"}.get(m.group(1).strip(), "")
         description = description[m.end() :].strip()
+    logger.debug("parse_attribute: retour dictionnaire")
     return {
         "nom": nom_complet.rsplit(".", 1)[-1],
         "nom_complet": nom_complet,
@@ -339,6 +353,7 @@ def parse_attribute(anchor: str, block: list[str]) -> dict[str, Any]:
 
 
 def _new_class(nom: str, module: str) -> dict[str, Any]:
+    logger.debug("_new_class: retour dictionnaire")
     return {"nom": nom, "module": module, "description": "", "exemples": [], "methodes": [], "attributs": []}
 
 
@@ -360,6 +375,7 @@ def parse_adoc(text: str, classes: dict[str, dict[str, Any]] | None = None) -> d
             classe["description"] = "\n\n".join(p for p in (classe["description"], desc) if p)
             classe["exemples"].extend(ex)
         class_desc = None
+        logger.debug("parse_adoc.fermer_description: fin")
 
     i = 0
     while i < len(lines):
@@ -404,6 +420,7 @@ def parse_adoc(text: str, classes: dict[str, dict[str, Any]] | None = None) -> d
                 classe["attributs"].append(parse_attribute(anchor, block))
             i = j + 1
     fermer_description()
+    logger.debug("parse_adoc: retour classes")
     return classes
 
 
@@ -417,7 +434,9 @@ def wireshark_version(src: Path) -> str:
     text = (src / "CMakeLists.txt").read_text(encoding="utf-8")
     parts = [re.search(rf"set\(PROJECT_{k}_VERSION\s+(\d+)\)", text) for k in ("MAJOR", "MINOR", "PATCH")]
     if not all(parts):
+        logger.debug("wireshark_version: si not all(parts) -> retour ''")
         return ""
+    logger.debug("wireshark_version: retour '.'.join(…)")
     return ".".join(p.group(1) for p in parts if p)
 
 
@@ -426,8 +445,10 @@ def wslua_modules(src: Path) -> list[Path]:
     cmake = (src / "epan" / "wslua" / "CMakeLists.txt").read_text(encoding="utf-8")
     m = re.search(r"set\(WSLUA_MODULES(.*?)\)", cmake, re.DOTALL)
     if not m:
+        logger.debug("wslua_modules: si not m -> levée ValueError")
         raise ValueError("WSLUA_MODULES introuvable dans epan/wslua/CMakeLists.txt")
     noms = re.findall(r"([\w.-]+\.c)", m.group(1))
+    logger.debug("wslua_modules: retour liste")
     return [src / "epan" / "wslua" / n for n in noms]
 
 
@@ -435,10 +456,12 @@ def generate_adoc(src: Path, out_dir: Path) -> list[Path]:
     """Lance ``tools/make-wsluarm.py`` du checkout Wireshark ; retourne les .adoc produits."""
     script = src / "tools" / "make-wsluarm.py"
     if not script.exists():
+        logger.debug("generate_adoc: si not script.exists() -> levée FileNotFoundError")
         raise FileNotFoundError(f"{script} introuvable (checkout Wireshark incomplet ?)")
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = [sys.executable, str(script), "--output-directory", str(out_dir), *map(str, wslua_modules(src))]
     subprocess.run(cmd, check=True, capture_output=True, text=True)  # noqa: S603
+    logger.debug("generate_adoc: retour sorted(…)")
     return sorted(out_dir.glob("*.adoc"))
 
 
@@ -465,6 +488,7 @@ def clone_tag(tag: str, dest: Path) -> tuple[Path, str]:
     commit = subprocess.run(  # noqa: S603
         [*git, "-C", str(dest), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
     ).stdout.strip()
+    logger.debug("clone_tag: retour tuple de 2")
     return dest, commit
 
 
@@ -478,6 +502,7 @@ def build_api(adoc_files: list[Path], version: str, source: str) -> dict[str, An
     classes: dict[str, dict[str, Any]] = {}
     for f in sorted(adoc_files):
         parse_adoc(f.read_text(encoding="utf-8"), classes)
+    logger.debug("build_api: retour dictionnaire")
     return {
         "version_wireshark": version,
         "date_generation": _dt.date.today().isoformat(),
@@ -514,6 +539,7 @@ def main(argv: list[str] | None = None) -> int:
             source = f"wireshark {ref} : tools/make-wsluarm.py sur epan/wslua/*.c"
         if not adoc_files:
             print("Aucun fichier .adoc a parser", file=sys.stderr)
+            logger.debug("main: si not adoc_files -> retour 1")
             return 1
         api = build_api(adoc_files, version, source)
 
@@ -525,6 +551,7 @@ def main(argv: list[str] | None = None) -> int:
         f"{args.output} : Wireshark {version or '?'}, {len(api['classes'])} classes, "
         f"{n_meth} fonctions/methodes, {n_attr} attributs"
     )
+    logger.debug("main: retour 0")
     return 0
 
 

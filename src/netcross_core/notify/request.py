@@ -40,6 +40,7 @@ class NotifySettings:
 
     @property
     def active(self) -> bool:
+        logger.debug("NotifySettings.active: retour bool(…)")
         return bool(self.threshold)
 
 
@@ -49,6 +50,7 @@ def validate_settings(settings: NotifySettings, security: bool, security_hint: s
     Meme principe que la CLI : echec immediat plutot qu'apres de longues
     minutes d'analyse."""
     if not settings.active:
+        logger.debug("validate_settings: si not settings.active -> retour liste vide")
         return []
     errors: list[str] = []
     if settings.threshold not in SEVERITIES:
@@ -111,6 +113,7 @@ def send_notifications(
         )
     except Exception as exc:  # noqa: BLE001 -- une notification ne fait jamais perdre l'analyse
         logger.exception(f"échec dans send_notifications: {exc}")
+        logger.debug("send_notifications: except Exception -> retour liste")
         return [DeliveryResult("notifications", STATUS_FAILED, str(exc)).to_dict()]
     lines = [res.to_dict() for res in results]
     logger.debug("send_notifications: {} ligne(s)", len(lines))
