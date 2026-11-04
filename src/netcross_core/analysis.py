@@ -20,6 +20,7 @@ from netcross_core.application import (
     build_http_transactions,
     classify_transaction,
 )
+from netcross_core.clock_sync import echantillon_ntp_ms, estimer_decalages
 from netcross_core.content import extract_http_objects
 from netcross_core.correlate import TOPN_DIMENSIONS, compute_throughput, compute_topn_series
 from netcross_core.extract.carver import detect_extracted_files
@@ -1387,7 +1388,7 @@ def _analyse_handshake(r: Report, flows, points, points_order, nat_tolerant):
                 if p not in reply_points:
                     r.syn_reply_missing[p] += 1
 
-            # decalage d'horloge : formule NTP classique offset = ((t2-t1)-(t4-t3))/2,
+            # decalage d'horloge : formule NTP classique (clock_sync.echantillon_ntp_ms),
             # necessite que le SYN ET le SYN-ACK soient tous deux vus aux deux points
             # de la paire (aller-retour complet visible des deux cotes)
             for a, b in r.pairs:
@@ -1396,13 +1397,10 @@ def _analyse_handshake(r: Report, flows, points, points_order, nat_tolerant):
                     t2 = min(pkt.ts for pkt in per_point[b])
                     t3 = min(pkt.ts for pkt in matched[b])
                     t4 = min(pkt.ts for pkt in matched[a])
-                    offset_ms = ((t2 - t1) - (t4 - t3)) / 2 * 1000.0
-                    r.clock_offset_samples[(a, b)].append(offset_ms)
+                    r.clock_offset_samples[(a, b)].append(echantillon_ntp_ms(t1, t2, t3, t4))
 
-    for pair, samples in r.clock_offset_samples.items():
-        mean_off = statistics.mean(samples)
-        stdev_off = statistics.pstdev(samples) if len(samples) > 1 else 0.0
-        r.clock_offset_estimate[pair] = (mean_off, stdev_off, len(samples))
+    # Estimateur isolé dans clock_sync (issue #1026) : moyenne + écart-type.
+    r.clock_offset_estimate.update(estimer_decalages(r.clock_offset_samples))
     logger.debug("_analyse_handshake: {}", _resume(r, "clock_offset_estimate", "syn_no_synack", "syn_reply_missing"))
 
 
