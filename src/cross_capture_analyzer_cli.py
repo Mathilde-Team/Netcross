@@ -153,6 +153,7 @@ from netcross_core.discovery import load_baseline_hosts
 from netcross_core.flow_timeline import build_flow_timelines
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
+from netcross_core.profiling import creer_mesures, marquer
 from netcross_core.report_text import load_capture_annotations, print_capture_annotations
 from netcross_core.security import close_db, connect_cve_db
 from netcross_core.security import findings as security_findings
@@ -2378,9 +2379,29 @@ def main():
         metavar="VALEUR",
         help="Valeur cherchee dans --search-field (sans --search-field : dans tous les champs).",
     )
+    prof = ap.add_argument_group(
+        "mesure des performances",
+        "Issue #1016 : duree et memoire par etape du pipeline (lecture, correlation, detecteurs, rapport). "
+        "Desactivee par defaut, sans cout quand elle est absente.",
+    )
+    prof.add_argument(
+        "--profile-steps",
+        metavar="FICHIER.json",
+        help="Ecrit la duree de chaque etape, la RSS max du processus et de tshark dans ce fichier JSON "
+        "et affiche un resume en fin d'analyse.",
+    )
+    prof.add_argument(
+        "--profile-tracemalloc",
+        action="store_true",
+        help="Avec --profile-steps : ajoute le pic des allocations Python par etape (tracemalloc ; "
+        "ralentit nettement l'analyse).",
+    )
     add_debug_argument(ap)
     args = ap.parse_args()
     apply_debug_argument(args)
+    if args.profile_tracemalloc and not args.profile_steps:
+        logger.debug("main: --profile-tracemalloc sans --profile-steps -> levée SystemExit")
+        ap.error("--profile-tracemalloc necessite --profile-steps")
 
     plugin_names = [n.strip() for n in (args.plugins or "").split(",") if n.strip()]
     if args.list_plugins:
@@ -2932,6 +2953,9 @@ def main():
 
     sample_n = _parse_sample_spec(args.sample) if args.sample else None
 
+    # Issue #1016 : None sans --profile-steps (aucun objet, aucun cout).
+    mesures = creer_mesures(bool(args.profile_steps), args.profile_tracemalloc)
+    marquer(mesures, "lecture")
     all_packets = []
     # Issue #940 : un point en echec (fichier illisible ou tshark absent)
     # doit se retrouver dans le code de sortie -- defini ici, car la
@@ -3073,6 +3097,8 @@ def main():
             print(f"\nATTENTION : {truncation_note}", file=sys.stderr)
 
     points_order = args.order.split(",") if args.order else None
+    # Doublons inter-captures et correlate() : rapprochement entre points.
+    marquer(mesures, "correlation")
     duplicate_counts = None
     if args.detect_duplicates or args.exclude_duplicates:
         if args.duplicate_threshold_ms < 0:
@@ -3091,6 +3117,7 @@ def main():
         # plus bas : c'est lui qui renseigne Report.duplicates_excluded.
         all_packets = [pk for pk in all_packets if not pk.is_duplicate]
     flows = correlate(all_packets, args.nat_tolerant, args.nat_window_ms, args.exclude_duplicates)
+    marquer(mesures, "detecteurs")
     r = analyse(
         flows,
         points_order,
@@ -3120,6 +3147,7 @@ def main():
     if truncation_note:
         r.truncated = True
         r.truncation_note = truncation_note
+    marquer(mesures, "rapport")
     print_report(r)
     # Issue #910 : annotations des sidecars (GUI ou `netcross annotations`)
     if captures:
@@ -3127,6 +3155,9 @@ def main():
     if r.truncated:
         print(f"\nATTENTION : {r.truncation_note}")
 
+    # Detecteurs complementaires (securite, IA, clients, triage, TLS/QUIC,
+    # medias) : de nouveau l'etape « detecteurs » (passages cumules).
+    marquer(mesures, "detecteurs")
     # --security-report (issue #139) : consolidation des quatre detecteurs
     # (CVE-1 a CVE-4) sur le rapport deja rempli par analyse(), puis rendu
     # dedie -- voir docs/security-report.md. Sans --cve-db, base minimale
@@ -3299,6 +3330,7 @@ def main():
     if args.media_quality or args.extract_contents:
         _run_content_extraction(captures, args.extract_contents, extract_kinds)
 
+    marquer(mesures, "rapport")
     if args.detail_csv:
         write_detail_csv(args.detail_csv, flows, r.points, names=names)
         print(f"\nDetail par flux ecrit dans {args.detail_csv}")
@@ -3539,6 +3571,9 @@ def main():
     # automatisation ne doit pas confondre analyse incomplete et succes.
     # 3 : 0 = succes, 1 = erreur fatale, 2 = erreur d'usage (argparse),
     # 3 = rapport rendu mais incomplet.
+    if mesures is not None:
+        mesures.ecrire_json(args.profile_steps)
+        print(f"\n{mesures.resume()}\nMesures ecrites dans {args.profile_steps}")
     if any_error:
         sys.exit(3)
     logger.debug("main: fin")
