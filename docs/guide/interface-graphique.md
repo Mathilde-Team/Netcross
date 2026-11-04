@@ -9,12 +9,18 @@ cd src && python3 -m netcross_gtk4.app  # depuis les sources
 ```
 
 Elle comporte trois onglets : **Configuration**, **Travail** et
-**Résultats**. Les captures d'écran ci-dessous ont été prises avec les
-captures d'exemple de [Première analyse](premiere-analyse.md).
+**Résultats**. La barre de titre porte aussi quatre fenêtres
+indépendantes de l'analyse en cours : **Historique des runs**, **Outils
+de capture**, **Analyse d'un dossier** et **Documentation Lua**.
+
+Les captures d'écran ci-dessous sont le rendu réel de l'interface GTK4,
+prises avec les captures d'exemple de [Première analyse](premiere-analyse.md)
+par `tools/captures_ecran_gui.py`, qui permet de les régénérer quand
+l'interface change.
 
 ## Configuration
 
-![Onglet Configuration, avec les deux captures d'exemple](images/01-configuration.png)
+![Onglet Configuration, avec les deux captures d'exemple et toutes les options](images/01-configuration.png)
 
 1. **Ajouter une capture** ouvre un sélecteur de fichiers. Répétez
    l'opération pour chaque point.
@@ -105,7 +111,7 @@ Ces deux modes ne se combinent pas entre eux.
 
 ## Travail
 
-![Onglet Travail pendant l'analyse](images/02-travail.png)
+![Onglet Travail en fin d'analyse : chaque point a chargé ses paquets](images/02-travail.png)
 
 Le journal suit chaque étape en temps réel : lecture de chaque fichier
 avec son nombre de paquets, corrélation, analyse, mise en forme. Vérifiez
@@ -208,6 +214,8 @@ Le bouton **Outils de capture** de la barre de titre ouvre une fenêtre à
 onglets qui transforme des fichiers sans lancer d'analyse, comme les
 modes utilitaires de la CLI :
 
+![Fenêtre Outils de capture, onglet Fusion](images/05-outils-capture.png)
+
 | Onglet | Équivalent CLI |
 |---|---|
 | Fusion (captures, « Dedupliquer les paquets identiques ») | `--merge`, `--merge-dedup` |
@@ -231,6 +239,8 @@ Réservez-le à un banc de test isolé ; tcpreplay et les droits d'émission
 Le bouton **Analyse d'un dossier** de la barre de titre ouvre l'équivalent
 de `cross_capture_batch_cli.py` (voir [mode lot](../batch-mode.md)) : même
 moteur, mêmes groupes, mêmes rapports et même `index.txt`.
+
+![Fenêtre Analyse d'un dossier, après un lot sur les quatre captures d'exemple](images/06-analyse-dossier.png)
 
 | Réglage | Équivalent CLI |
 |---|---|
@@ -258,6 +268,8 @@ complète), recherche plein texte (« Resultats max. » = `--limit`,
 de `--json`. Aucun accès réseau ; la banque est celle de la CLI
 (`~/.cache/netcross/lua_api.db`).
 
+![Fenêtre Documentation Lua, fiche de la classe Tvb](images/07-documentation-lua.png)
+
 La liste en tête de la fenêtre passe de « API Lua » à **Dissecteurs Lua**,
 le catalogue des dissecteurs Wireshark écrits en Lua : plus de 1 200 dépôts
 recensés dans [wireshark-lua](https://github.com/Mathilde-Team/wireshark-lua),
@@ -279,6 +291,8 @@ consultation d'une base `--history-db` sans relancer d'analyse, comme
 étiquette exacte (`--label`) et nombre maximal de runs (`--limit`, 0 =
 tous). La base et l'étiquette de la configuration sont reprises à
 l'ouverture.
+
+![Fenêtre Historique des runs : l'exemple avant (72/100) puis après correction (100/100)](images/08-historique.png)
 
 ## Ce que l'interface ne fait pas
 
