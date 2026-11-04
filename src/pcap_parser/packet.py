@@ -37,6 +37,7 @@ from pcap_parser.protocols import (
     extract_dns,
     extract_http,
     extract_rtp,
+    extract_sdp_media,
     extract_sip,
     extract_tls_certificate,
     extract_tls_handshake,
@@ -301,6 +302,10 @@ class RawPacket:
     # Adresses A/AAAA de la reponse DNS (issue #344) : tuple vide hors
     # reponse DNS. Voir protocols._dns_answers.
     dns_answers: tuple[str, ...] = ()
+    # Points de reception media (adresse, port) annonces par le SDP d'un
+    # message SIP (issue #1120) : tuple vide hors SIP avec SDP. Voir
+    # protocols.extract_sdp_media.
+    sip_sdp_media: tuple[tuple[str, int], ...] = ()
     # Commentaire de paquet pcapng (Enhanced Packet Block, option
     # opt_comment -- Job 39, issue #159). None sur un pcap classique (le
     # format ne porte aucune notion de commentaire) ou sur un paquet
@@ -533,6 +538,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
     rtp_seq = rtp_ts = rtp_ssrc = None
     dhcp_xid = dhcp_msg_type = dhcp_server_id = dhcp_vendor_class = None
     sip_call_id = sip_msg_type = sip_cseq = sip_user_agent = sip_server = None
+    sip_sdp_media: tuple[tuple[str, int], ...] = ()
     dns_txn_id = dns_qry_name = dns_rcode = None
     dns_is_response = False
     dns_answers: tuple[str, ...] = ()
@@ -669,6 +675,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
             sip_cseq = sip["cseq"]
             sip_user_agent = _intern(sip["user_agent"])
             sip_server = _intern(sip["server"])
+            sip_sdp_media = extract_sdp_media(payload)
 
     if proto in ("TCP", "UDP"):
         # Contrairement a extract_sip ci-dessus, extract_dns ne lit que la
@@ -868,6 +875,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
         expert_details=expert_details,
         tcp_len=tcp_len,
         dns_answers=dns_answers,
+        sip_sdp_media=sip_sdp_media,
         ip_checksum=ip_checksum,
         ip_checksum_bad=ip_checksum_bad,
         tcp_checksum=tcp_checksum,

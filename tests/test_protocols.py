@@ -879,3 +879,42 @@ def test_public_key_summary_cle_indecodable_ou_type_inconnu():
     type_nom, taille = _public_key_summary(SimpleNamespace(public_key=lambda: cle))
     assert type_nom == type(cle).__name__
     assert taille is None
+
+
+# -- Issue #1120 : points media SDP (c=/m=) -------------------------------------
+
+
+def test_extract_sdp_media_c_de_session_et_de_media():
+    from pcap_parser.protocols import extract_sdp_media
+
+    payload = (
+        b"INVITE sip:bob@example.org SIP/2.0\r\n"
+        b"Call-ID: x\r\n"
+        b"c: application/sdp\r\n"
+        b"\r\n"
+        b"v=0\r\n"
+        b"o=- 1 1 IN IP4 10.0.0.1\r\n"
+        b"c=IN IP4 10.0.0.1\r\n"
+        b"m=audio 40000 RTP/AVP 0\r\n"
+        b"m=video 40002/2 RTP/AVP 96\r\n"
+        b"c=IN IP4 224.2.1.1/127\r\n"
+        b"m=audio 0 RTP/AVP 0\r\n"
+        b"m=audio 40000 RTP/AVP 8\r\n"
+        b"m=text\r\n"
+        b"c=IN\r\n"
+        b"m=audio 40004 RTP/AVP 0\r\n"
+        b"c=IN IP6 2001:db8::1\r\n"
+    )
+    assert extract_sdp_media(payload) == (
+        ("10.0.0.1", 40000),
+        ("224.2.1.1", 40002),
+        ("2001:db8::1", 40004),
+    )
+
+
+def test_extract_sdp_media_sans_corps_ou_sans_sdp():
+    from pcap_parser.protocols import extract_sdp_media
+
+    assert extract_sdp_media(b"") == ()
+    assert extract_sdp_media(b"BYE sip:bob SIP/2.0\r\nCall-ID: x") == ()
+    assert extract_sdp_media(b"SIP/2.0 200 OK\nCall-ID: x\n\nv=0\nm=audio 4000 RTP/AVP 0\n") == ()

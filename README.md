@@ -124,7 +124,10 @@ ordre connu à l'avance), `netcross` :
   quelques exemples concrets méthode+URI+code), et durée moyenne de
   réponse (calculée nativement par tshark, pas recomposée à la main) ;
   HTTP/2 et HTTP/3 (QUIC) ne sont pas couverts par cette section ;
-- calcule la **qualité vocale (MOS/R-factor)** sur les flux RTP détectés ;
+- calcule la **qualité vocale (MOS/R-factor)** sur les flux RTP détectés et
+  rattache chaque flux à son appel SIP par le SDP (lignes `c=`/`m=` de
+  l'offre et de la réponse), avec repli sur la fenêtre temporelle de l'appel ;
+  la méthode retenue (`sdp`, `time_window`, `mixed`) est toujours affichée ;
 - diagnostique les **handshakes TLS** par segment (SNI, cipher négocié,
   alertes fatales) et localise où un handshake qui aboutissait se met à
   échouer (indice d'inspection TLS/pare-feu sur SNI) ;
