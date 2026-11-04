@@ -1237,12 +1237,15 @@ avant un déploiement en production.
   sur des URI différentes, qui reste correctement distingué). Une réponse
   4xx est signalée pour information mais n'est pas en elle-même une
   anomalie réseau.
-- **QUIC/HTTP3** : seule la v1 (RFC 9001) est gérée ; la dérivation de clés
-  a été validée octet pour octet contre les vecteurs de test officiels de
-  la RFC 9001 Annexe A.2. Seul le paquet Initial (ClientHello, SNI) est
+- **QUIC/HTTP3** : les versions 1 (RFC 9001) et 2 (RFC 9369, version
+  `0x6b3343cf`) sont gérées ; la dérivation de clés a été validée octet
+  pour octet contre les vecteurs de test officiels de la RFC 9001
+  Annexe A.2 et de la RFC 9369 Annexe A (paquet Client Initial v2 complet
+  déchiffré, SNI compris). Les constats signalent les Initial v2 par point ;
+  les brouillons et versions privées restent ignorés. Seul le paquet Initial (ClientHello, SNI) est
   accessible — les échanges 0-RTT/1-RTT sont chiffrés avec des clés de
   session qui ne sont pas publiques, donc structurellement indéchiffrables
-  sans capture des clés côté client (keylog). QUIC v2 (RFC 9369) non geré.
+  sans capture des clés côté client (keylog).
 - **TLS/QUIC sur `cross_capture_diff_cli.py`** : `--tls`/`--quic` exécutent
   le diagnostic séparément sur le baseline et sur le run courant plutôt que
   de produire une vraie comparaison chiffrée — ces deux modules ne
