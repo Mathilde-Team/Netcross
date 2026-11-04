@@ -1805,6 +1805,14 @@ def main():
         "reduire a 50-200ms pour detecter des microbursts)",
     )
     ap.add_argument(
+        "--link-speed",
+        action="append",
+        metavar="POINT=VITESSE",
+        help="Vitesse du lien d'un point de capture (ex: A=1G, B=100M, C=2.5G), "
+        "utilisee seulement si le pcapng ne porte pas l'option if_speed "
+        "(issue #1132). Repetable, une fois par point.",
+    )
+    ap.add_argument(
         "--rtp-clock-rate",
         type=int,
         default=8000,
@@ -2922,6 +2930,21 @@ def main():
     if args.split_interfaces and captures:
         captures = _expand_split_interfaces(captures)
 
+    # Issue #1132 : --link-speed valide AVANT toute lecture de paquets
+    # (point inconnu, doublon ou vitesse illisible -> sortie immediate).
+    link_speed_overrides: dict[str, int] = {}
+    if args.link_speed:
+        from netcross_core.link_speed import parse_link_speed_specs
+
+        try:
+            link_speed_overrides = parse_link_speed_specs(
+                args.link_speed, list(dict.fromkeys(label for label, _ in captures))
+            )
+        except ValueError as exc:
+            logger.debug("main: --link-speed invalide ({})", exc)
+            print(str(exc), file=sys.stderr)
+            sys.exit(1)
+
     # Avertissement memoire (issue #283, Etape 2) : AVANT toute lecture de
     # paquets -- une fois parse_capture() lance sur une capture trop
     # volumineuse, il est deja trop tard (c'est precisement le moment ou
@@ -3111,6 +3134,9 @@ def main():
     if captures:
         r.capture_comments = read_capture_comments(captures)
         r.capture_infos = read_capture_infos(captures)
+        from netcross_core.link_speed import resolve_link_speeds
+
+        r.link_speeds = resolve_link_speeds(captures, link_speed_overrides)
     # Report.truncated/truncation_note (issue #283, Etape 3) : ecrit ici, pas
     # dans analyse() -- meme discipline que capture_comments/capture_infos
     # ci-dessus, la troncature est une decision de l'appelant (CLI), pas un

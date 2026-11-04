@@ -244,6 +244,19 @@ def print_report(r: Report):
         for c in r.packet_comments:
             print(f"  [paquet] {c}")
 
+    if any(fiche.get("speed_bps") for fiche in r.link_speeds.values()):
+        # Issue #1132 : section absente tant qu'aucune vitesse n'est connue
+        # (sortie historique inchangee) ; la source est toujours affichee.
+        from netcross_core.link_speed import format_speed
+
+        print("\n-- Vitesse des liens --")
+        for point_label, fiche in r.link_speeds.items():
+            speed = fiche.get("speed_bps")
+            resolution = fiche.get("ts_resolution")
+            vitesse = f"{format_speed(speed)} (source : {fiche.get('speed_source')})" if speed else "inconnue"
+            tick = f", horodatage au {resolution:g} s" if resolution else ""
+            print(f"  {point_label} : {vitesse}{tick}")
+
     if r.capture_infos:
         # Job 38/issue #158 -- metadonnees de capture (format, snaplen,
         # paquets perdus...). Section absente si capinfos est absent ou si
