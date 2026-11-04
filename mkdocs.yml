@@ -87,6 +87,7 @@ nav:
       - Décisions d'architecture: adr/netflow-sflow-architecture.md
       - Qualité: quality/anonymization-plan.md
       - Couverture de la GUI: quality/gui-app-coverage.md
+      - Jeux synthétiques multi-points: quality/jeux-synthetiques.md
   - Référence:
       - Roadmap: archived/roadmap.md
       - Backlog: features-backlog.md
