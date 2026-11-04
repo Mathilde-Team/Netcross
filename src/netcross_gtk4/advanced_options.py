@@ -2,8 +2,9 @@
 (issue #672), sans GTK.
 
 Equivalents de ``--max-packets``, ``--sample 1/N``, ``--parallel-workers``,
-``--test-net-external``, ``--known-destinations``, ``--known-hosts`` et
-``--cve-db``, avec les memes refus que la CLI : les fichiers de securite
+``--test-net-external``, ``--known-destinations``, ``--known-hosts``,
+``--cve-db`` et ``--tls-keylog`` (fichier global, issue #1040), avec les
+memes refus que la CLI : les fichiers de securite
 exigent le rapport de securite, doivent exister et contenir au moins une IP
 (une baseline vide ferait passer tous les hotes pour nouveaux), et une base
 CVE absente n'est jamais creee vide.
@@ -15,6 +16,7 @@ import os
 from dataclasses import dataclass
 
 from netcross_core.logging_config import get_logger
+from netcross_core.tls_keylog import MESSAGE_REDACT
 
 logger = get_logger(__name__)
 
@@ -37,6 +39,8 @@ class AdvancedSettings:
     known_destinations: str | None = None
     known_hosts: str | None = None
     cve_db: str | None = None
+    # Issue #1040 : fichier de cles TLS (SSLKEYLOGFILE) pour tous les points
+    tls_keylog: str | None = None
 
     @property
     def security_files(self) -> bool:
@@ -51,6 +55,7 @@ def settings_from_values(
     known_destinations: str | None = None,
     known_hosts: str | None = None,
     cve_db: str | None = None,
+    tls_keylog: str | None = None,
 ) -> AdvancedSettings:
     """Valeurs des widgets -> reglages : 0 (et 1 pour l'echantillonnage)
     veut dire « pas de limite » ou « automatique »."""
@@ -62,12 +67,19 @@ def settings_from_values(
         known_destinations=known_destinations or None,
         known_hosts=known_hosts or None,
         cve_db=cve_db or None,
+        tls_keylog=tls_keylog or None,
     )
 
 
-def validate(settings: AdvancedSettings, *, security: bool) -> list[str]:
+def validate(settings: AdvancedSettings, *, security: bool, redact: bool = False) -> list[str]:
     """Motifs de refus (liste vide : lancement possible), libelles de la CLI."""
+    logger.debug("validate: entrée")
     errors = []
+    if settings.tls_keylog:
+        if redact:
+            errors.append(MESSAGE_REDACT)
+        elif not os.path.isfile(settings.tls_keylog):
+            errors.append(f"--tls-keylog : fichier introuvable : {settings.tls_keylog}")
     for option, path in (
         ("--known-destinations", settings.known_destinations),
         ("--known-hosts", settings.known_hosts),
@@ -81,6 +93,7 @@ def validate(settings: AdvancedSettings, *, security: bool) -> list[str]:
             errors.append(f"{option} : fichier introuvable : {path}")
     if settings.test_net_external and not security:
         errors.append("« Plages TEST-NET externes » necessite « Rapport de securite »")
+    logger.debug("validate: retour, {} refus", len(errors))
     return errors
 
 
