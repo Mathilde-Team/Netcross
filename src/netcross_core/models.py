@@ -291,6 +291,9 @@ class Report:
     bucket_seconds: float = 1.0
     rtp_clock_rate: int = 8000
     seen_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    # issue #1110 : paquets vus a chaque point (seen_count compte des FLUX) --
+    # alimente netcross_point_packets_total (netcross_report.metrics_export)
+    packet_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     loss_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     # issue #352 : paquets vus en amont dont le couple d'hotes n'echange
     # jamais rien a ce point (ni aller ni retour) -- trafic hors chemin
