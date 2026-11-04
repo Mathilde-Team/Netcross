@@ -7,6 +7,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Ajouté
+- Journaux de flux au format Zeek `conn.log` (#1115) : `--zeek-conn FICHIER` écrit une ligne par connexion et par point, colonnes Zeek standard (`#fields`/`#types`, lisible par `zeek-cut`) puis colonnes `netcross_*` (segment, latence et pertes par segment avec `--order`) ; `--zeek-format json` pour un objet par ligne. Respecte `--redact`. Voir docs/zeek-export.md.
+
 ### Modifié
 - Guide utilisateur (#465) : captures d'écran de l'interface GTK4 à jour (les quatre onglets et la cartographie, plus quatre nouvelles pour les fenêtres Outils de capture, Analyse d'un dossier, Documentation Lua et Historique des runs), prises sur la vraie interface par `tools/captures_ecran_gui.py`, qui les régénère.
 - CI (#966) : un nouveau commit sur une PR annule le run du commit précédent (`concurrency`), dans `ci.yml` et `pr-coverage.yml`. Les runs `push` sur dev et main ne sont jamais annulés.
