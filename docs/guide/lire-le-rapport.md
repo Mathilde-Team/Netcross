@@ -92,6 +92,7 @@ présentes.
 | Intégrité de capture : checksums IP/TCP/UDP | Paquets dont tshark juge la somme de contrôle fausse, par point, avec le numéro de trame et la valeur reçue | Un checksum à `0x0000` n'est jamais compté : c'est l'offload de la carte réseau qui capture, pas une corruption. Faux à un seul point : plutôt le lien en amont de ce point, ou la machine qui y capture ; faux à tous les points : plutôt l'émetteur |
 | DNS, HTTP, DHCP, SIP, RTP | Transactions incomplètes, erreurs, durées | Une erreur 5xx ou un SERVFAIL est souvent un problème **applicatif**, pas réseau |
 | Décomposition réseau / serveur | Part du temps passée sur le réseau et côté serveur | Tranche entre « le réseau est lent » et « l'application est lente » |
+| Décalage d'horloge | Décalage et dérive estimés entre points, avec intervalle de confiance à 95 % | Un segment « non mesurable » (tiret cadratin) : l'incertitude dépasse la latence, voir [Estimation d'horloge](../estimation-horloge.md) |
 
 Quand Netcross ne peut pas conclure, il l'écrit (« indéterminé »,
 « impossible de conclure ») plutôt que de deviner. C'est volontaire.

@@ -70,6 +70,7 @@ nav:
       - Capture distante: capture-distante.md
       - API des sondes distribuées: probe-api.md
   - Analyses:
+      - Estimation d'horloge: estimation-horloge.md
       - Rapport de sécurité: security-report.md
       - Export SIEM (CEF, LEEF, STIX): siem-export.md
       - Notifications: notifications.md
