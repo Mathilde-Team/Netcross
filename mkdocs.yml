@@ -69,6 +69,7 @@ nav:
       - Mode batch: batch-mode.md
       - Capture distante: capture-distante.md
   - Analyses:
+      - Estimation d'horloge: estimation-horloge.md
       - Rapport de sécurité: security-report.md
       - Export SIEM (CEF, LEEF, STIX): siem-export.md
       - Notifications: notifications.md
