@@ -68,6 +68,7 @@ nav:
       - Filtres BPF: bpf-filters.md
       - Mode batch: batch-mode.md
       - Capture distante: capture-distante.md
+      - API des sondes distribuées: probe-api.md
   - Analyses:
       - Estimation d'horloge: estimation-horloge.md
       - Rapport de sécurité: security-report.md
