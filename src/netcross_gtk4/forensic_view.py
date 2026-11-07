@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from netcross_core.forensic_search import ForensicSearchQuery, ForensicSearchResult
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 
 logger = get_logger(__name__)
 
@@ -36,6 +36,7 @@ class SearchInputError(ValueError):
 
 def _clean(value: str | None) -> str | None:
     text = (value or "").strip()
+    logger.debug("_clean: retour text or None")
     return text or None
 
 
@@ -84,7 +85,9 @@ def build_query(
 
 def _format_ts(ts: float | None) -> str:
     if ts is None:
+        logger.debug("_format_ts: si ts is None -> retour '-'")
         return "-"
+    logger.debug("_format_ts: retour datetime.fromtimestamp(ts, tz=timezone.utc).strft…")
     return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
 
@@ -98,12 +101,14 @@ def format_result_row(result: ForensicSearchResult) -> str:
     if result.matched_fields:
         parts.append(f"({', '.join(result.matched_fields)})")
     line = " ".join(parts)
+    logger.debug("format_result_row: retour f'(line) -- (result.snippet)' if result.snippet e…")
     return f"{line} -- {result.snippet}" if result.snippet else line
 
 
 def summary_line(results: Sequence[ForensicSearchResult]) -> str:
     """Compte des resultats, par type, et troncature eventuelle."""
     if not results:
+        logger.debug("summary_line: si not results -> retour 'Aucun resultat.'")
         return "Aucun resultat."
     kinds: dict[str, int] = {}
     for r in results:
@@ -112,6 +117,7 @@ def summary_line(results: Sequence[ForensicSearchResult]) -> str:
     line = f"{len(results)} resultat(s) : {detail}."
     if len(results) > MAX_DISPLAYED:
         line += f" {MAX_DISPLAYED} premiers affiches ; l'export JSON contient tout."
+    logger.debug("summary_line: retour line={}", summarize(line, "line"))
     return line
 
 
@@ -119,6 +125,7 @@ def search_payload(query: ForensicSearchQuery, results: Iterable[ForensicSearchR
     """Meme contenu que le fichier de ``--forensic-search`` (version 1) :
     la requete est rappelee pour qu'un resultat vide reste interpretable."""
     rows = [asdict(r) for r in results]
+    logger.debug("search_payload: retour dictionnaire")
     return {
         "version": 1,
         "query": {k: v for k, v in asdict(query).items() if v is not None},
@@ -142,7 +149,9 @@ def write_search_json(path: str | Path, query: ForensicSearchQuery, results: Seq
 def wireshark_filter(result: ForensicSearchResult) -> str | None:
     """Filtre d'affichage Wireshark qui isole la trame du resultat."""
     if result.frame_number is None:
+        logger.debug("wireshark_filter: si result.frame_number is None -> retour None")
         return None
+    logger.debug("wireshark_filter: retour chaîne formatée")
     return f"frame.number == {result.frame_number}"
 
 
@@ -151,22 +160,29 @@ def capture_for_point(result: ForensicSearchResult, captures: Sequence[tuple[str
     ou porte plusieurs fichiers (rotation) : le numero de trame ne dirait
     pas dans lequel aller."""
     if not captures or not result.point:
+        logger.debug("capture_for_point: si not captures or not result.point -> retour None")
         return None
     paths = [path for label, path in captures if label == result.point]
+    logger.debug("capture_for_point: retour paths[0] if len(paths) == 1 else None")
     return paths[0] if len(paths) == 1 else None
 
 
 def wireshark_command(path: str, frame_number: int, program: str = "wireshark") -> list[str]:
     """Ouvre ``path`` dans Wireshark, positionne sur la trame (option -g)."""
+    logger.debug("wireshark_command: retour liste")
     return [program, "-r", path, "-g", str(frame_number)]
 
 
 def describe_selection(result: ForensicSearchResult, path: str | None) -> str:
     """Ligne d'etat apres le choix d'un resultat."""
     if result.frame_number is None:
+        logger.debug(
+            "describe_selection: si result.frame_number is None -> retour 'Resultat sans numero de trame : pas de…"
+        )
         return "Resultat sans numero de trame : pas de lien vers le paquet."
     where = f"point {result.point}" if result.point else "point inconnu"
     text = f"Trame {result.frame_number} ({where}) -- filtre Wireshark : {wireshark_filter(result)}"
     if path:
         text += f" -- fichier : {path}"
+    logger.debug("describe_selection: retour text={}", summarize(text, "text"))
     return text
