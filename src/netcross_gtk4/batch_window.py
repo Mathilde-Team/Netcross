@@ -20,7 +20,7 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import GLib, Gtk  # noqa: E402
 
 from netcross_core.batch import DEFAULT_GROUP_WINDOW, DEFAULT_MIN_COMMON_IPS, DEFAULT_MIN_OVERLAP  # noqa: E402
-from netcross_core.logging_config import get_logger  # noqa: E402
+from netcross_core.logging_config import get_logger, summarize  # noqa: E402
 from netcross_gtk4.capture_tools_window import PathChooser, _grid, _row  # noqa: E402
 from netcross_report import batch_runner  # noqa: E402
 
@@ -31,6 +31,7 @@ class BatchWindow(Gtk.Window):
     def __init__(
         self, parent: Gtk.Window | None = None, start_thread: Callable[[Callable[[], None]], None] | None = None
     ):
+        logger.debug("BatchWindow.__init__: entrée")
         super().__init__(title="Analyse d'un dossier", default_width=780, default_height=560)
         if parent is not None:
             self.set_transient_for(parent)
@@ -82,10 +83,12 @@ class BatchWindow(Gtk.Window):
             getattr(self.status_label, f"set_margin_{side}")(10)
         root.append(self.status_label)
         self.set_child(root)
+        logger.debug("BatchWindow.__init__: fin")
 
     # -- reglages --------------------------------------------------------------
 
     def options(self) -> batch_runner.BatchOptions:
+        logger.debug("BatchWindow.options: retour batch_runner.BatchOptions(…)")
         return batch_runner.BatchOptions(
             recursive=self.recursive.get_active(),
             group=self.group.get_active(),
@@ -98,12 +101,15 @@ class BatchWindow(Gtk.Window):
         )
 
     def progress_text(self) -> str:
+        logger.debug("BatchWindow.progress_text: entrée")
         buf = self.progress_view.get_buffer()
+        logger.debug("BatchWindow.progress_text: retour buf.get_text(…)")
         return buf.get_text(buf.get_start_iter(), buf.get_end_iter(), False)
 
     def _append_progress(self, message: str) -> bool:
         buf = self.progress_view.get_buffer()
         buf.insert(buf.get_end_iter(), message + "\n")
+        logger.debug("BatchWindow._append_progress: retour False")
         return False
 
     # -- execution ---------------------------------------------------------------
@@ -112,16 +118,20 @@ class BatchWindow(Gtk.Window):
         """Lot complet, memes refus que la CLI ; renvoie le message de fin."""
         folder = self.input_dir.path
         if not folder or not os.path.isdir(folder):
+            logger.debug("BatchWindow.run_batch_now: si not folder or not os.path.isdir(folder) -> levée ValueError")
             raise ValueError(f"--input : dossier introuvable : {folder or '(aucun)'}")
         output = self.output_dir.path
         if not output:
+            logger.debug("BatchWindow.run_batch_now: si not output -> levée ValueError")
             raise ValueError("choisissez le dossier de sortie (--output)")
         options = self.options()
         refus = batch_runner.check_options(options)
         if refus:
+            logger.debug("BatchWindow.run_batch_now: si refus -> levée ValueError")
             raise ValueError(refus)
         captures, ignored = batch_runner.list_captures(folder, options.recursive)
         if not captures:
+            logger.debug("BatchWindow.run_batch_now: si not captures -> levée ValueError")
             raise ValueError(f"Aucune capture ({', '.join(batch_runner.CAPTURE_EXTENSIONS)}) dans {folder}.")
         report = progress or (lambda msg: GLib.idle_add(self._append_progress, msg))
         result = batch_runner.run_batch(captures, ignored, output, options, folder, report)
@@ -132,10 +142,12 @@ class BatchWindow(Gtk.Window):
             f"{len(plan.failures) + len(result.errors)} echec(s). Index : {result.index_path}"
         )
         logger.info("BatchWindow: {}", message)
+        logger.debug("BatchWindow.run_batch_now: retour message={}", summarize(message, "message"))
         return message
 
     def launch(self) -> None:
         if self.running:
+            logger.debug("BatchWindow.launch: si self.running -> retour")
             return
         self.running = True
         self.run_btn.set_sensitive(False)
@@ -149,11 +161,14 @@ class BatchWindow(Gtk.Window):
                 logger.warning("BatchWindow: {}", exc)
                 message = f"Erreur : {exc}"
             GLib.idle_add(self._done, message)
+            logger.debug("BatchWindow.launch._thread: fin")
 
         self._start_thread(_thread)
+        logger.debug("BatchWindow.launch: fin")
 
     def _done(self, message: str) -> bool:
         self.running = False
         self.run_btn.set_sensitive(True)
         self.status_label.set_text(message)
+        logger.debug("BatchWindow._done: retour False")
         return False
