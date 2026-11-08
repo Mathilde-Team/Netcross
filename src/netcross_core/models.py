@@ -547,6 +547,9 @@ class Report:
     encap_frag_correlated: dict[tuple[str, str], int] = field(default_factory=lambda: defaultdict(int))
     # -- RTP (voix/visio) --
     rtp_streams: list[dict] = field(default_factory=list)
+    # Flux RTP apparies entre points malgre NAT/SBC (#1121), voir
+    # netcross_core.rtp_match.match_rtp_streams.
+    rtp_matches: list[dict] = field(default_factory=list)
     # -- VoIP orientee appel (Job 24 / §6.12) --
     voip_calls: list[dict] = field(default_factory=list)
     voip_quality_distribution: dict[str, int] = field(default_factory=lambda: defaultdict(int))

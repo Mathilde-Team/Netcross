@@ -13,6 +13,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   Le calcul est exact, incrémental (paquet par paquet, compatible avec `--streaming`) et à mémoire bornée par la
   fenêtre. Une échelle plus fine que la résolution d'horodatage du point (`if_tsresol`) ou que 1 µs est refusée
   explicitement, avec la raison. Voir docs/fenetres-multi-echelles.md.
+- Appariement des flux RTP entre points (#1121) : le même flux est reconnu à plusieurs points malgré un NAT ou un SBC
+  (ports, adresses, SSRC, séquence et horodatage RTP réécrits), par SSRC puis par couples (séquence, horodatage RTP)
+  avec décalage constant. Clé `rtp_matches` de `--json-report` : jambes par point, méthode, `nat_rewritten`, pertes
+  entre jambes. Voir docs/appariement-rtp.md.
 - Corrélation en flux (#1022) : `--streaming` fusionne les points en k voies par temps (`heapq.merge`) et ferme
   chaque groupe après `--streaming-window` secondes ; la mémoire suit la fenêtre, pas le nombre de paquets. Paquets
   désordonnés rattachés dans la fenêtre, troncature (paquet arrivé après la fermeture de son groupe) signalée dans

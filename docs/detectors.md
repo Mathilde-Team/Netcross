@@ -103,6 +103,7 @@ celui que produit `tableau_markdown()`.
 | `handshake` | phase | fenetre_bornee | SYN en attente de SYN-ACK, par point | délai de connexion TCP (retransmissions du SYN comprises) | `syn_no_synack`, `syn_reply_missing`, `clock_offset_estimate` | fournit aussi l'estimation de décalage d'horloge utilisée par rtp |
 | `tcp_options` | phase | fenetre_bornee | options du SYN / SYN-ACK par point | latence entre points adjacents | `mss_clamped`, `wscale_stripped`, `sack_stripped` |  |
 | `rtp` | phase | incremental | par flux RTP (5-tuple + SSRC) et par point : dernière séquence, gigue, compteurs | aucune | `rtp_streams` | le délai bout en bout dépend du décalage d'horloge estimé par handshake |
+| `rtp_match` | phase | fenetre_bornee | par jambe RTP (point, 5-tuple, SSRC) : couples (séquence, horodatage RTP) | durée du flux RTP, plus 5 s de recouvrement entre jambes | `rtp_matches` | appariement entre points malgré NAT/SBC (#1121) : décalage constant de séquence et d'horodatage |
 | `response_time` | phase | fenetre_bornee | client de chaque connexion (SYN) et dernière requête en attente de réponse | temps de réponse serveur ; client connu pendant la vie de la connexion | `server_think_time` |  |
 | `dhcp` | phase | fenetre_bornee | messages par xid et par point | durée d'une transaction DHCP | `dhcp_missing`, `dhcp_duration_ms` |  |
 | `sip` | phase | fenetre_bornee | messages par Call-ID et par point | durée de l'appel | `sip_missing`, `sip_setup_duration_ms`, `sip_failed_calls` |  |
@@ -141,7 +142,7 @@ celui que produit `tableau_markdown()`.
 | `quic_diagnostics` | diagnostic | seconde_passe | paquets QUIC Initial de chaque point | capture entière |  | --quic : relit les fichiers avec tshark |
 | `greffons` | greffon | seconde_passe | DetectorContext : tous les paquets et le rapport, en lecture seule | capture entière |  | contrat de netcross_core.plugins.api ; un mode en flux devra proposer un contrat incrémental |
 
-Total : 58 détecteurs -- incremental : 28, fenetre_bornee : 24, seconde_passe : 6.
+Total : 59 détecteurs -- incremental : 28, fenetre_bornee : 25, seconde_passe : 6.
 
 <!-- inventaire-detecteurs:fin -->
 
