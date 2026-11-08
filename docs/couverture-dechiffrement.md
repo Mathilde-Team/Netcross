@@ -43,3 +43,30 @@ La clé `decryption` est absente quand rien n'est à signaler.
   dépendance du projet). Sans clé, tshark ne signale pas d'échec sur un paquet 1-RTT : seule la présence de
   trames disséquées prouve le déchiffrement.
 - Une session dont la capture ne contient que la fin (ni poignée de main ni clé) est comptée non déchiffrée.
+
+## Diagnostics sur le contenu déchiffré
+
+Issue #1045. Avec un fichier de clés (`--tls-keylog`, API `tls_keylogs`, onglet avancé de l'interface), trois
+analyses lisent aussi le contenu déchiffré :
+
+- **Certificat TLS 1.3** : le message Certificate, chiffré en TLS 1.3, devient lisible. tshark rend la trame
+  déchiffrée comme plusieurs couches `tls` (EncryptedExtensions, Certificate, CertificateVerify, Finished) ;
+  Netcross lit celle qui porte le certificat. Le numéro de série alimente alors le détecteur de substitution
+  entre points (`tls_cert_mismatch`, « interception/substitution TLS possible »), qui reste muet sans clé.
+- **QUIC 1-RTT** (`--quic`) : chaque paquet à en-tête court donne un constat par point, « N/M paquet(s) QUIC
+  1-RTT déchiffré(s) sur C connexion(s) », ou « aucun ... déchiffré malgré le fichier de clés ». Une trame
+  CONNECTION_CLOSE lue dans le contenu déchiffré donne « connexion QUIC fermée par ... : code applicatif 0x42
+  (raison) » : à surveiller si le code est non nul, informatif sinon.
+- **Signatures d'exploits** (`--security`) : les signatures sont aussi appliquées aux octets TLS en clair que
+  tshark expose (bloc « Decrypted TLS » de `-x`). Ces détections portent `decrypted=True` et leur détail se
+  termine par « contenu TLS déchiffré ».
+
+Sans fichier de clés, ces trois lectures sont inchangées.
+
+### Limites du branchement
+
+- Les signatures ne s'appliquent pas au contenu QUIC déchiffré : ses blocs portent des trames QUIC, pas un flux
+  HTTP directement exploitable.
+- La lecture du contenu en clair relance tshark une seconde fois, limitée aux trames `tls.app_data`. Si elle
+  échoue, l'erreur est journalisée et seules les détections sur le contenu chiffré restent.
+- `nc diff` ne transmet pas encore le fichier de clés aux diagnostics QUIC.

@@ -340,6 +340,10 @@ class RawPacket:
     tls_dechiffre: bool = False
     quic_connexion: int | None = None
     quic_dechiffre: bool = False
+    # Issue #1045 : paquet a en-tete court (1-RTT), dechiffre ou non, et
+    # trame CONNECTION_CLOSE lisible (« applicatif 0x42 (raison) »).
+    quic_court: bool = False
+    quic_fermeture: str | None = None
 
 
 # Cles de couches EK dont le "_ws_expert" est collecte en plus des couches
@@ -902,4 +906,6 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
         tls_dechiffre=dechiffrement.get("tls_dechiffre", False),
         quic_connexion=dechiffrement.get("quic_connexion"),
         quic_dechiffre=dechiffrement.get("quic_dechiffre", False),
+        quic_court=dechiffrement.get("quic_court", False),
+        quic_fermeture=dechiffrement.get("quic_fermeture"),
     )

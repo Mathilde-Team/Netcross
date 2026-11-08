@@ -47,6 +47,8 @@ def test_extraction_tls_dechiffre():
         "tls_dechiffre": True,
         "quic_connexion": None,
         "quic_dechiffre": False,
+        "quic_court": False,
+        "quic_fermeture": None,
     }
 
 

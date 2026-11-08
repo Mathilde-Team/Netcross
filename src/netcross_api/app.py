@@ -587,7 +587,7 @@ def _tls_quic_findings(
             raise AnalysisError("quic nécessite le paquet cryptography (pip install cryptography)") from exc
         quic_events = []
         for label, path in captures:
-            quic_events.extend(parse_quic_capture(label, path))
+            quic_events.extend(parse_quic_capture(label, path, **options_lecture(dict(options.tls_keylogs), label)))
         quic_findings = diagnose_quic(quic_events, points)
     logger.debug(
         "_tls_quic_findings: retour tls={} quic={}",
@@ -758,7 +758,10 @@ def _analyse_captures(
             # refus que --security-report --redact).
             detections = []
             for label, path in captures:
-                detections.extend(scan_capture_exploits(label, path))
+                cle = dict(options.tls_keylogs).get(label)
+                detections.extend(
+                    scan_capture_exploits(label, path, tls_keylog=cle) if cle else scan_capture_exploits(label, path)
+                )
             cve_conn = _open_cve_db()
             try:
                 apply_security_findings(
