@@ -1444,8 +1444,9 @@ def test_handshake_matching_syn_synack_et_decalage_horloge():
     assert r.syn_no_synack["B"] == 0
     assert r.syn_reply_missing["A"] == 0
     assert ("A", "B") in r.clock_offset_estimate
-    _mean_off, _stdev, n = r.clock_offset_estimate[("A", "B")]
-    assert n == 1
+    estimation = r.clock_offset_estimate[("A", "B")]
+    assert estimation.n_echantillons == 1
+    assert estimation.derive_ppm == 0.0
 
 
 def test_handshake_reponse_manquante_a_un_point():

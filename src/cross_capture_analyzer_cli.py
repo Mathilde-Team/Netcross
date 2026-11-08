@@ -1667,6 +1667,18 @@ def main():
         "desynchronisees.",
     )
     ap.add_argument("--order", help="Ordre physique des points sur le chemin reseau, ex: LAN,WAN,DC")
+    # Issue #996 : decalage d'horloge connu (cas PTP) -- desactive
+    # l'estimation robuste pour la paire et l'annonce dans le rapport.
+    ap.add_argument(
+        "--clock-offset",
+        action="append",
+        default=[],
+        metavar="A:B=+12.5ms",
+        help=(
+            "Decalage d'horloge CONNU entre deux points (cas PTP), ex. LAN:WAN=+12.5ms ;"
+            " desactive l'estimation pour cette paire (repetable)"
+        ),
+    )
     ap.add_argument("--detail-csv", help="Chemin de sortie pour le detail par flux (CSV)")
     # Issue #911 : dashboard analytique (vue GUI « Dashboard »)
     ap.add_argument(
@@ -3102,6 +3114,7 @@ def main():
         idle_timeout_seconds=args.idle_timeout_seconds,
         exclude_duplicates=args.exclude_duplicates,
         duplicate_counts=duplicate_counts,
+        clock_offsets=args.clock_offset,
     )
     # Commentaires de SECTION pcapng (Job 39/issue #159) -- lus ici, au
     # dernier moment avant le rendu : metadonnee de fichier, pas de paquet,
