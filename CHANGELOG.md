@@ -8,6 +8,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Empreinte de paquet invariante (#1021) : `netcross_core.empreinte` projette la clé de corrélation sur 64 bits
+  stables (BLAKE2b, indépendants de `PYTHONHASHSEED`), avec `apparier()` et `comparer_appariements()` pour vérifier
+  l'équivalence avec `correlate()`. Limites (NAT, fragmentation, réécritures) dans docs/empreinte-paquet.md.
 - Journaux de flux au format Zeek `conn.log` (#1115) : `--zeek-conn FICHIER` écrit une ligne par connexion et par point, colonnes Zeek standard (`#fields`/`#types`, lisible par `zeek-cut`) puis colonnes `netcross_*` (segment, latence et pertes par segment avec `--order`) ; `--zeek-format json` pour un objet par ligne. Respecte `--redact`. Voir docs/zeek-export.md.
 - Image de CI préconstruite (#968, étape 1) : `.github/ci-image/Dockerfile` (paquets apt des jobs `quality`, `gtk4` et
   `packaging`) et workflow `ci-image.yml`. L'image est construite sur chaque PR qui la modifie, puis poussée vers
