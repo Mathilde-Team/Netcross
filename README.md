@@ -124,7 +124,10 @@ ordre connu à l'avance), `netcross` :
   quelques exemples concrets méthode+URI+code), et durée moyenne de
   réponse (calculée nativement par tshark, pas recomposée à la main) ;
   HTTP/2 et HTTP/3 (QUIC) ne sont pas couverts par cette section ;
-- calcule la **qualité vocale (MOS/R-factor)** sur les flux RTP détectés ;
+- calcule la **qualité vocale (MOS/R-factor)** sur les flux RTP détectés et
+  rattache chaque flux à son appel SIP par le SDP (lignes `c=`/`m=` de
+  l'offre et de la réponse), avec repli sur la fenêtre temporelle de l'appel ;
+  la méthode retenue (`sdp`, `time_window`, `mixed`) est toujours affichée ;
 - diagnostique les **handshakes TLS** par segment (SNI, cipher négocié,
   alertes fatales) et localise où un handshake qui aboutissait se met à
   échouer (indice d'inspection TLS/pare-feu sur SNI) ;
@@ -354,6 +357,10 @@ Options utiles :
   microbursts).
 - `--rtp-clock-rate` : cadence d'horloge RTP (8000Hz voix par défaut, 90000
   pour de la vidéo).
+- `--link-speed POINT=VITESSE` (répétable, ex. `A=1G`, `B=2.5G`) : vitesse
+  du lien d'un point, utilisée seulement si le pcapng ne porte pas l'option
+  `if_speed` ; la section « Vitesse des liens » du rapport indique la source
+  retenue et la résolution d'horodatage (`if_tsresol`) de chaque point.
 - `--idle-timeout-seconds` : seuil (en secondes) au-delà duquel un silence
   entre deux paquets consécutifs d'une connexion TCP déjà établie est
   signalé comme un timeout d'inactivité / coupure NAT-FW silencieuse
@@ -589,7 +596,21 @@ Options utiles :
   adresses réelles indépendamment de cette anonymisation (relecture de
   fichier ou argument direct). `--redact-map chemin.csv` conserve la
   correspondance adresse réelle ↔ pseudonyme dans un fichier **local, à
-  ne jamais transmettre avec le rapport**.
+  ne jamais transmettre avec le rapport** ; il porte aussi la table des
+  noms (types `nom` et `domaine` : `host-N.domain-M.example.invalid`,
+  même suffixe pour un même domaine parent, module commun
+  `netcross_core/pseudonyms.py`, issue #1151), remplie dès que des noms
+  sont pseudonymisés (#1153).
+- `--tls-keylog keys.txt` (tous les points) ou `--tls-keylog CLIENT=keys.txt`
+  (un point, prioritaire ; option répétable) : fichier de clés TLS au
+  format `SSLKEYLOGFILE` (navigateur, `curl`, `openssl s_client -keylogfile`)
+  transmis à tshark (`-o tls.keylog_file:...`) pour déchiffrer les sessions
+  TLS des captures : HTTP et objets transportés redeviennent visibles.
+  Le fichier doit exister et être lisible ; nom de point inconnu refusé.
+  Refusé avec `--redact` tant que l'interaction déchiffrement/anonymisation
+  n'est pas définie, et sans objet en direct (`--live`). Le contenu du
+  fichier n'est jamais lu ni journalisé par Netcross. Sans l'option,
+  comportement inchangé (issue #1040, chantier #997).
 - `--history-db chemin.db` : enregistre un résumé de ce run (score de
   santé, nombre de constats par sévérité) dans une base SQLite locale,
   créée si absente — pour suivre une tendance dans le temps sur des runs
@@ -694,6 +715,9 @@ Options supplémentaires (parité avec `cross_capture_analyzer_cli.py`) :
   présente des deux côtés garde le même pseudonyme, sans quoi la
   comparaison perdrait son sens. Même exclusion mutuelle avec
   `--tls`/`--quic` (pas de `--client-group` sur ce CLI).
+- `--tls-keylog [NOM=]FICHIER` : même option que sur
+  `cross_capture_analyzer_cli.py`, appliquée aux captures `--baseline` et
+  `--current` (mêmes noms de points des deux côtés) ; refusée avec `--redact`.
 - `--history-db` / `--history-label` / `--history-show` : même mécanisme
   que sur `cross_capture_analyzer_cli.py` (voir ci-dessus) — un même
   fichier `.db` peut mélanger des runs d'analyse et de comparaison
@@ -936,7 +960,7 @@ netcross/
 ├── pytest.ini               configuration pytest (pythonpath = src)
 ├── docs/                   documentation MkDocs
 │   ├── class-diagram.md     diagramme de classes (GENERE depuis src/)
-│   ├── detectors.md         comportement et limites des detecteurs (#365)
+│   ├── detectors.md         comportement, limites et inventaire des detecteurs (#365, #1020)
 │   ├── features-backlog.md  fonctionnalites, dette, comparaison OmniPeek
 │   └── sessions/             historique detaille session par session
 ├── scripts/
@@ -1237,12 +1261,15 @@ avant un déploiement en production.
   sur des URI différentes, qui reste correctement distingué). Une réponse
   4xx est signalée pour information mais n'est pas en elle-même une
   anomalie réseau.
-- **QUIC/HTTP3** : seule la v1 (RFC 9001) est gérée ; la dérivation de clés
-  a été validée octet pour octet contre les vecteurs de test officiels de
-  la RFC 9001 Annexe A.2. Seul le paquet Initial (ClientHello, SNI) est
+- **QUIC/HTTP3** : les versions 1 (RFC 9001) et 2 (RFC 9369, version
+  `0x6b3343cf`) sont gérées ; la dérivation de clés a été validée octet
+  pour octet contre les vecteurs de test officiels de la RFC 9001
+  Annexe A.2 et de la RFC 9369 Annexe A (paquet Client Initial v2 complet
+  déchiffré, SNI compris). Les constats signalent les Initial v2 par point ;
+  les brouillons et versions privées restent ignorés. Seul le paquet Initial (ClientHello, SNI) est
   accessible — les échanges 0-RTT/1-RTT sont chiffrés avec des clés de
   session qui ne sont pas publiques, donc structurellement indéchiffrables
-  sans capture des clés côté client (keylog). QUIC v2 (RFC 9369) non geré.
+  sans capture des clés côté client (keylog).
 - **TLS/QUIC sur `cross_capture_diff_cli.py`** : `--tls`/`--quic` exécutent
   le diagnostic séparément sur le baseline et sur le run courant plutôt que
   de produire une vraie comparaison chiffrée — ces deux modules ne
@@ -1254,9 +1281,12 @@ avant un déploiement en production.
   l'état du handshake par segment (ClientHello/ServerHello/Alert) — pas de
   réassemblage TCP inter-segments, pas de TLS en tunnel, pas de chaîne de
   certificats.
-- **Analyse RF WiFi** (retries, RSSI, roaming 802.11) : hors périmètre,
-  nécessiterait des captures en mode moniteur distinctes du scénario filaire
-  multi-points de cet outil.
+- **Analyse RF WiFi** (retries, RSSI, roaming 802.11) : en cours (#1006).
+  Une capture en mode moniteur avec radiotap (linktype 127) est acceptée
+  comme point, et chaque trame porte RSSI, MCS, débit, retry et canal
+  (`Pkt.radio`, issue #1142) ; une capture 802.11 sans radiotap
+  (linktype 105) est lue avec un avertissement explicite (retry seul).
+  Pas encore de constats radio ni de section de rapport dédiée.
 - **Protocoles propriétaires non standard** (ex : signalisation Alcatel NOE
   historique, non-SIP) : non couverts, faute de spécification publique
   fiable.
