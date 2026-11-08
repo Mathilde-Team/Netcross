@@ -13,7 +13,7 @@ Module sans GTK (aucun import de gi) : testable sans interface graphique.
 
 from __future__ import annotations
 
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 
 logger = get_logger(__name__)
 
@@ -54,6 +54,7 @@ def validate_client_settings(groups: dict[str, set[str]], reference: str | None,
     if not groups:
         if reference:
             errors.append("une reference de comparaison necessite au moins deux groupes de postes")
+        logger.debug("validate_client_settings: si not groups -> retour errors={}", summarize(errors, "errors"))
         return errors
     if len(groups) < 2:
         errors.append(
@@ -70,9 +71,11 @@ def validate_client_settings(groups: dict[str, set[str]], reference: str | None,
 def comparison_summary(comparison) -> str:
     """Ligne de synthese pour la page Resultats."""
     if comparison is None:
+        logger.debug('comparison_summary: si comparison is None -> retour "(renseignez au moins deux groupes de p…')
         return "(renseignez au moins deux groupes de postes dans la configuration, puis relancez l'analyse)"
     others = [name for name in comparison.clients if name != comparison.reference]
     total = sum(len(f) for f in comparison.diffs.values())
+    logger.debug("comparison_summary: retour chaîne formatée")
     return (
         f"Reference : {comparison.reference} ; compare(s) : {', '.join(others)} ; "
         f"{total} ecart(s). Detail dans le rapport (section COMPARAISON CLIENT VS CLIENT)."

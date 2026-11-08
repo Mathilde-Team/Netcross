@@ -45,11 +45,13 @@ class AISettings:
     @property
     def requested(self) -> bool:
         """Au moins un usage d'analyse demande (comme ``_check_ai_args``)."""
+        logger.debug("AISettings.requested: retour bool(…)")
         return bool(self.baseline_save or self.anomalies or self.training_export or self.classify or self.summary)
 
 
 def _path(text: str | None) -> str | None:
     value = (text or "").strip()
+    logger.debug("_path: retour os.path.expanduser(value) if value else None")
     return os.path.expanduser(value) if value else None
 
 
@@ -116,6 +118,7 @@ def to_options(settings: AISettings) -> Any:
     """``netcross_ai.pipeline.AIOptions`` equivalent (memes champs que la CLI)."""
     from netcross_ai.pipeline import AIOptions
 
+    logger.debug("to_options: retour AIOptions(…)")
     return AIOptions(
         baseline_path=settings.anomalies,
         baseline_save=settings.baseline_save,
@@ -143,6 +146,7 @@ def run_ai_section(settings: AISettings, report: Any, all_packets: list) -> tupl
         result = run_ai(report, flows, to_options(settings))
     except (RuntimeError, ValueError, OSError) as exc:
         logger.exception(f"échec dans run_ai_section: {exc}")
+        logger.debug("run_ai_section: except (RuntimeError, ValueError, OSError) -> retour tuple de 3")
         return None, "", [f"Module IA : {exc}"]
     logs = [f"Module IA : {len(flows)} flux analyse(s)."]
     if settings.report:

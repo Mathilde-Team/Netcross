@@ -153,6 +153,7 @@ from netcross_core.discovery import load_baseline_hosts
 from netcross_core.flow_timeline import build_flow_timelines
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
+from netcross_core.profiling import creer_mesures, marquer
 from netcross_core.report_text import load_capture_annotations, print_capture_annotations
 from netcross_core.security import close_db, connect_cve_db
 from netcross_core.security import findings as security_findings
@@ -171,6 +172,15 @@ from netcross_core.support import (
     install_crash_handler,
     write_support_map_csv,
     write_ticket,
+)
+from netcross_core.tls_keylog import (
+    MESSAGE_SANS_CAPTURE,
+    TlsKeylogError,
+    options_lecture,
+    options_lecture_parallele,
+    resoudre_keylogs,
+    resume_keylogs,
+    verifier_compatibilite,
 )
 from netcross_report.comm_map import build_comm_map, write_comm_map
 from netcross_report.security_report import build_security_report, print_security_report
@@ -1159,6 +1169,12 @@ def _parse_sample_spec(spec: str) -> int:
 def _apply_packet_limits(all_packets, max_packets, sample_n):
     """--max-packets/--sample (issue #283) : ``netcross_core.packet_limits``,
     partage avec la GUI (issue #672). Renvoie ``(paquets_retenus, note)``."""
+    logger.debug(
+        "_apply_packet_limits: all_packets={} max_packets={} sample_n={}",
+        summarize(all_packets, "all_packets"),
+        summarize(max_packets, "max_packets"),
+        summarize(sample_n, "sample_n"),
+    )
     from netcross_core.packet_limits import apply_packet_limits
 
     logger.debug("_apply_packet_limits: retour apply_packet_limits(…)")
@@ -1667,6 +1683,18 @@ def main():
         "desynchronisees.",
     )
     ap.add_argument("--order", help="Ordre physique des points sur le chemin reseau, ex: LAN,WAN,DC")
+    # Issue #996 : decalage d'horloge connu (cas PTP) -- desactive
+    # l'estimation robuste pour la paire et l'annonce dans le rapport.
+    ap.add_argument(
+        "--clock-offset",
+        action="append",
+        default=[],
+        metavar="A:B=+12.5ms",
+        help=(
+            "Decalage d'horloge CONNU entre deux points (cas PTP), ex. LAN:WAN=+12.5ms ;"
+            " desactive l'estimation pour cette paire (repetable)"
+        ),
+    )
     ap.add_argument("--detail-csv", help="Chemin de sortie pour le detail par flux (CSV)")
     # Issue #911 : dashboard analytique (vue GUI « Dashboard »)
     ap.add_argument(
@@ -2224,6 +2252,16 @@ def main():
         "independamment de cette redaction.",
     )
     ap.add_argument(
+        "--tls-keylog",
+        action="append",
+        metavar="[NOM=]FICHIER",
+        help="Fichier de cles TLS (format SSLKEYLOGFILE) transmis a tshark "
+        "(-o tls.keylog_file:...) pour dechiffrer les sessions TLS des captures : "
+        "FICHIER vaut pour tous les points, NOM=FICHIER pour un seul point "
+        "(prioritaire). Repetable. Refuse avec --redact. Sans cette option, "
+        "comportement inchange (issue #1040).",
+    )
+    ap.add_argument(
         "--redact-map",
         metavar="CHEMIN",
         help="Avec --redact : ecrit la correspondance adresse reelle <-> "
@@ -2378,9 +2416,29 @@ def main():
         metavar="VALEUR",
         help="Valeur cherchee dans --search-field (sans --search-field : dans tous les champs).",
     )
+    prof = ap.add_argument_group(
+        "mesure des performances",
+        "Issue #1016 : duree et memoire par etape du pipeline (lecture, correlation, detecteurs, rapport). "
+        "Desactivee par defaut, sans cout quand elle est absente.",
+    )
+    prof.add_argument(
+        "--profile-steps",
+        metavar="FICHIER.json",
+        help="Ecrit la duree de chaque etape, la RSS max du processus et de tshark dans ce fichier JSON "
+        "et affiche un resume en fin d'analyse.",
+    )
+    prof.add_argument(
+        "--profile-tracemalloc",
+        action="store_true",
+        help="Avec --profile-steps : ajoute le pic des allocations Python par etape (tracemalloc ; "
+        "ralentit nettement l'analyse).",
+    )
     add_debug_argument(ap)
     args = ap.parse_args()
     apply_debug_argument(args)
+    if args.profile_tracemalloc and not args.profile_steps:
+        logger.debug("main: --profile-tracemalloc sans --profile-steps -> levée SystemExit")
+        ap.error("--profile-tracemalloc necessite --profile-steps")
 
     plugin_names = [n.strip() for n in (args.plugins or "").split(",") if n.strip()]
     if args.list_plugins:
@@ -2919,8 +2977,20 @@ def main():
     for c in args.capture or []:
         label, paths = _parse_capture_spec(c, "--capture")
         captures.extend((label, path) for path in paths)
+    try:
+        verifier_compatibilite(args.tls_keylog, redact=args.redact)
+        if args.tls_keylog and not captures:
+            logger.debug("main: si args.tls_keylog and (not captures) -> levée TlsKeylogError")
+            raise TlsKeylogError(MESSAGE_SANS_CAPTURE)
+        tls_keylogs = resoudre_keylogs(args.tls_keylog, [label for label, _ in captures])
+    except TlsKeylogError as exc:
+        logger.debug("main: --tls-keylog refusé ({})", exc)
+        print(exc, file=sys.stderr)
+        sys.exit(1)
     if args.split_interfaces and captures:
         captures = _expand_split_interfaces(captures)
+    if tls_keylogs:
+        print(f"Fichier(s) de cles TLS transmis a tshark pour : {resume_keylogs(tls_keylogs)}", file=sys.stderr)
 
     # Avertissement memoire (issue #283, Etape 2) : AVANT toute lecture de
     # paquets -- une fois parse_capture() lance sur une capture trop
@@ -2932,6 +3002,9 @@ def main():
 
     sample_n = _parse_sample_spec(args.sample) if args.sample else None
 
+    # Issue #1016 : None sans --profile-steps (aucun objet, aucun cout).
+    mesures = creer_mesures(bool(args.profile_steps), args.profile_tracemalloc)
+    marquer(mesures, "lecture")
     all_packets = []
     # Issue #940 : un point en echec (fichier illisible ou tshark absent)
     # doit se retrouver dans le code de sortie -- defini ici, car la
@@ -2984,7 +3057,9 @@ def main():
                 "la lecture de chaque fichier individuellement plutot que "
                 "l'accelerer."
             )
-        all_packets, per_file_stats = parse_captures_parallel(captures, args.parallel_workers)
+        all_packets, per_file_stats = parse_captures_parallel(
+            captures, args.parallel_workers, **options_lecture_parallele(tls_keylogs, captures)
+        )
         # chaque fichier est rapporte explicitement, succes ou echec -- rien
         # ne doit pouvoir passer sous silence derriere un total agrege
         for s in per_file_stats:
@@ -3021,7 +3096,7 @@ def main():
         # emprunte. raise_on_error=True rend l'echec visible ici.
         for label, path in captures:
             try:
-                pkts = parse_capture(label, path, raise_on_error=True)
+                pkts = parse_capture(label, path, raise_on_error=True, **options_lecture(tls_keylogs, label))
             except (TsharkNotFoundError, TsharkError) as exc:
                 logger.exception(f"échec dans main: {exc}")
                 any_error = True
@@ -3073,6 +3148,8 @@ def main():
             print(f"\nATTENTION : {truncation_note}", file=sys.stderr)
 
     points_order = args.order.split(",") if args.order else None
+    # Doublons inter-captures et correlate() : rapprochement entre points.
+    marquer(mesures, "correlation")
     duplicate_counts = None
     if args.detect_duplicates or args.exclude_duplicates:
         if args.duplicate_threshold_ms < 0:
@@ -3091,6 +3168,7 @@ def main():
         # plus bas : c'est lui qui renseigne Report.duplicates_excluded.
         all_packets = [pk for pk in all_packets if not pk.is_duplicate]
     flows = correlate(all_packets, args.nat_tolerant, args.nat_window_ms, args.exclude_duplicates)
+    marquer(mesures, "detecteurs")
     r = analyse(
         flows,
         points_order,
@@ -3102,6 +3180,7 @@ def main():
         idle_timeout_seconds=args.idle_timeout_seconds,
         exclude_duplicates=args.exclude_duplicates,
         duplicate_counts=duplicate_counts,
+        clock_offsets=args.clock_offset,
     )
     # Commentaires de SECTION pcapng (Job 39/issue #159) -- lus ici, au
     # dernier moment avant le rendu : metadonnee de fichier, pas de paquet,
@@ -3120,6 +3199,7 @@ def main():
     if truncation_note:
         r.truncated = True
         r.truncation_note = truncation_note
+    marquer(mesures, "rapport")
     print_report(r)
     # Issue #910 : annotations des sidecars (GUI ou `netcross annotations`)
     if captures:
@@ -3127,6 +3207,9 @@ def main():
     if r.truncated:
         print(f"\nATTENTION : {r.truncation_note}")
 
+    # Detecteurs complementaires (securite, IA, clients, triage, TLS/QUIC,
+    # medias) : de nouveau l'etape « detecteurs » (passages cumules).
+    marquer(mesures, "detecteurs")
     # --security-report (issue #139) : consolidation des quatre detecteurs
     # (CVE-1 a CVE-4) sur le rapport deja rempli par analyse(), puis rendu
     # dedie -- voir docs/security-report.md. Sans --cve-db, base minimale
@@ -3299,6 +3382,7 @@ def main():
     if args.media_quality or args.extract_contents:
         _run_content_extraction(captures, args.extract_contents, extract_kinds)
 
+    marquer(mesures, "rapport")
     if args.detail_csv:
         write_detail_csv(args.detail_csv, flows, r.points, names=names)
         print(f"\nDetail par flux ecrit dans {args.detail_csv}")
@@ -3539,6 +3623,9 @@ def main():
     # automatisation ne doit pas confondre analyse incomplete et succes.
     # 3 : 0 = succes, 1 = erreur fatale, 2 = erreur d'usage (argparse),
     # 3 = rapport rendu mais incomplet.
+    if mesures is not None:
+        mesures.ecrire_json(args.profile_steps)
+        print(f"\n{mesures.resume()}\nMesures ecrites dans {args.profile_steps}")
     if any_error:
         sys.exit(3)
     logger.debug("main: fin")

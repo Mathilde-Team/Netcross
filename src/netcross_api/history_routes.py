@@ -21,7 +21,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 
 logger = get_logger(__name__)
 
@@ -40,10 +40,12 @@ def require_history_db() -> str:
     """Base configurée, sinon 400 (demande d'enregistrement refusée)."""
     path = history_db_path()
     if path is None:
+        logger.debug("require_history_db: si path is None -> levée HTTPException")
         raise HTTPException(
             status_code=400,
             detail=f"historique desactive sur ce serveur : {HISTORY_DB_ENV} non defini",
         )
+    logger.debug("require_history_db: retour path={}", summarize(path, "path"))
     return path
 
 
@@ -54,6 +56,7 @@ def record_comparison(findings, baseline_report, current_report, label: str | No
 
     path = history_db_path()
     if path is None:
+        logger.debug("record_comparison: si path is None -> retour dictionnaire vide")
         return {}
     try:
         run_id = record_diff_run(
@@ -66,8 +69,10 @@ def record_comparison(findings, baseline_report, current_report, label: str | No
         )
     except HistoryDatabaseError as exc:
         logger.warning("historique : enregistrement impossible ({})", exc)
+        logger.debug("record_comparison: except HistoryDatabaseError -> retour dictionnaire")
         return {"history_error": str(exc)}
     logger.info("comparaison enregistree dans l'historique (id {}, etiquette {})", run_id, label)
+    logger.debug("record_comparison: retour dictionnaire")
     return {"history_id": run_id}
 
 
@@ -93,8 +98,10 @@ def record_analysis(report, findings, tls_findings, quic_findings, label: str | 
         )
     except HistoryDatabaseError as exc:
         logger.warning("historique : enregistrement de l'analyse impossible ({})", exc)
+        logger.debug("record_analysis: except HistoryDatabaseError -> retour dictionnaire")
         return {"history_error": str(exc)}
     logger.info("analyse enregistree dans l'historique (id {}, etiquette {})", run_id, label)
+    logger.debug("record_analysis: retour dictionnaire")
     return {"history_id": run_id}
 
 
@@ -111,14 +118,19 @@ def register(app: FastAPI, verify: Callable[..., None]) -> None:
 
         path = history_db_path()
         if path is None:
+            logger.debug("register.list_history_route: si path is None -> levée HTTPException")
             raise HTTPException(status_code=503, detail=f"historique non configure ({HISTORY_DB_ENV})")
         if run_type is not None and run_type not in RUN_TYPES:
+            logger.debug(
+                "register.list_history_route: si run_type is not None and run_type not in RUN_TYPES -> levée HTTPExce…"
+            )
             raise HTTPException(status_code=400, detail=f"run_type : analyse ou diff (recu {run_type!r})")
         try:
             entries = list_history(path, limit=limit, label=label, run_type=run_type)
         except HistoryDatabaseError as exc:
             logger.warning("historique illisible : {}", exc)
             raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.debug("register.list_history_route: retour dictionnaire")
         return {"entries": [dataclasses.asdict(e) for e in entries]}
 
     logger.debug("history_routes.register: 1 route")

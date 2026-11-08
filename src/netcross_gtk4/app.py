@@ -1338,6 +1338,16 @@ class MainWindow(Gtk.ApplicationWindow):
             security_box.append(widget)
         self.single_options_box.append(security_box)
 
+        # Issue #1040 : fichier de cles TLS (--tls-keylog), tous les points
+        self.tls_keylog_option = FileOption(
+            "Cles TLS...",
+            "Fichier de cles TLS (format SSLKEYLOGFILE, --tls-keylog) transmis a tshark pour dechiffrer "
+            "les sessions TLS de toutes les captures. Incompatible avec l'anonymisation (--redact).",
+            ("*.txt", "*.log", "*.keys", "*"),
+            "Fichier de cles TLS",
+        )
+        self.single_options_box.append(self.tls_keylog_option)
+
         # Issue #674 : diagramme de sequence (export PDF) et historique SQLite
         report_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         report_box.append(Gtk.Label(label="Diagramme de sequence (--sequence-diagram, flux, 0 = aucun) :"))
@@ -2156,7 +2166,9 @@ class MainWindow(Gtk.ApplicationWindow):
                 logger.debug("MainWindow.on_run_analysis: si client_errors -> retour")
                 return
             advanced = self.advanced_settings()  # issue #672
-            advanced_errors = validate_advanced(advanced, security=self.security_check.get_active())
+            advanced_errors = validate_advanced(
+                advanced, security=self.security_check.get_active(), redact=self.redact_check.get_active()
+            )
             if advanced_errors:
                 self.stack.set_visible_child_name("log")
                 self._log(f"Options avancees : {'; '.join(advanced_errors)} -- analyse non lancee.")
@@ -3035,6 +3047,7 @@ class MainWindow(Gtk.ApplicationWindow):
             known_destinations=self.known_destinations_option.path,
             known_hosts=self.known_hosts_option.path,
             cve_db=self.cve_db_option.path,
+            tls_keylog=self.tls_keylog_option.path,
         )
 
     def expertise_settings(self) -> ExpertiseSettings:
