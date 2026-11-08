@@ -37,6 +37,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from netcross_api import history_routes  # noqa: E402
 from netcross_api.app import _comparisons, app  # noqa: E402
+from netcross_core.redact import SCOPE_ALL, scope_label  # noqa: E402
 
 client = TestClient(app)
 
@@ -151,7 +152,7 @@ def test_gui_record_diff_history_comme_la_cli(tmp_path):
     msg = record_diff_history([], base, cur, HistorySettings(str(tmp_path / "g.db"), "Site-A"), redact=True)
     assert msg == f"Resume de ce diff enregistre dans l'historique {tmp_path / 'g.db'} (etiquette: Site-A)."
     (entree,) = list_history(tmp_path / "g.db")
-    assert entree.run_type == "diff" and entree.meta == {"Anonymisation": "adresses IP/MAC anonymisees (--redact)"}
+    assert entree.run_type == "diff" and entree.meta == {"Anonymisation": scope_label(SCOPE_ALL)}
 
 
 def test_gui_fenetre_historique_filtres(tmp_path):

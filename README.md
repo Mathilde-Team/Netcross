@@ -589,9 +589,10 @@ Options utiles :
   5737/3849) et MAC (OUI localement administré) avant l'analyse, avec un
   mapping cohérent sur tout le run — pour partager un rapport (ou une
   capture) sans exposer l'adressage réel (ticket support vendeur, rapport
-  transmis à un tiers). Ne couvre que les *adresses* : noms DNS/URI HTTP/
-  SAN de certificat TLS/identifiants SIP restent inchangés (voir
-  `netcross_core/redact.py` pour le détail du périmètre). Mutuellement
+  transmis à un tiers). Par défaut, les noms sont aussi anonymisés (noms
+  DNS, cible HTTP, SAN/sujet/émetteur des certificats TLS, Call-ID/
+  User-Agent/Server SIP) ; `--redact-scope adresses|noms|tout` restreint
+  la portée (issue #1153, voir `netcross_core/redact.py`). Mutuellement
   exclusif avec `--tls`/`--quic`/`--client-group`, qui accèdent aux
   adresses réelles indépendamment de cette anonymisation (relecture de
   fichier ou argument direct). `--redact-map chemin.csv` conserve la
@@ -1190,12 +1191,13 @@ avant un déploiement en production.
   confiance du client. Invisible en TLS 1.3 sans `SSLKEYLOGFILE` : le
   message Certificate y est chiffré par construction (RFC 8446) — limite
   protocolaire, pas contournable par ce projet.
-- **Anonymisation (`--redact`, Session 28)** : ne couvre que les
-  *adresses* — IP (RFC 5737/3849) et MAC (OUI localement administré) —
-  pas les noms : `dns.qry.name`, l'URI/host HTTP, le SAN de certificat
-  TLS et les identifiants SIP (`Call-ID`, `User-Agent`, `Server`)
-  restent inchangés. Une capture "redigee" peut donc rester identifiante
-  via ces canaux — à garder en tête avant tout partage externe. De plus,
+- **Anonymisation (`--redact`, Session 28, étendue par #1153)** : les
+  adresses IP (RFC 5737/3849) et MAC (OUI localement administré), et par
+  défaut les noms (`dns.qry.name`, la cible HTTP, le SAN, le sujet et
+  l'émetteur des certificats TLS, `Call-ID`, `User-Agent` et `Server`
+  SIP). Les autres champs texte (corps HTTP, en-têtes non listés, SNI lu
+  par `--tls`) ne sont pas couverts ; avec `--redact-scope adresses`,
+  les noms restent identifiants. De plus,
   `--redact` est refusé en combinaison avec `--tls`/`--quic`/
   `--client-group` : ces trois options accèdent aux adresses réelles
   indépendamment de la liste de paquets anonymisée (relecture de fichier

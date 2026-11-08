@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: netcross\n"
 "Report-Msgid-Bugs-To: https://github.com/MathildeDec/Netcross/issues\n"
-"POT-Creation-Date: 2026-11-08 13:40+0000\n"
+"POT-Creation-Date: 2026-11-08 14:37+0000\n"
 "PO-Revision-Date: 2026-09-23 07:01+0000\n"
 "Last-Translator: Netcross\n"
 "Language-Team: none\n"
@@ -72,7 +72,7 @@ msgstr "Bytes"
 msgid "Paquets"
 msgstr "Packets"
 
-#: src/netcross_gtk4/stats_view.py
+#: src/netcross_gtk4/stats_view.py src/netcross_report/html_report.py
 msgid "Protocole"
 msgstr "Protocol"
 
@@ -272,6 +272,10 @@ msgid "Etat"
 msgstr "State"
 
 #: src/netcross_report/html_report.py
+msgid "Filtrer les constats"
+msgstr "Filter findings"
+
+#: src/netcross_report/html_report.py
 msgid "Fragmentations nouvelles"
 msgstr "New fragmentations"
 
@@ -308,6 +312,19 @@ msgid "Points de capture"
 msgstr "Capture points"
 
 #: src/netcross_report/html_report.py
+#, python-brace-format
+msgid "Preuve : trame {frame} au point {point}"
+msgstr "Evidence: frame {frame} at point {point}"
+
+#: src/netcross_report/html_report.py
+msgid "Preuves"
+msgstr "Evidence"
+
+#: src/netcross_report/html_report.py
+msgid "Preuves vues a chaque point"
+msgstr "Evidence seen at each point"
+
+#: src/netcross_report/html_report.py
 msgid "Rapport Netcross"
 msgstr "Netcross report"
 
@@ -336,6 +353,10 @@ msgid "Segments par priorite"
 msgstr "Segments by priority"
 
 #: src/netcross_report/html_report.py
+msgid "Selectionner une preuve pour voir la trame a chaque point de capture."
+msgstr "Select a piece of evidence to see the frame at each capture point."
+
+#: src/netcross_report/html_report.py
 msgid "Severite"
 msgstr "Severity"
 
@@ -356,8 +377,32 @@ msgid "Taux de perte"
 msgstr "Loss rate"
 
 #: src/netcross_report/html_report.py
+msgid "Tous"
+msgstr "All"
+
+#: src/netcross_report/html_report.py
 msgid "Tous les constats de l'analyse"
 msgstr "All findings of the analysis"
+
+#: src/netcross_report/html_report.py
+msgid "Trame"
+msgstr "Frame"
+
+#: src/netcross_report/html_report.py
+msgid ""
+"Trame de preuve et ses voisines de la meme conversation, vues a chaque point "
+"(date en ms depuis la preuve)"
+msgstr ""
+"Evidence frame and its neighbours in the same conversation, seen at each "
+"point (time in ms since the evidence)"
+
+#: src/netcross_report/html_report.py
+msgid "Trame introuvable dans les paquets correles : aucun diagramme."
+msgstr "Frame not found among correlated packets: no diagram."
+
+#: src/netcross_report/html_report.py
+msgid "Transit"
+msgstr "Transit"
 
 #: src/netcross_report/html_report.py
 msgid "Trous noirs PMTUD"
@@ -368,12 +413,20 @@ msgid "mesure"
 msgstr "measured"
 
 #: src/netcross_report/html_report.py
+msgid "non corrige du decalage d'horloge"
+msgstr "not corrected for clock offset"
+
+#: src/netcross_report/html_report.py
 msgid "non mesurable"
 msgstr "not measurable"
 
 #: src/netcross_report/html_report.py
 msgid "non mesure"
 msgstr "not measured"
+
+#: src/netcross_report/html_report.py
+msgid "non vue"
+msgstr "not seen"
 
 #: src/netcross_report/html_report.py
 msgid "pertes"
@@ -395,6 +448,11 @@ msgstr "hop by hop"
 #, python-brace-format
 msgid "{n} message(s) non represente(s)."
 msgstr "{n} message(s) not shown."
+
+#: src/netcross_report/html_report.py
+#, python-brace-format
+msgid "{shown} / {total} constat(s) affiche(s)"
+msgstr "{shown} / {total} finding(s) shown"
 
 #: src/netcross_report/html_report.py
 #, python-brace-format

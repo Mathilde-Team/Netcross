@@ -14,7 +14,7 @@ ici fait donc échouer la CI.
 
 | Surface | Points d'entrée | Capacités |
 |---|---|---|
-| CLI | `cross_capture_analyzer_cli.py` (135 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
+| CLI | `cross_capture_analyzer_cli.py` (136 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 3 pages, 44 cases à cocher, 31 réglages numériques | Analyse interactive et exploration visuelle |
 | API | 62 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) |
 
@@ -57,7 +57,7 @@ actif, non réglable.
 | Limiter ou échantillonner les paquets | oui (« Paquets max. », « Echantillonnage 1/N » en analyse simple, troncature annoncée dans le rapport ; issue #672) | `--max-packets`, `--sample` | `max_packets`, `sample` (issue #672) |
 | Noms logiques des hôtes | oui (« Table des noms... », exports CSV détaillé et JSON) | `--names` | `names` (fichier joint, issue #672) |
 | Plages TEST-NET traitées comme externes | oui (case « Plages TEST-NET externes », avec « Rapport de securite » ; issue #672) | `--test-net-external` | `test_net_external` (issue #672) |
-| Anonymisation IP/MAC | oui (« Anonymiser les adresses IP/MAC », table : « Table d'anonymisation (--redact-map)... » des Résultats, issue #876) | `--redact`, `--redact-map` | `redact` (sans sécurité, refusé avec `tls`/`quic`, comme la CLI) ; table : `GET /analyses/{analysis_id}/redact-map` (issue #876) |
+| Anonymisation IP/MAC et noms (portée « tout » hors CLI) | oui (« Anonymiser les adresses IP/MAC », table : « Table d'anonymisation (--redact-map)... » des Résultats, issue #876) | `--redact`, `--redact-scope`, `--redact-map` | `redact` (sans sécurité, refusé avec `tls`/`quic`, comme la CLI) ; table : `GET /analyses/{analysis_id}/redact-map` (issue #876) |
 
 ## Diagnostics et triage
 

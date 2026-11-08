@@ -272,7 +272,7 @@ def test_pdf_genere_et_dependances_absentes(lance, monkeypatch, tmp_path, capsys
     monkeypatch.setattr(netcross_report, "generate_pdf", lambda r, path, **kw: appels.append(kw["meta"]))
     pdf = tmp_path / "r.pdf"
     assert lance("--pdf-report", pdf, "--redact") == 0
-    assert appels == [{"Anonymisation": "adresses IP/MAC anonymisees (--redact)"}]
+    assert appels == [{"Anonymisation": "adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (--redact)"}]
     monkeypatch.delattr(netcross_report, "generate_pdf")
     assert lance("--pdf-report", pdf) == 1
     assert "--pdf-report necessite reportlab" in capsys.readouterr().err

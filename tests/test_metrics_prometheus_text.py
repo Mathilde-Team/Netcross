@@ -258,7 +258,7 @@ def test_cli_redact(tmp_path):
     res = _cli(*_captures(), "--redact", "--prom-file", str(prom), "--metrics-run", "192.168.0.1")
     assert res.returncode == 0, res.stderr
     texte = prom.read_text(encoding="utf-8")
-    assert texte.startswith("# adresses IP/MAC anonymisees (--redact)\n")
+    assert texte.startswith("# adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (--redact)\n")
     assert "192.168.0.1" not in texte
     list(parse_prometheus(texte))
 
