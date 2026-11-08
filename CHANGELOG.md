@@ -8,6 +8,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- `--prom-file` et `--openmetrics-file` (#1112) : métriques de l'analyse au format texte Prometheus (textfile
+  collector de node_exporter, écriture atomique) et OpenMetrics 1.0 ; `--metrics-run` fixe l'étiquette `run` ;
+  `--redact` anonymise les adresses présentes dans les étiquettes. Voir docs/metriques-prometheus.md.
 - Client TWAMP-Light (#1066) : `netcross_core.active.twamp.mesurer` envoie des sondes RFC 5357 (annexe I, non
   authentifiées) à un réflecteur et rend délai aller-retour corrigé du temps de traitement, délais aller et retour,
   pertes, gigue et TTL reçu. Sans réflecteur (aucune réponse, port fermé, cible injoignable), le résultat l'indique
