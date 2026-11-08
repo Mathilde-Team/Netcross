@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: netcross\n"
 "Report-Msgid-Bugs-To: https://github.com/MathildeDec/Netcross/issues\n"
-"POT-Creation-Date: 2026-11-08 12:31+0000\n"
+"POT-Creation-Date: 2026-11-08 13:40+0000\n"
 "PO-Revision-Date: 2026-09-23 07:01+0000\n"
 "Last-Translator: Netcross\n"
 "Language-Team: none\n"
@@ -144,12 +144,20 @@ msgid "A surveiller"
 msgstr "Watch"
 
 #: src/netcross_report/html_report.py
+msgid "ABSENT"
+msgstr "MISSING"
+
+#: src/netcross_report/html_report.py
 msgid "Anomalie"
 msgstr "Anomaly"
 
 #: src/netcross_report/html_report.py
 msgid "Aucun constat : rien d'anormal detecte."
 msgstr "No findings: nothing abnormal detected."
+
+#: src/netcross_report/html_report.py
+msgid "Aucun message SIP pour cet appel."
+msgstr "No SIP message for this call."
 
 #: src/netcross_report/html_report.py
 msgid ""
@@ -186,6 +194,22 @@ msgstr "Categories"
 #: src/netcross_report/html_report.py
 msgid "Changements DSCP"
 msgstr "DSCP changes"
+
+#: src/netcross_report/html_report.py
+msgid ""
+"Chaque message SIP de l'appel, point de capture par point (date en ms depuis "
+"le debut de l'appel). ABSENT : vu a un autre point mais pas a celui-ci. "
+"Retransmis : vu plusieurs fois au meme point. Reecrit : SDP, premier Via ou "
+"Contact differents du premier point ou le message a ete vu (ALG, SBC ; un "
+"proxy ajoute aussi son propre Via). Les 100 Trying, produits a chaque saut, "
+"ne sont jamais declares perdus."
+msgstr ""
+"Each SIP message of the call, capture point by capture point (time in ms "
+"since the start of the call). MISSING: seen at another point but not at this "
+"one. Retransmitted: seen several times at the same point. Rewritten: SDP, "
+"first Via or Contact different from the first point where the message was "
+"seen (ALG, SBC; a proxy also adds its own Via). 100 Trying responses, "
+"produced at each hop, are never reported as lost."
 
 #: src/netcross_report/html_report.py
 msgid "Chemin observe"
@@ -240,6 +264,10 @@ msgid "Echantillons"
 msgstr "Samples"
 
 #: src/netcross_report/html_report.py
+msgid "Echelle SIP multi-points"
+msgstr "Multi-point SIP ladder"
+
+#: src/netcross_report/html_report.py
 msgid "Etat"
 msgstr "State"
 
@@ -262,6 +290,10 @@ msgstr "Information"
 #: src/netcross_report/html_report.py
 msgid "Message"
 msgstr "Message"
+
+#: src/netcross_report/html_report.py
+msgid "Messages SIP de l'appel, une colonne par point de capture"
+msgstr "SIP messages of the call, one column per capture point"
 
 #: src/netcross_report/html_report.py
 msgid "Metriques par segment, dans l'ordre du chemin"
@@ -346,3 +378,29 @@ msgstr "not measured"
 #: src/netcross_report/html_report.py
 msgid "pertes"
 msgstr "loss"
+
+#: src/netcross_report/html_report.py
+msgid "reecrit"
+msgstr "rewritten"
+
+#: src/netcross_report/html_report.py
+msgid "retransmis"
+msgstr "retransmitted"
+
+#: src/netcross_report/html_report.py
+msgid "saut par saut"
+msgstr "hop by hop"
+
+#: src/netcross_report/html_report.py
+#, python-brace-format
+msgid "{n} message(s) non represente(s)."
+msgstr "{n} message(s) not shown."
+
+#: src/netcross_report/html_report.py
+#, python-brace-format
+msgid ""
+"{total} message(s) : {lost} perdu(s), {retransmitted} retransmis, "
+"{rewritten} reecrit(s)."
+msgstr ""
+"{total} message(s): {lost} lost, {retransmitted} retransmitted, {rewritten} "
+"rewritten."
