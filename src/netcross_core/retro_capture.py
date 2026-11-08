@@ -38,6 +38,7 @@ import hashlib
 import itertools
 import json
 import os
+import re
 import shutil
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -81,12 +82,20 @@ class GelConfig:
 
     min_delay_between_gels : délai minimal entre deux gels
     (anti-flapping : une salve d'alarmes voisines ne produit qu'un gel).
+
+    max_octets_archives : quota disque TOTAL du répertoire d'archives
+    (issue #1093). None = pas de quota (comportement inchangé). À chaque
+    gel, les archives les plus anciennes sont supprimées tant que le
+    total dépasse le quota — jamais l'archive du gel COURANT. La taille
+    compte les liens durs à leur taille pleine (comptage conservateur :
+    un fichier protégé et son original dans le tampon pèsent deux fois).
     """
 
     seconds_before: float = 60.0
     seconds_after: float = 30.0
     min_severity: str = "anomalie"
     min_delay_between_gels: float = 30.0
+    max_octets_archives: int | None = None
 
 
 @dataclass(frozen=True)
@@ -128,6 +137,10 @@ class GelReport:
     (en horloge d'analyse) — reporté dans le manifeste d'incident
     (#1090). None si absent (GelReport fabriqué à la main).
 
+    quota_supprimes : archives de gel supprimées par le quota disque
+    (#1093) au moment de CE gel (les plus anciennes d'abord) — la
+    suppression est aussi mentionnée dans le journal (logger.warning).
+
     ignored_reason : None si le gel a bien été déclenché ; sinon la
     raison du refus (sévérité trop faible, délai minimal, alarme non
     « raised »).
@@ -142,6 +155,7 @@ class GelReport:
     fenetres: Mapping[str, tuple[float, float]] = field(default_factory=dict)
     dossier: str = ""
     horodatage_alarme: float | None = None
+    quota_supprimes: tuple[str, ...] = ()
     ignored_reason: str | None = None
 
 
@@ -243,6 +257,14 @@ class GelManager:
             f"({dossier}, fenêtre [{start:.0f}, {end:.0f}])"
         )
         logger.info("{}", message)
+
+        # Quota disque (issue #1093) : l'archive du gel COURANT compte
+        # dans le total (elle vient d'être écrite) mais n'est jamais
+        # supprimée — on évince les gels plus anciens.
+        supprimes: tuple[str, ...] = ()
+        if self._config.max_octets_archives is not None:
+            supprimes = appliquer_quota(self._archives_dir, self._config.max_octets_archives, conserver=dossier)
+
         logger.debug("GelManager._geler: retour GelReport")
         return GelReport(
             rule_id=event.rule_id,
@@ -254,6 +276,7 @@ class GelManager:
             fenetres=fenetres,
             dossier=dossier,
             horodatage_alarme=event.timestamp,
+            quota_supprimes=supprimes,
         )
 
     def _geler_point(
@@ -506,3 +529,93 @@ def verifier_manifeste(manifeste: ManifesteIncident) -> list[str]:
             non_conformes.append(f.segment)
     logger.debug("verifier_manifeste: retour {} non conforme(s)", len(non_conformes))
     return non_conformes
+
+
+# -- Quota disque des archives (issue #1093) ------------------------------------
+
+_GEL_RE = re.compile(r"gel-(\d+)$")
+
+
+def _taille_fichier(chemin: str) -> int:
+    """Taille d'un fichier (sans suivre les liens symboliques), 0 s'il
+    disparaît pendant le parcours (rotation du tampon, quota
+    concurrent...) — il ne pèse plus, on l'ignore sans échouer."""
+    logger.debug("_taille_fichier: entrée ({})", chemin)
+    try:
+        taille = os.lstat(chemin).st_size
+    except OSError:
+        logger.debug("_taille_fichier: fichier parti pendant le parcours, retour 0")
+        return 0
+    logger.debug("_taille_fichier: retour {}", taille)
+    return taille
+
+
+def _taille_octets(dossier: str) -> int:
+    """Taille totale (octets) d'un répertoire, sans suivre les liens
+    symboliques. Les liens durs comptent à leur taille pleine — comptage
+    CONSERVATEUR : un fichier protégé par le gel et son original dans le
+    tampon (même inode) pèsent deux fois, on préfère évincer trop tôt que
+    saturer le disque."""
+    logger.debug("_taille_octets: entrée ({})", dossier)
+    total = 0
+    for racine, _sous_rep, noms in os.walk(dossier):
+        for nom in noms:
+            total += _taille_fichier(os.path.join(racine, nom))
+    logger.debug("_taille_octets: retour {}", total)
+    return total
+
+
+def appliquer_quota(archives_dir: str, quota_octets: int, conserver: str | None = None) -> tuple[str, ...]:
+    """Évince les archives de gel les plus ANCIENNES tant que le total du
+    répertoire d'archives dépasse le quota (issue #1093) — jamais
+    ``conserver`` (l'archive du gel courant), jamais d'échec silencieux :
+    chaque suppression est mentionnée dans le journal (logger.warning)
+    et renvoyée.
+
+    Renvvoie les répertoires supprimés (les plus anciens d'abord). Si le
+    quota reste dépassé après éviction (gel courant trop gros seul), un
+    avertissement le mentionne — on ne supprime JAMAIS l'archive de
+    l'incident qui vient d'être gélée."""
+    logger.debug("appliquer_quota: entrée ({}, quota={})", archives_dir, quota_octets)
+    if not os.path.isdir(archives_dir):
+        logger.debug("appliquer_quota: si répertoire absent -> retour tuple vide")
+        return ()
+
+    # Gels triés par numéro croissant = ordre chronologique de création.
+    gels = sorted(
+        (os.path.join(archives_dir, nom) for nom in os.listdir(archives_dir) if _GEL_RE.fullmatch(nom)),
+        key=lambda chemin: int(_GEL_RE.search(os.path.basename(chemin)).group(1)),
+    )
+    if not gels:
+        logger.debug("appliquer_quota: si aucun gel -> retour tuple vide")
+        return ()
+
+    supprimes: list[str] = []
+    total = sum(_taille_octets(gel) for gel in gels)
+    for gel in gels:
+        if total <= quota_octets:
+            logger.debug("appliquer_quota: total {} <= quota -> arrêt", total)
+            break
+        if conserver is not None and os.path.abspath(gel) == os.path.abspath(conserver):
+            # L'archive courante n'est JAMAIS évincée, même trop grosse.
+            logger.warning(
+                "Quota archives ({} octets) dépassé de {} — l'archive courante {} est conservée",
+                quota_octets,
+                total - quota_octets,
+                gel,
+            )
+            break
+        taille_gel = _taille_octets(gel)
+        shutil.rmtree(gel)
+        total -= taille_gel
+        logger.warning(
+            "Quota archives ({} octets) : archive {} supprimée ({} octets libérés, total {})",
+            quota_octets,
+            gel,
+            taille_gel,
+            total,
+        )
+        supprimes.append(gel)
+
+    logger.debug("appliquer_quota: retour {} suppression(s)", len(supprimes))
+    return tuple(supprimes)
