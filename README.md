@@ -590,6 +590,16 @@ Options utiles :
   fichier ou argument direct). `--redact-map chemin.csv` conserve la
   correspondance adresse réelle ↔ pseudonyme dans un fichier **local, à
   ne jamais transmettre avec le rapport**.
+- `--tls-keylog keys.txt` (tous les points) ou `--tls-keylog CLIENT=keys.txt`
+  (un point, prioritaire ; option répétable) : fichier de clés TLS au
+  format `SSLKEYLOGFILE` (navigateur, `curl`, `openssl s_client -keylogfile`)
+  transmis à tshark (`-o tls.keylog_file:...`) pour déchiffrer les sessions
+  TLS des captures : HTTP et objets transportés redeviennent visibles.
+  Le fichier doit exister et être lisible ; nom de point inconnu refusé.
+  Refusé avec `--redact` tant que l'interaction déchiffrement/anonymisation
+  n'est pas définie, et sans objet en direct (`--live`). Le contenu du
+  fichier n'est jamais lu ni journalisé par Netcross. Sans l'option,
+  comportement inchangé (issue #1040, chantier #997).
 - `--history-db chemin.db` : enregistre un résumé de ce run (score de
   santé, nombre de constats par sévérité) dans une base SQLite locale,
   créée si absente — pour suivre une tendance dans le temps sur des runs
@@ -694,6 +704,9 @@ Options supplémentaires (parité avec `cross_capture_analyzer_cli.py`) :
   présente des deux côtés garde le même pseudonyme, sans quoi la
   comparaison perdrait son sens. Même exclusion mutuelle avec
   `--tls`/`--quic` (pas de `--client-group` sur ce CLI).
+- `--tls-keylog [NOM=]FICHIER` : même option que sur
+  `cross_capture_analyzer_cli.py`, appliquée aux captures `--baseline` et
+  `--current` (mêmes noms de points des deux côtés) ; refusée avec `--redact`.
 - `--history-db` / `--history-label` / `--history-show` : même mécanisme
   que sur `cross_capture_analyzer_cli.py` (voir ci-dessus) — un même
   fichier `.db` peut mélanger des runs d'analyse et de comparaison
@@ -936,7 +949,7 @@ netcross/
 ├── pytest.ini               configuration pytest (pythonpath = src)
 ├── docs/                   documentation MkDocs
 │   ├── class-diagram.md     diagramme de classes (GENERE depuis src/)
-│   ├── detectors.md         comportement et limites des detecteurs (#365)
+│   ├── detectors.md         comportement, limites et inventaire des detecteurs (#365, #1020)
 │   ├── features-backlog.md  fonctionnalites, dette, comparaison OmniPeek
 │   └── sessions/             historique detaille session par session
 ├── scripts/
@@ -1237,12 +1250,15 @@ avant un déploiement en production.
   sur des URI différentes, qui reste correctement distingué). Une réponse
   4xx est signalée pour information mais n'est pas en elle-même une
   anomalie réseau.
-- **QUIC/HTTP3** : seule la v1 (RFC 9001) est gérée ; la dérivation de clés
-  a été validée octet pour octet contre les vecteurs de test officiels de
-  la RFC 9001 Annexe A.2. Seul le paquet Initial (ClientHello, SNI) est
+- **QUIC/HTTP3** : les versions 1 (RFC 9001) et 2 (RFC 9369, version
+  `0x6b3343cf`) sont gérées ; la dérivation de clés a été validée octet
+  pour octet contre les vecteurs de test officiels de la RFC 9001
+  Annexe A.2 et de la RFC 9369 Annexe A (paquet Client Initial v2 complet
+  déchiffré, SNI compris). Les constats signalent les Initial v2 par point ;
+  les brouillons et versions privées restent ignorés. Seul le paquet Initial (ClientHello, SNI) est
   accessible — les échanges 0-RTT/1-RTT sont chiffrés avec des clés de
   session qui ne sont pas publiques, donc structurellement indéchiffrables
-  sans capture des clés côté client (keylog). QUIC v2 (RFC 9369) non geré.
+  sans capture des clés côté client (keylog).
 - **TLS/QUIC sur `cross_capture_diff_cli.py`** : `--tls`/`--quic` exécutent
   le diagnostic séparément sur le baseline et sur le run courant plutôt que
   de produire une vraie comparaison chiffrée — ces deux modules ne

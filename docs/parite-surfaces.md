@@ -14,7 +14,7 @@ ici fait donc échouer la CI.
 
 | Surface | Points d'entrée | Capacités |
 |---|---|---|
-| CLI | `cross_capture_analyzer_cli.py` (123 options), `cross_capture_diff_cli.py` (27), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
+| CLI | `cross_capture_analyzer_cli.py` (127 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 3 pages, 44 cases à cocher, 31 réglages numériques | Analyse interactive et exploration visuelle |
 | API | 62 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) |
 
@@ -50,6 +50,7 @@ actif, non réglable.
 | Lecture parallèle | oui (« Lecture parallele des captures », nombre « Lecteurs paralleles » en analyse simple, issue #672) | `--parallel`, `--parallel-workers` | `parallel_workers` (issue #672) |
 | Fenêtre temporelle du débit | oui | `--bucket-ms` | `bucket_ms` (#330, #841) |
 | Cadence RTP | oui | `--rtp-clock-rate` | `rtp_clock_rate` (#330, #841) |
+| Décalage d'horloge entre points (estimation TCP/DNS, correction automatique des délais) | non | `--clock-offset` (décalage manuel imposé, désactive l'estimation de la paire) | non |
 | Seuil de coupure NAT/pare-feu silencieuse | oui (« Coupure silencieuse (s) », 0 = défaut 60 s) | `--idle-timeout-seconds` | `idle_timeout_seconds` (#330, #841) |
 | Limiter ou échantillonner les paquets | oui (« Paquets max. », « Echantillonnage 1/N » en analyse simple, troncature annoncée dans le rapport ; issue #672) | `--max-packets`, `--sample` | `max_packets`, `sample` (issue #672) |
 | Noms logiques des hôtes | oui (« Table des noms... », exports CSV détaillé et JSON) | `--names` | `names` (fichier joint, issue #672) |
@@ -65,6 +66,7 @@ actif, non réglable.
 | Diagnostic QUIC/HTTP3 | oui (« Diagnostic QUIC/HTTP3 ») | `--quic` | `quic` (clé `quic_findings` de `/report`) |
 | Rapport de sécurité (détecteurs, signatures d'exploit, CVE) | oui (« Rapport de securite ») | `--security-report` | auto (toujours exécuté, sauf avec `redact`), `GET /analyses/{analysis_id}/security` |
 | Base CVE complète (NVD) | oui (« Base CVE... », avec « Rapport de securite » ; issue #672) | `--cve-db` | variable de serveur `NETCROSS_CVE_DB`, sinon base embarquée (issue #672) |
+| Déchiffrement TLS par fichier de clés (SSLKEYLOGFILE) | oui (« Cles TLS... » de la configuration : un fichier pour tous les points ; refusé avec l'anonymisation ; issue #1040) | `--tls-keylog FICHIER` (tous les points) ou `NOM=FICHIER` (un point), répétable, refusé avec `--redact` | `tls_keylog` (fichier(s) joint(s), copie temporaire 0600 supprimée en fin d'analyse) et `tls_keylog_labels` (un point par fichier, `*` = tous) ; refusé avec `redact` (issue #1040) |
 | Destinations et hôtes connus (sécurité) | oui (« Destinations connues... », « Hotes connus... », avec « Rapport de securite » ; issue #672) | `--known-destinations`, `--known-hosts` | `known_destinations`, `known_hosts` (fichiers joints, issue #672) |
 | Moteur de règles | oui (case « Moteur de regles », section du rapport ; issue #673) | `--rule-engine` | `rule_engine` (clé `rule_engine` de `/report`, issue #673) |
 | Section expertise détaillée | oui (case « Section expertise », section du rapport ; issue #673) | `--expert-section` | `expert_section` (issue #673) |
@@ -147,6 +149,7 @@ de sécurité, déjà produit par `POST /analyses`.
 | TLS / QUIC de chaque côté | oui | `--tls`, `--quic` | `tls`, `quic` (issue #669) |
 | Triage des écarts | oui (« Triage des ecarts (classement des segments) », Top) | `--triage`, `--triage-top-n` | `triage_top_n` (issue #669) |
 | Exports | oui (PDF, CSV, JSON) | `--pdf-report`, `--diff-csv`, `--json-report` | `GET /comparisons/{id}/csv` (issue #669) |
+| Déchiffrement TLS par fichier de clés | non (un seul jeu de captures dans la GUI : « Cles TLS... » ne s'applique qu'à l'analyse) | `--tls-keylog FICHIER` ou `NOM=FICHIER` (baseline et courant, mêmes noms de points), refusé avec `--redact` (issue #1040) | non (issue #1040 : routes `POST /captures` et `/captures/multi` seulement) |
 | Anonymisation partagée | oui | `--redact`, `--redact-map` | `redact` (issue #669) |
 | Historique | oui (« Historique... » et « Etiquette » de la configuration, aussi en comparaison et en comparaison en direct ; consultation : fenêtre « Historique des runs » ; issue #874) | `--history-db`, `--history-label`, `--history-show` | `history`, `history_label` (base fixée par `NETCROSS_HISTORY_DB`), consultation `GET /history` (issue #874) |
 | Code de sortie 1 sur régression | sans objet | oui | `regression: true` dans la réponse (issue #669) |
@@ -188,6 +191,7 @@ fenêtre « Outils de capture » (bouton de la barre de titre).
 | Historique des runs (analyses et comparaisons) | fenêtre « Historique des runs » (bouton de la barre de titre) : base, type, étiquette, nombre (issue #874) | `cross_history_cli.py` : `--db`, `--label`, `--run-type`, `--limit` | `GET /history` : `run_type`, `label`, `limit` (base du serveur `NETCROSS_HISTORY_DB`, issue #874) |
 | Historique des analyses | oui (fenêtre « Historique des runs », type « Analyses (analyse) » ; enregistrement par « Historique... » / « Etiquette », issues #674, #874) | `cross_history_cli.py` : `--db`, `--label`, `--run-type`, `--limit` | `GET /history?run_type=…` ; enregistrement par `history`/`history_label` de `POST /captures` (issue #890) ; `GET /analyses` liste les analyses du serveur |
 | Mode debug | `--debug` au lancement | `--debug` (toutes les CLI) | `NETCROSS_DEBUG=1` |
+| Mesure des performances par étape (lecture, corrélation, détecteurs, rapport : durées, RSS max, pic tracemalloc ; issue #1016, banc #994) | non (outil de banc, voir PR de #1016) | `--profile-steps`, `--profile-tracemalloc` | non (outil de banc, voir PR de #1016) |
 
 ## Annotations et signets
 
@@ -220,6 +224,7 @@ son équivalent CLI ou API.
 | Exclure les doublons des statistiques | Configuration | `--exclude-duplicates` |
 | Lecture parallele des captures | Configuration | `--parallel` |
 | Anonymiser les adresses IP/MAC (--redact) | Configuration | `--redact` |
+| Cles TLS... | Configuration | `--tls-keylog` |
 | Deduire la topologie automatiquement (ignore l'ordre de la liste) | Configuration | absence de `--order` |
 | Séparer les interfaces d'un pcapng (--split-interfaces) | Configuration | `--split-interfaces` |
 | Triage (classement des segments) | Configuration | `--triage` |
@@ -271,7 +276,8 @@ l'option CLI de même nom) : `nat_tolerant`, `nat_window_ms`, `tls`,
 `expert_section`, `media_quality`, `tshark_stats`, `flow_timeline`,
 `flow_timeline_window` (issue #673), `bucket_ms`, `rtp_clock_rate`,
 `idle_timeout_seconds`, `detect_duplicates`, `exclude_duplicates`,
-`duplicate_threshold_ms` (issue #330, lot 1 de #841).
+`duplicate_threshold_ms` (issue #330, lot 1 de #841), `tls_keylog`,
+`tls_keylog_labels` (issue #1040).
 | `GET /analyses` | Liste des analyses |
 | `GET /analyses/{analysis_id}` | Mesures brutes (voir plus haut) |
 | `GET /analyses/{analysis_id}/report` | Rapport structuré, identique à `--json-report` |
