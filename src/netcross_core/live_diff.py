@@ -41,10 +41,11 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Callable
 
-from netcross_core.alarms import AlarmEngine, AlarmSignal
+from netcross_core.alarms import AlarmEngine, AlarmEvent, AlarmSignal
 from netcross_core.baseline_diff import DiffFinding, diff_reports
 from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import Pkt, Report
+from netcross_core.retro_capture import GelManager
 from pcap_parser.capture import CaptureRingBuffer
 
 logger = get_logger(__name__)
@@ -135,20 +136,26 @@ class LiveDiffEngine:
         on_alarm: Callable[[object], None] | None = None,
         alarm_engine: AlarmEngine | None = None,
         ring_buffer: CaptureRingBuffer | None = None,
+        gel: GelManager | None = None,
     ):
         logger.debug(
-            "LiveDiffEngine.__init__: baseline_report={} config={} on_alarm={} alarm_engine={} ring_buffer={}",
+            "LiveDiffEngine.__init__: baseline_report={} config={} on_alarm={} alarm_engine={} "
+            "ring_buffer={} gel={}",
             summarize(baseline_report, "baseline_report"),
             summarize(config, "config"),
             summarize(on_alarm, "on_alarm"),
             summarize(alarm_engine, "alarm_engine"),
             summarize(ring_buffer, "ring_buffer"),
+            summarize(gel, "gel"),
         )
         self.baseline = baseline_report
         self.config = config or LiveDiffConfig()
         self.on_alarm = on_alarm
         self.alarm_engine = alarm_engine or AlarmEngine([])
         self.ring_buffer = ring_buffer
+        # Gel rétroactif (issue #1087) : branché sur AlarmEngine —
+        # déclenché pour chaque NOUVELLE alarme « raised ».
+        self.gel = gel
         self.state = LiveDiffState()
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -304,9 +311,19 @@ class LiveDiffEngine:
 
         # Conversion en AlarmSignal et alimentation du AlarmEngine
         signals = [finding_to_alarm_signal(f) for f in findings]
+        nouveaux_evenements: list[AlarmEvent] = []
         if signals:
             timestamp = pkts[-1].ts if pkts else time.time()
-            self.alarm_engine.feed(timestamp, signals)
+            nouveaux_evenements = self.alarm_engine.feed(timestamp, signals)
+
+        # Gel rétroactif (issue #1087) : chaque NOUVELLE alarme déclenche
+        # la protection des fichiers du tampon. Uniquement les nouveaux
+        # événements (le retour de feed()) — pas engine.events, qui
+        # accumule tout l'historique et renotifierait les anciennes
+        # alarmes à chaque cycle.
+        if self.gel is not None:
+            for event in nouveaux_evenements:
+                self.gel.on_alarm(event)
 
         # Notification des nouvelles alarmes
         if self.on_alarm is not None:
