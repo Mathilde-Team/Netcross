@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from netcross_core.clock_sync import EchantillonHorloge, EstimationHorloge
 from netcross_core.logging_config import get_logger
+from pcap_parser.radio import RadioInfo
 
 logger = get_logger(__name__)
 
@@ -198,6 +199,9 @@ class Pkt:
     # message SIP (issue #1120), reportes depuis RawPacket.sip_sdp_media ;
     # tuple vide hors SIP avec SDP. Consommes par voip.build_calls.
     sip_sdp_media: tuple[tuple[str, int], ...] = ()
+    # Metadonnees radio 802.11 par trame (issue #1142), reportees depuis
+    # RawPacket.radio ; None hors capture 802.11.
+    radio: RadioInfo | None = None
     # -- Checksums IP/TCP/UDP (Job 43/issue #163) : valeurs brutes (chaine
     # hex) et verdicts tri-etats (True=invalide, False=valide, None=non
     # determine) reportes tels quels depuis RawPacket. Pas encore consommes
