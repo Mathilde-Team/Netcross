@@ -8,6 +8,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Appariement des flux RTP entre points (#1121) : le même flux est reconnu à plusieurs points malgré un NAT ou un SBC
+  (ports, adresses, SSRC, séquence et horodatage RTP réécrits), par SSRC puis par couples (séquence, horodatage RTP)
+  avec décalage constant. Clé `rtp_matches` de `--json-report` : jambes par point, méthode, `nat_rewritten`, pertes
+  entre jambes. Voir docs/appariement-rtp.md.
 - `--prom-file` et `--openmetrics-file` (#1112) : métriques de l'analyse au format texte Prometheus (textfile
   collector de node_exporter, écriture atomique) et OpenMetrics 1.0 ; `--metrics-run` fixe l'étiquette `run` ;
   `--redact` anonymise les adresses présentes dans les étiquettes. Voir docs/metriques-prometheus.md.
