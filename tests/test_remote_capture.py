@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Sources de capture distantes (issue #166) : rpcap://, sshdump:// (ssh://),
 pipe:// -- analyse des URL, arguments tshark (subprocess simule), CLI et GUI.
 tshark n'est jamais lance : subprocess.Popen est remplace."""

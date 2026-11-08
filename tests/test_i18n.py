@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #299 : internationalisation gettext.
 
 Les verifications de catalogues (synchronisation .po/.pot, en-tetes,

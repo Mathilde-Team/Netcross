@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_api.app -- application FastAPI pour exposer les analyses Netcross
 (issues #209, #354, #356).

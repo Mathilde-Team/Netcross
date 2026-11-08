@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.json_report -- verifie que le JSON produit est valide,
 structurellement complet, et coherent avec le meme calcul de findings/

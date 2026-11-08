@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_gtk4.app -- interface GTK4 pour netcross_core / netcross_report.
 

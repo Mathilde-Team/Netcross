@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.expert_model -- objets de contrat partages entre
 netcross_core et netcross_report ("Session 0" de FEATURES.md section 13.3 :

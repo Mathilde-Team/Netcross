@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.naming -- table locale de correspondance adresse/MAC -> nom
 logique, type, contexte (Job 18 / issue #16-bis, section 6.15 de FEATURES.md).

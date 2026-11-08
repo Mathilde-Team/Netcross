@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Couverture GTK4 de app.py, lot 5 (issue #426, sous-issue de #421).
 
 Portee (lignes 1545-1718) : cycle de vie complet d'une capture en direct --

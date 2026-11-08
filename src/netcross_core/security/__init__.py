@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security -- detection passive de vulnerabilites (CVE) sur
 traces reseau (issue #133, sous-tache CVE-4 / issue #138).

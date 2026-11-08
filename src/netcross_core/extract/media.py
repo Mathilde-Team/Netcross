@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.extract.media -- issue #278 : flux RTP audio/video.
 

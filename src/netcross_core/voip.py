@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Analyse VoIP orientee appel, association SIP/RTP par SDP.
 
 Cette couche fusionne les informations SIP et RTP deja extraites par le

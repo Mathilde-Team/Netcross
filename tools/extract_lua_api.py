@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Extraction de l'API Lua Wireshark vers JSON structure (issue #386).
 

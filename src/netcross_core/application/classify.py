@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.application.classify -- classification automatique des
 transactions applicatives (Job 23, §6.9).

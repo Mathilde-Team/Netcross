@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_forensic_search.py -- tests du moteur de recherche analytique
 post-capture transversal (netcross_core.forensic_search, Job 17 / issue #16,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Inventaire des détecteurs et de leur besoin de vue globale (issue #1020, chantier #995).
 
 Avant de passer le pipeline en flux (#995 : fenêtre glissante #1022, état

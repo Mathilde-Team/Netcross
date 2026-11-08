@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.protocols -- lit d'abord ce que tshark a nativement
 dissecte (RTP/DHCP/SIP), retombe sur une heuristique par octets sinon.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.extract.carver -- issue #150 (SCENARIO-4, parent #141) :
 extraction et reconstruction de fichiers depuis les traces réseau.

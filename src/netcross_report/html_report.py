@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.html_report -- rapport HTML autonome alimente par le JSON
 du rapport (issue #1073, sous-issue 1/6 du chantier #1000).

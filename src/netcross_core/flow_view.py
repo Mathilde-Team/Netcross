@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.flow_view -- vue enrichie d'un flux (FlowView), sixieme
 objet de contrat de la Session 0 (Job 9/issue #6, section 6.4 et 6.14 de

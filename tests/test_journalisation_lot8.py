@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """#441, lot 8 : traces d'entrée des points d'analyse une fois par capture."""
 
 from __future__ import annotations

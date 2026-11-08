@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests app.py -- Lot 9/10 (issue #430, sous-issue de #421) : cartographie des
 communications, threads d'export PDF/JSON, declenchement de l'export

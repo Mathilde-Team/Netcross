@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #1132 : vitesse d'interface (if_speed) et resolution d'horodatage
 (if_tsresol) par interface pcapng, repli --link-speed POINT=VITESSE."""
 

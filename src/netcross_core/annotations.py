@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_core.annotations -- annotations (etiquettes / signets sur des
 trames) partagees par la CLI et l'API (issue #910).
 

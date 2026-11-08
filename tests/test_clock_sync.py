@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de l'estimation robuste du decalage et de la derive d'horloge
 (issue #996) : estimateur isole (clock_sync.py) et integration dans

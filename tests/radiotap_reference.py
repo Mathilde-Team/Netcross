@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Generateur des captures 802.11 de reference versionnees (issue #1142).
 
 Trames entierement synthetiques, ecrites a la main octet par octet pour

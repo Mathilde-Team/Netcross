@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_ai_models_cli -- paquets de modeles IA partageables et boite
 d'envoi hors connexion (issue #271).
 

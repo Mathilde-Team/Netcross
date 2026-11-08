@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Capture en continu + diff en direct (Job 33, issue #33).
 
 Le plus gros chantier des pistes d'origine : capture continue avec diff

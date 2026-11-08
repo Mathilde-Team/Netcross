@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_api.bpf_routes -- bibliothèque de filtres BPF enregistrés
 (issue #906), équivalent API de ``--bpf-library NOM`` et des boutons
 « Filtres… » / « Enregistrer » de la GUI.

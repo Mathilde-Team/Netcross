@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """tests/test_annotations_view.py -- tests du module
 netcross_gtk4.annotations_view (Job 40/issue #160).
 

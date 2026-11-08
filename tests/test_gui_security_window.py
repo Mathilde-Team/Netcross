@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Section Securite de la fenetre GTK (issue #357), pilotee via pygobject.
 
 Ignore si GTK4/pygobject ou un affichage manquent (CI sans libgtk-4) ; la

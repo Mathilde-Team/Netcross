@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #169 : conversion et exports sur un vrai tshark (CI uniquement).
 
 La capture source est construite octet par octet (tests/pcap_builders) ;

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #872 (GUI) : fenêtre « Analyse d'un dossier », équivalent de
 ``cross_capture_batch_cli.py``. Même moteur (``batch_runner``) que la CLI :
 mêmes groupes, mêmes rapports, mêmes refus."""

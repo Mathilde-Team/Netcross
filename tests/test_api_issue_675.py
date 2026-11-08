@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #675 : API recherche forensique, extraction, comparaison, NetFlow.
 
 Tests des endpoints POST /analyses/{id}/search, /extract, /client-diff, /netflow.

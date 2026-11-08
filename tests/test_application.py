@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_application -- tests du modèle transactionnel applicatif
 (Job 23, §6.9/§6.10).

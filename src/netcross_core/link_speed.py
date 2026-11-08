@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Vitesse de lien et resolution d'horodatage par point (issue #1132).
 
 Premiere brique du chantier microrafales (#1005) : pour chaque point de

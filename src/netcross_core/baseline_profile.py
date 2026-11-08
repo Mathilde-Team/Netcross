@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.baseline_profile -- profil de reference dynamique construit
 a partir de l'historique SQLite (Job 12/issue #9, section 8.5 de

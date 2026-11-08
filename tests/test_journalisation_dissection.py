@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """#441, lot 2 : la dissection par paquet ne trace les cas particuliers
 qu'au niveau TRACE, et les calculs par flux au niveau DEBUG.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """tests/test_stats.py — Exploration statistique interactive (Job 27, issue #22).
 
 Tests du module netcross_core.stats : Top-N, tri, regroupement, filtres

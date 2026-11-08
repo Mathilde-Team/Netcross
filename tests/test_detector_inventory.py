@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Inventaire des détecteurs (issue #1020) : aucun oubli, doc à jour."""
 
 from __future__ import annotations

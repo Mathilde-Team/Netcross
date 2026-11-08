@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 cross_capture_diff_cli.py -- --live-current (Session 16).
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests du planificateur de mesures actives (issue #1063) -- sans reseau."""
 
 from __future__ import annotations

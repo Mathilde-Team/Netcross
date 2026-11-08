@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #890 : POST /captures et /captures/multi écrivent dans l'historique
 (history, history_label), comme --history-db / --history-label de la CLI."""
 

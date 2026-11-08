@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #675 : recherche forensic dans la GUI (equivalent de
 --forensic-search / --search-*). Partie sans GTK : saisie, mise en forme,
 export JSON et index construit par le pipeline."""

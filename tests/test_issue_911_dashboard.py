@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #911 : dashboard en CLI (--dashboard) et dans l'API
 (GET /analyses/{analysis_id}/dashboard), même calcul que la GUI."""
 

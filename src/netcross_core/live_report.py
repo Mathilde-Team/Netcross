@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.live_report -- issue #274 : export / rapport temps reel du
 mode ``--live``.

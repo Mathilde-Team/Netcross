@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Module commun de pseudonymisation : adresses et noms (issue #1151).
 
 Factorise la mecanique de pseudonymisation jusque-la propre a

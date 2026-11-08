@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.report_exports -- diagramme de sequence, export SIEM,
 historique SQLite et ticket de support dans la GUI (issue #674), sans GTK.
 

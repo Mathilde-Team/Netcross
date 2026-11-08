@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_api.models -- modèles Pydantic pour les requêtes/réponses API
 (issue #209).
