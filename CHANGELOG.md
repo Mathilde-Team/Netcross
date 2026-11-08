@@ -8,6 +8,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Client TWAMP-Light (#1066) : `netcross_core.active.twamp.mesurer` envoie des sondes RFC 5357 (annexe I, non
+  authentifiées) à un réflecteur et rend délai aller-retour corrigé du temps de traitement, délais aller et retour,
+  pertes, gigue et TTL reçu. Sans réflecteur (aucune réponse, port fermé, cible injoignable), le résultat l'indique
+  au lieu d'échouer. 10 sondes/s au plus, chaque mesure journalisée. Voir docs/mesures-actives.md.
 - Non-régression de performance (#1019) : `scripts/bench.py --reference benchmarks/reference.json` compare le banc
   à une référence versionnée (durée totale et pics RSS, seuils `--seuil-duree`/`--seuil-memoire`, 20 % par défaut,
   code 3 sur régression ; `--resultat` pour comparer sans relancer, `--resume` pour le résumé du job). Workflow
