@@ -8,6 +8,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Corrélation en flux (#1022) : `--streaming` fusionne les points en k voies par temps (`heapq.merge`) et ferme
+  chaque groupe après `--streaming-window` secondes ; la mémoire suit la fenêtre, pas le nombre de paquets. Paquets
+  désordonnés rattachés dans la fenêtre, troncature (paquet arrivé après la fermeture de son groupe) signalée dans
+  le rapport texte et la clé `streaming` de `--json-report`. Voir docs/correlation-en-flux.md.
 - Client TWAMP-Light (#1066) : `netcross_core.active.twamp.mesurer` envoie des sondes RFC 5357 (annexe I, non
   authentifiées) à un réflecteur et rend délai aller-retour corrigé du temps de traitement, délais aller et retour,
   pertes, gigue et TTL reçu. Sans réflecteur (aucune réponse, port fermé, cible injoignable), le résultat l'indique

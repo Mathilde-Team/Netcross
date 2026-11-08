@@ -370,6 +370,9 @@ def build_json_report_document(
     }
     # Issue #1043 : couverture du dechiffrement TLS/QUIC par point -- cle
     # absente si aucun point n'a de cle ni de session dechiffree.
+    # Correlation en flux (#1022) : posee par la CLI avec --streaming.
+    if getattr(r, "streaming", None):
+        doc["streaming"] = r.streaming
     decryption = document_json(r)
     if decryption:
         doc["decryption"] = {"by_point": decryption}
