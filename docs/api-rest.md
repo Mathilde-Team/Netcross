@@ -259,7 +259,11 @@ curl http://localhost:8000/analyses/a1b2c3d4e5f6/report
 
 Même document que `netcross --json-report rapport.json --security-report`
 et que l'export JSON de la GUI : `findings`, `triage`, `health_score`,
-`health_label`, `security_report`... Le rapport de sécurité est toujours
+`health_label`, `path_metrics`, `security_report`... `path_metrics` donne
+les métriques de chaque segment dans l'ordre du chemin déduit (délai,
+percentiles, gigue, pertes, débit, sauts, horloge). Un segment sans
+aucune mesure reste dans la liste avec `measured: false` et ses valeurs
+inconnues à `null`, jamais à zéro. Le rapport de sécurité est toujours
 calculé par l'API, la clé `security_report` n'est donc jamais vide. La
 clé `meta` vaut `{"Source": "API REST"}` et `_analysis_id` est ajoutée.
 

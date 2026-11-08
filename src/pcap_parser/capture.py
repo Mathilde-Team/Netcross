@@ -696,6 +696,32 @@ def merge_captures(paths: Sequence[str], output_path: str, dedup: bool = False) 
     logger.debug("merge_captures: fin")
 
 
+def cut_capture_window(path: str, output_path: str, start: float, end: float) -> None:
+    """Découpe la fenêtre [start, end] (epoch, secondes, bornes INCLUSES
+    au sens editcap : -A garde les paquets >= start, -B les paquets < end)
+    d'un fichier de capture vers ``output_path`` (issue #1090).
+
+    Simple enveloppe autour d'editcap -A/-B : ne décode rien. Les bornes
+    sont passées au format epoch Unix (« 940.5 », « 1030.0 ») — un des
+    formats documentés d'editcap, sans ambiguïté de fuseau horaire. La
+    fenêtre est celle de l'HORLOGE DU FICHIER source : à l'appelant de
+    translater ses bornes si son horloge d'analyse diffère (décalage
+    d'horloge estimé).
+
+    Crée le répertoire parent de ``output_path`` si absent. Si la
+    fenêtre ne contient aucun paquet, editcap écrit quand même un
+    fichier de sortie vide (valide) — l'archive d'incident reste
+    exploitable côté chaîne de preuve.
+    """
+    logger.debug("cut_capture_window: entrée ({} -> {} [{}, {}])", path, output_path, start, end)
+    editcap = _wireshark_tool_path("editcap")
+    dossier = os.path.dirname(output_path)
+    if dossier:
+        os.makedirs(dossier, exist_ok=True)
+    _run_wireshark_tool([editcap, "-A", repr(start), "-B", repr(end), path, output_path])
+    logger.debug("cut_capture_window: fin")
+
+
 class TcpreplayNotFoundError(RuntimeError):
     """tcpreplay n'est pas installe / pas dans le PATH.
 

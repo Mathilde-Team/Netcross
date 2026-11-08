@@ -8,6 +8,46 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Débit crête multi-échelle en fenêtre glissante (#1133, chantier microrafales #1005) : `netcross_core.multiscale`
+  cherche, pour chaque point et chaque échelle (100 µs, 1 ms, 10 ms par défaut), la fenêtre la plus chargée en octets.
+  Le calcul est exact, incrémental (paquet par paquet, compatible avec `--streaming`) et à mémoire bornée par la
+  fenêtre. Une échelle plus fine que la résolution d'horodatage du point (`if_tsresol`) ou que 1 µs est refusée
+  explicitement, avec la raison. Voir docs/fenetres-multi-echelles.md.
+- Échelle SIP multi-points (#1125) : pour chaque appel, une ligne par message SIP et une colonne par point de capture,
+  dans le PDF, le rapport HTML (avec ou sans JavaScript) et le JSON (`sip_ladders`). Un message perdu entre deux
+  points (« ABSENT »), retransmis ou réécrit (SDP, premier Via, Contact modifiés par un ALG ou un SBC) est mis en
+  évidence ; les `100 Trying`, produits à chaque saut, ne sont jamais déclarés perdus. Les en-têtes Via et Contact
+  sont désormais extraits, et `--redact` anonymise leurs adresses. Voir docs/echelle-sip.md.
+- Appariement des flux RTP entre points (#1121) : le même flux est reconnu à plusieurs points malgré un NAT ou un SBC
+  (ports, adresses, SSRC, séquence et horodatage RTP réécrits), par SSRC puis par couples (séquence, horodatage RTP)
+  avec décalage constant. Clé `rtp_matches` de `--json-report` : jambes par point, méthode, `nat_rewritten`, pertes
+  entre jambes. Voir docs/appariement-rtp.md.
+- Corrélation en flux (#1022) : `--streaming` fusionne les points en k voies par temps (`heapq.merge`) et ferme
+  chaque groupe après `--streaming-window` secondes ; la mémoire suit la fenêtre, pas le nombre de paquets. Paquets
+  désordonnés rattachés dans la fenêtre, troncature (paquet arrivé après la fermeture de son groupe) signalée dans
+  le rapport texte et la clé `streaming` de `--json-report`. Voir docs/correlation-en-flux.md.
+- Vue « Chemin » du rapport HTML autonome (#1075) : les points de capture dans l'ordre du chemin, reliés par leurs
+  segments. Le survol, le focus clavier ou le clic sur un segment affichent son détail (délai, P50/P95/P99, gigue,
+  pertes, débit, sauts, horloge). Les flèches, Début et Fin passent d'un segment à l'autre. Un segment sans mesure est
+  marqué « non mesurable » (en texte, avec une bordure pointillée). Le rendu sans JavaScript contient un tableau
+  équivalent. Le JSON du rapport gagne la clé `path_metrics`, avec les mêmes chiffres que le PDF.
+- `--prom-file` et `--openmetrics-file` (#1112) : métriques de l'analyse au format texte Prometheus (textfile
+  collector de node_exporter, écriture atomique) et OpenMetrics 1.0 ; `--metrics-run` fixe l'étiquette `run` ;
+  `--redact` anonymise les adresses présentes dans les étiquettes. Voir docs/metriques-prometheus.md.
+- Client TWAMP-Light (#1066) : `netcross_core.active.twamp.mesurer` envoie des sondes RFC 5357 (annexe I, non
+  authentifiées) à un réflecteur et rend délai aller-retour corrigé du temps de traitement, délais aller et retour,
+  pertes, gigue et TTL reçu. Sans réflecteur (aucune réponse, port fermé, cible injoignable), le résultat l'indique
+  au lieu d'échouer. 10 sondes/s au plus, chaque mesure journalisée. Voir docs/mesures-actives.md.
+- Diagnostics sur le contenu déchiffré (#1045) : avec un fichier de clés, le certificat TLS 1.3 est lu (détection de
+  substitution entre points), les paquets QUIC 1-RTT et leurs fermetures (CONNECTION_CLOSE) donnent des constats,
+  et les signatures d'exploits sont aussi appliquées au contenu TLS en clair. Voir `docs/couverture-dechiffrement.md`.
+- Couverture du déchiffrement TLS/QUIC (#1043) : le rapport texte, le PDF et le JSON (`decryption.by_point`)
+  indiquent par point « 42/50 sessions TLS déchiffrées au point CLIENT » (et de même pour QUIC) dès qu'un fichier de
+  clés ou des blocs DSB sont fournis. Voir docs/couverture-dechiffrement.md.
+- Garde-fous de non-fuite des secrets (#1047) : un test de bout en bout cherche les secrets d'un fichier de clés et
+  d'un bloc DSB (hexadécimal, octets bruts, base64) dans toutes les sorties d'un run : rapports texte, JSON,
+  Markdown, PDF et HTML, journaux loguru, export SIEM, Zeek, base d'historique, ticket de support, contenus extraits
+  et API. Voir docs/non-fuite-secrets.md.
 - Non-régression de performance (#1019) : `scripts/bench.py --reference benchmarks/reference.json` compare le banc
   à une référence versionnée (durée totale et pics RSS, seuils `--seuil-duree`/`--seuil-memoire`, 20 % par défaut,
   code 3 sur régression ; `--resultat` pour comparer sans relancer, `--resume` pour le résumé du job). Workflow

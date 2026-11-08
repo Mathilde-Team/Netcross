@@ -73,8 +73,11 @@ jobs:
           echo "wireshark-common wireshark-common/install-setuid boolean false" \
             | debconf-set-selections
           DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark poppler-utils gettext
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark poppler-utils gettext nodejs
           tshark --version 2>&1 | sed -n 1p
+          # nodejs : rendu headless du JavaScript du rapport HTML
+          # (tests/js/rendu_headless.js, issue #1075).
+          node --version
           editcap --version 2>&1 | sed -n 1p
           # poppler-utils fournit pdftotext, utilise par tests/test_security_outputs.py
           # (issue #218) pour REEXTRAIRE le texte du PDF produit au lieu de

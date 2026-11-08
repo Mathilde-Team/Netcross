@@ -16,10 +16,13 @@ JSON et le PDF doivent toujours s'accorder sur les memes constats/le
 meme triage pour un meme Report.
 """
 
+import dataclasses
 import datetime
 import json
 
+from netcross_core.dechiffrement import document_json
 from netcross_core.logging_config import get_logger, summarize
+from netcross_report.path_metrics import build_path_metrics
 from netcross_report.synthesis import build_findings
 from netcross_report.triage import health_label, health_score, rank_segments
 
@@ -213,6 +216,21 @@ def _compliance_dict(result) -> dict:
     }
 
 
+def _path_segment_dict(m) -> dict:
+    """Un ``SegmentMetrics`` (path_metrics) en dict JSON (issue #1075).
+
+    Toutes les metriques du segment, plus ``segment`` (meme libelle que les
+    constats, pour les rapprocher) et ``measured`` : un segment non
+    mesurable reste dans la liste, ses valeurs inconnues a ``None``.
+    """
+    logger.debug("_path_segment_dict: entrée ({})", m.label)
+    d = dataclasses.asdict(m)
+    d["segment"] = m.label
+    d["measured"] = m.measured
+    logger.debug("_path_segment_dict: retour dict")
+    return d
+
+
 def _segment_score_dict(s) -> dict:
     """Le detail des findings du segment n'est pas re-imbrique ici : ils
     sont deja tous presents dans la liste "findings" de premier niveau
@@ -341,6 +359,11 @@ def build_json_report_document(
             }
             for (a, b), est in r.clock_offset_estimate.items()
         ],
+        # Issue #1075 : metriques par segment, dans l'ordre du chemin deduit
+        # (netcross_report.path_metrics, memes chiffres que le PDF) -- lues
+        # par la vue « Chemin » du rapport HTML. Toujours presente (liste
+        # vide sans paire de points).
+        "path_metrics": [_path_segment_dict(m) for m in build_path_metrics(r)],
         "meta": dict(meta) if meta else {},
         "findings": [_finding_dict(f) for f in findings],
         "triage": [_segment_score_dict(s) for s in ranked],
@@ -367,6 +390,14 @@ def build_json_report_document(
         "flow_anomalies": list(getattr(r, "flow_anomalies", [])),
         "lateral_movement_events": list(getattr(r, "lateral_movement_events", [])),
     }
+    # Issue #1043 : couverture du dechiffrement TLS/QUIC par point -- cle
+    # absente si aucun point n'a de cle ni de session dechiffree.
+    # Correlation en flux (#1022) : posee par la CLI avec --streaming.
+    if getattr(r, "streaming", None):
+        doc["streaming"] = r.streaming
+    decryption = document_json(r)
+    if decryption:
+        doc["decryption"] = {"by_point": decryption}
     if getattr(r, "duplicate_count", None):
         # Job 41/issue #161 : cle absente si la detection n'a rien trouve
         # (meme convention que voip_calls ci-dessous).
@@ -402,9 +433,15 @@ def build_json_report_document(
         {"point": e.point, "frame_number": e.frame_number, "protocol": e.protocol, "checksum": e.checksum}
         for e in (getattr(r, "checksum_errors", None) or [])
     ]
+    # #1121 : jambes d'un meme flux RTP a plusieurs points (NAT/SBC).
+    if getattr(r, "rtp_matches", None):
+        doc["rtp_matches"] = list(r.rtp_matches)
     if getattr(r, "voip_calls", None):
         doc["voip_calls"] = list(r.voip_calls)
         doc["voip_quality_distribution"] = dict(r.voip_quality_distribution)
+    # Echelle SIP multi-points (issue #1125), omise sans SIP.
+    if getattr(r, "sip_ladders", None):
+        doc["sip_ladders"] = list(r.sip_ladders)
     if tls_findings is not None:
         doc["tls_findings"] = [_finding_dict(f) for f in tls_findings]
     if quic_findings is not None:

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: netcross\n"
 "Report-Msgid-Bugs-To: https://github.com/MathildeDec/Netcross/issues\n"
-"POT-Creation-Date: 2026-10-30 11:11+0000\n"
+"POT-Creation-Date: 2026-11-08 13:40+0000\n"
 "PO-Revision-Date: 2026-09-23 07:01+0000\n"
 "Last-Translator: Netcross\n"
 "Language-Team: none\n"
@@ -136,8 +136,16 @@ msgid "{v:.1f} Mo"
 msgstr "{v:.1f} MB"
 
 #: src/netcross_report/html_report.py
+msgid ","
+msgstr "."
+
+#: src/netcross_report/html_report.py
 msgid "A surveiller"
 msgstr "Watch"
+
+#: src/netcross_report/html_report.py
+msgid "ABSENT"
+msgstr "MISSING"
 
 #: src/netcross_report/html_report.py
 msgid "Anomalie"
@@ -148,8 +156,28 @@ msgid "Aucun constat : rien d'anormal detecte."
 msgstr "No findings: nothing abnormal detected."
 
 #: src/netcross_report/html_report.py
+msgid "Aucun message SIP pour cet appel."
+msgstr "No SIP message for this call."
+
+#: src/netcross_report/html_report.py
+msgid ""
+"Aucun paquet correle ni aucune perte observee sur ce segment : ses valeurs "
+"sont inconnues, pas nulles."
+msgstr ""
+"No correlated packet and no loss observed on this segment: its values are "
+"unknown, not zero."
+
+#: src/netcross_report/html_report.py
+msgid "Aucun segment : une seule capture, ou aucun couple de points correle."
+msgstr "No segment: a single capture, or no correlated pair of points."
+
+#: src/netcross_report/html_report.py
 msgid "Aucun segment a prioriser."
 msgstr "No segment to prioritise."
+
+#: src/netcross_report/html_report.py
+msgid "Aucun segment selectionne."
+msgstr "No segment selected."
 
 #: src/netcross_report/html_report.py
 msgid "Bon"
@@ -164,6 +192,30 @@ msgid "Categories"
 msgstr "Categories"
 
 #: src/netcross_report/html_report.py
+msgid "Changements DSCP"
+msgstr "DSCP changes"
+
+#: src/netcross_report/html_report.py
+msgid ""
+"Chaque message SIP de l'appel, point de capture par point (date en ms depuis "
+"le debut de l'appel). ABSENT : vu a un autre point mais pas a celui-ci. "
+"Retransmis : vu plusieurs fois au meme point. Reecrit : SDP, premier Via ou "
+"Contact differents du premier point ou le message a ete vu (ALG, SBC ; un "
+"proxy ajoute aussi son propre Via). Les 100 Trying, produits a chaque saut, "
+"ne sont jamais declares perdus."
+msgstr ""
+"Each SIP message of the call, capture point by capture point (time in ms "
+"since the start of the call). MISSING: seen at another point but not at this "
+"one. Retransmitted: seen several times at the same point. Rewritten: SDP, "
+"first Via or Contact different from the first point where the message was "
+"seen (ALG, SBC; a proxy also adds its own Via). 100 Trying responses, "
+"produced at each hop, are never reported as lost."
+
+#: src/netcross_report/html_report.py
+msgid "Chemin observe"
+msgstr "Observed path"
+
+#: src/netcross_report/html_report.py
 msgid "Constats"
 msgstr "Findings"
 
@@ -172,12 +224,64 @@ msgid "Critique"
 msgstr "Critical"
 
 #: src/netcross_report/html_report.py
+msgid "Debit au point aval"
+msgstr "Throughput at downstream point"
+
+#: src/netcross_report/html_report.py
+msgid "Decalage d'horloge"
+msgstr "Clock offset"
+
+#: src/netcross_report/html_report.py
 msgid "Degrade"
 msgstr "Degraded"
 
 #: src/netcross_report/html_report.py
+msgid "Delai P50"
+msgstr "P50 delay"
+
+#: src/netcross_report/html_report.py
+msgid "Delai P95"
+msgstr "P95 delay"
+
+#: src/netcross_report/html_report.py
+msgid "Delai P99"
+msgstr "P99 delay"
+
+#: src/netcross_report/html_report.py
+msgid "Delai moyen"
+msgstr "Mean delay"
+
+#: src/netcross_report/html_report.py
+msgid "Derive d'horloge"
+msgstr "Clock drift"
+
+#: src/netcross_report/html_report.py
+msgid "Ecarts de sauts"
+msgstr "Hop outliers"
+
+#: src/netcross_report/html_report.py
+msgid "Echantillons"
+msgstr "Samples"
+
+#: src/netcross_report/html_report.py
+msgid "Echelle SIP multi-points"
+msgstr "Multi-point SIP ladder"
+
+#: src/netcross_report/html_report.py
+msgid "Etat"
+msgstr "State"
+
+#: src/netcross_report/html_report.py
+msgid "Fragmentations nouvelles"
+msgstr "New fragmentations"
+
+#: src/netcross_report/html_report.py
 msgid "Genere le"
 msgstr "Generated on"
+
+#: src/netcross_report/html_report.py
+msgid "Gigue"
+msgstr "Jitter"
 
 #: src/netcross_report/html_report.py
 msgid "Information"
@@ -188,12 +292,32 @@ msgid "Message"
 msgstr "Message"
 
 #: src/netcross_report/html_report.py
+msgid "Messages SIP de l'appel, une colonne par point de capture"
+msgstr "SIP messages of the call, one column per capture point"
+
+#: src/netcross_report/html_report.py
+msgid "Metriques par segment, dans l'ordre du chemin"
+msgstr "Metrics per segment, in path order"
+
+#: src/netcross_report/html_report.py
+msgid "Paquets perdus"
+msgstr "Lost packets"
+
+#: src/netcross_report/html_report.py
 msgid "Points de capture"
 msgstr "Capture points"
 
 #: src/netcross_report/html_report.py
 msgid "Rapport Netcross"
 msgstr "Netcross report"
+
+#: src/netcross_report/html_report.py
+msgid "Retransmissions"
+msgstr "Retransmissions"
+
+#: src/netcross_report/html_report.py
+msgid "Sauts IP"
+msgstr "IP hops"
 
 #: src/netcross_report/html_report.py
 msgid "Score"
@@ -216,9 +340,67 @@ msgid "Severite"
 msgstr "Severity"
 
 #: src/netcross_report/html_report.py
+msgid ""
+"Survoler un segment, ou le selectionner au clavier (Tab puis fleches), pour "
+"voir son detail."
+msgstr ""
+"Hover over a segment, or select it with the keyboard (Tab then arrows), to "
+"see its details."
+
+#: src/netcross_report/html_report.py
 msgid "Synthese"
 msgstr "Summary"
 
 #: src/netcross_report/html_report.py
+msgid "Taux de perte"
+msgstr "Loss rate"
+
+#: src/netcross_report/html_report.py
 msgid "Tous les constats de l'analyse"
 msgstr "All findings of the analysis"
+
+#: src/netcross_report/html_report.py
+msgid "Trous noirs PMTUD"
+msgstr "PMTUD black holes"
+
+#: src/netcross_report/html_report.py
+msgid "mesure"
+msgstr "measured"
+
+#: src/netcross_report/html_report.py
+msgid "non mesurable"
+msgstr "not measurable"
+
+#: src/netcross_report/html_report.py
+msgid "non mesure"
+msgstr "not measured"
+
+#: src/netcross_report/html_report.py
+msgid "pertes"
+msgstr "loss"
+
+#: src/netcross_report/html_report.py
+msgid "reecrit"
+msgstr "rewritten"
+
+#: src/netcross_report/html_report.py
+msgid "retransmis"
+msgstr "retransmitted"
+
+#: src/netcross_report/html_report.py
+msgid "saut par saut"
+msgstr "hop by hop"
+
+#: src/netcross_report/html_report.py
+#, python-brace-format
+msgid "{n} message(s) non represente(s)."
+msgstr "{n} message(s) not shown."
+
+#: src/netcross_report/html_report.py
+#, python-brace-format
+msgid ""
+"{total} message(s) : {lost} perdu(s), {retransmitted} retransmis, "
+"{rewritten} reecrit(s)."
+msgstr ""
+"{total} message(s): {lost} lost, {retransmitted} retransmitted, {rewritten} "
+"rewritten."

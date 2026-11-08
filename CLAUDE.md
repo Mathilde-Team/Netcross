@@ -22,6 +22,13 @@ que pour un contexte spécifique, pas systématiquement.
 
 ## État courant
 
+- **Journalisation, issue #954 (08/11/2026)** : 183 traces d'entrée sans
+  argument ajoutées aux fonctions éligibles hors chemins chauds. L'audit
+  mesure désormais 9 entrées manquantes (référence abaissée de 193 à 9).
+  Le module d'amorçage `netcross_core/logging_config.py` reste inchangé :
+  journaliser avant le retrait du handler DEBUG par défaut polluerait
+  stderr en mode normal. Ces neuf fonctions restent comptées, sans
+  exclusion ni assouplissement du garde-fou. Voir la session 74.
 - **Tests** : 4057 collectés au 2026-09-25 (`pytest --collect-only -q`),
   suite complète rejouée à chaque session avant tout nouveau code. Les
   tests sautés dépendent de l'environnement (GTK4, `networkx`, `tshark`,

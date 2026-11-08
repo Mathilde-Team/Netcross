@@ -74,6 +74,7 @@ class TsharkError(RuntimeError):
     stderr pour que l'appelant puisse construire un message utile."""
 
     def __init__(self, message: str, returncode: int | None = None, stderr: str = ""):
+        logger.debug("__init__: entrée")
         super().__init__(message)
         self.returncode = returncode
         self.stderr = stderr

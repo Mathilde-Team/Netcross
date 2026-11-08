@@ -163,6 +163,7 @@ from netcross_core.stats import EXPORT_FORMATS as STATS_EXPORT_FORMATS
 from netcross_core.stats import GROUP_BY as STATS_GROUP_BY
 from netcross_core.stats import SORT_BY as STATS_SORT_BY
 from netcross_core.stats import explore_stats, render_stats, stats_format_for
+from netcross_core.streaming import DEFAULT_WINDOW_SECONDS, correlate_streaming, sources_by_point
 from netcross_core.support import (
     SCOPES as SUPPORT_SCOPES,
 )
@@ -184,6 +185,13 @@ from netcross_core.tls_keylog import (
     verifier_compatibilite,
 )
 from netcross_report.comm_map import build_comm_map, write_comm_map
+from netcross_report.metrics_export import (
+    collect_samples,
+    redact_samples,
+    render_openmetrics,
+    render_prometheus_text,
+    write_prom_file,
+)
 from netcross_report.security_report import build_security_report, print_security_report
 from netcross_report.zeek_export import ZEEK_FORMATS, build_conn_records, write_zeek_conn
 from pcap_parser.capture import split_by_interface
@@ -199,6 +207,7 @@ def _parse_live_spec(spec):
     reste intact, seuls les 2 premiers ':' sont significatifs. INTERFACE
     peut etre une source distante (issue #166) : les ':' de son hote/port
     ne comptent pas -- voir pcap_parser.remote.split_live_target."""
+    logger.debug("_parse_live_spec: entrée")
     label, sep, rest = spec.partition(":")
     iface, bpf = split_live_target(rest) if sep else ("", None)
     if not label or not iface:
@@ -223,6 +232,7 @@ def _parse_ring_buffer_spec(spec):
 
     Retourne (None, None) si spec est vide ; leve SystemExit sur format invalide.
     """
+    logger.debug("_parse_ring_buffer_spec: entrée")
     if not spec:
         logger.debug("_parse_ring_buffer_spec: si not spec -> retour tuple de 2")
         return None, None
@@ -253,6 +263,7 @@ def _load_bpf_from_library(name):
     Retourne l'expression BPF (str) ou None si le nom est vide.
     Leve SystemExit si le filtre n'est pas trouve.
     """
+    logger.debug("_load_bpf_from_library: entrée")
     if not name:
         logger.debug("_load_bpf_from_library: si not name -> retour None")
         return None
@@ -362,6 +373,7 @@ def _collect_tshark_stats(captures) -> dict:
     """Statistiques tshark -z par fichier (issue #361) : document commun a
     l'API et a la GUI (``collect_capture_stats``, issue #673) ; une capture
     en echec porte une cle `error` et un message stderr."""
+    logger.debug("_collect_tshark_stats: entrée")
     from netcross_core.tshark_stats import collect_capture_stats
 
     def _report(label, path, exc):
@@ -410,6 +422,7 @@ def _run_netflow(args) -> int:
     """Mode --netflow (issue #362) : resume d'exports NetFlow v5, sans analyse
     multi-points. Code de retour : 0, ou 1 (options incompatibles, fichier
     illisible ou tronque)."""
+    logger.debug("_run_netflow: entrée")
     import json
 
     from netcross_core.netflow import (
@@ -530,6 +543,7 @@ def _expand_split_interfaces(captures):
     segments d'une meme interface portent le meme label et sont concatenes
     comme d'habitude. Un fichier illisible est laisse tel quel : la lecture
     normale le signalera en ECHEC, comme sans l'option."""
+    logger.debug("_expand_split_interfaces: entrée")
     workdir = tempfile.mkdtemp(prefix="netcross-split-interfaces-")
     atexit.register(shutil.rmtree, workdir, True)
     expanded = []
@@ -560,6 +574,7 @@ def _run_merge(capture_specs, output_path, dedup):
     sortie et la deduplication). Les NOM= des specs ne servent a rien ici
     -- une capture fusionnee perd la notion de point de capture, c'est
     pourquoi aucune analyse n'est lancee ensuite (l'appelant retourne)."""
+    logger.debug("_run_merge: entrée")
     paths = []
     for spec in capture_specs:
         _label, spec_paths = _parse_capture_spec(spec, "--capture")
@@ -586,6 +601,7 @@ def _run_convert(capture_specs, output_path, fmt):
     """--convert : convertit UN fichier de capture vers un autre format
     (pcap, pcapng, erf) ou exporte en CSV/JSON structure, puis s'arrete
     sans lancer d'analyse. Comme --merge/--split, ne lance aucune analyse."""
+    logger.debug("_run_convert: entrée")
     if not capture_specs:
         print("--convert necessite --capture (fichier source).", file=sys.stderr)
         sys.exit(1)
@@ -621,6 +637,7 @@ def _run_export(capture_specs, output_path, bpf_filter, time_start, time_end, en
     """--export-pcap : exporte un sous-ensemble filtre de la premiere
     capture vers un nouveau fichier. Comme --merge/--split, ne lance aucune
     analyse ensuite."""
+    logger.debug("_run_export: entrée")
     if not capture_specs:
         print("--export-pcap necessite --capture (fichier source).", file=sys.stderr)
         sys.exit(1)
@@ -665,6 +682,7 @@ _SPLIT_DEFAULT_DIR = "captures_split"
 
 def _parse_size(text):
     """Voir netcross_core.capture_tools.parse_size (partage GUI/API, #869)."""
+    logger.debug("_parse_size: entrée")
     from netcross_core.capture_tools import parse_size
 
     logger.debug("_parse_size: retour parse_size(…)")
@@ -674,6 +692,7 @@ def _parse_size(text):
 def _parse_split_spec(spec):
     """MODE:VALEUR -> (mode, valeur) : netcross_core.capture_tools.parse_split_spec
     (partage avec la GUI et l'API, issue #869) ; message d'erreur puis sortie 1."""
+    logger.debug("_parse_split_spec: entrée")
     from netcross_core.capture_tools import parse_split_spec
 
     try:
@@ -692,6 +711,7 @@ def _run_split(capture_specs, split_spec, output_dir):
     echec est rapporte explicitement puis les suivants sont traites quand
     meme (meme choix que --parallel : rien ne passe sous silence, mais un
     fichier illisible n'empeche pas de decouper les autres)."""
+    logger.debug("_run_split: entrée")
     mode, value = _parse_split_spec(split_spec)
     status = 0
     for spec in capture_specs:
@@ -729,6 +749,7 @@ def _run_adjust_time(capture_specs, output_path, offset, normalize, align_to):
     """--adjust-time : ajuste les timestamps d'une capture (decalage fixe,
     normalisation ou alignement sur une autre capture). Comme --merge/--split,
     ne lance aucune analyse ensuite."""
+    logger.debug("_run_adjust_time: entrée")
     if not capture_specs:
         print("--adjust-time necessite --capture (fichier source).", file=sys.stderr)
         sys.exit(1)
@@ -772,6 +793,7 @@ def _run_replay(capture_specs, interface, speed, loop):
     fichiers a la fois n'a pas de sens pour tcpreplay (un seul flux emis,
     un seul ordre de paquets possible) -- fusionner d'abord avec --merge
     si plusieurs segments doivent etre rejoues comme un seul flux continu."""
+    logger.debug("_run_replay: entrée")
     paths = []
     for spec in capture_specs:
         _label, spec_paths = _parse_capture_spec(spec, "--capture")
@@ -801,6 +823,7 @@ def _start_ring_recorders(points, ring_buffer):
     """Issue #676 : lance un enregistreur en ring buffer par point si
     ``ring_buffer`` vaut (N, SECONDES). Renvoie {label: (processus, repertoire)}.
     Quitte avec un message si une source ne le permet pas (pipe://)."""
+    logger.debug("_start_ring_recorders: entrée")
     if not ring_buffer or ring_buffer[0] is None:
         logger.debug("_start_ring_recorders: pas de ring buffer -> retour dict vide")
         return {}
@@ -832,6 +855,7 @@ def _start_ring_recorders(points, ring_buffer):
 
 def _stop_ring_recorders(recorders):
     """Arrete les enregistreurs et affiche les fichiers conserves par point."""
+    logger.debug("_stop_ring_recorders: entrée")
     if not recorders:
         logger.debug("_stop_ring_recorders: si not recorders -> retour")
         return
@@ -858,6 +882,7 @@ def _run_live_captures(live_specs, duration, reporter=None, ring_buffer=None):
 
     ``reporter`` (issue #274, --live-report) : LiveReporter alimente paquet
     par paquet et publie a intervalle regulier pendant la capture."""
+    logger.debug("_run_live_captures: entrée")
     points = [_parse_live_spec(s) for s in live_specs]
     _check_single_stdin(points)
     stop_event = threading.Event()
@@ -1062,6 +1087,7 @@ def _available_memory_bytes() -> int | None:
     visee par install.sh. Aucune exception ne remonte : une plateforme sans
     /proc/meminfo (autre qu'Linux) degrade simplement vers "indeterminable",
     l'avertissement est alors omis plutot que de bloquer l'analyse."""
+    logger.debug("_available_memory_bytes: entrée")
     try:
         with open("/proc/meminfo") as f:
             for line in f:
@@ -1270,6 +1296,7 @@ def _parse_plugin_exports(specs: list[str], authorized: list[str]) -> list[tuple
 
 def _check_extraction_args(args) -> tuple[str, ...]:
     """Validations de l'issue #278 ; renvoie les types a extraire."""
+    logger.debug("_check_extraction_args: entrée")
     from netcross_core.extract.contents import parse_kinds
 
     if args.extract_kinds and not args.extract_contents:
@@ -1310,8 +1337,43 @@ def _check_extraction_args(args) -> tuple[str, ...]:
     return kinds
 
 
+def _run_streaming(args, all_packets, points_order, r) -> None:
+    """--streaming (issue #1022) : correlation en flux, affichee et posee
+    sur ``r.streaming`` pour --json-report."""
+    logger.debug("_run_streaming: entrée")
+    resultat = correlate_streaming(
+        sources_by_point(all_packets),
+        points_order,
+        window_seconds=args.streaming_window,
+        nat_tolerant=args.nat_tolerant,
+        nat_window_ms=args.nat_window_ms,
+        exclude_duplicates=args.exclude_duplicates,
+    )
+    print("\n" + "\n".join(resultat.summary_lines()))
+    r.streaming = resultat.to_dict()
+    logger.debug("_run_streaming: retour None")
+
+
+def _write_metrics_files(args, r, findings, redactor) -> None:
+    """--prom-file / --openmetrics-file (issue #1112) : series du catalogue
+    (#1110), etiquettes anonymisees avec --redact."""
+    logger.debug("_write_metrics_files: entrée")
+    samples = collect_samples(r, args.metrics_run, findings=findings)
+    if redactor is not None:
+        samples = redact_samples(samples, redactor)
+    commentaire = "adresses IP/MAC anonymisees (--redact)" if redactor is not None else None
+    if args.prom_file:
+        write_prom_file(render_prometheus_text(samples, comment=commentaire), args.prom_file)
+        print(f"\nMetriques Prometheus ({len(samples)} serie(s)) ecrites dans {args.prom_file}")
+    if args.openmetrics_file:
+        write_prom_file(render_openmetrics(samples), args.openmetrics_file)
+        print(f"\nMetriques OpenMetrics ({len(samples)} serie(s)) ecrites dans {args.openmetrics_file}")
+    logger.debug("_write_metrics_files: retour None")
+
+
 def _run_content_extraction(captures, out_dir, kinds) -> None:
     """Analyse qualitative / extraction des contenus (issue #278)."""
+    logger.debug("_run_content_extraction: entrée")
     from netcross_core.extract.contents import USAGE_REMINDER, format_extraction, run_extraction
 
     print("\n" + "=" * 70)
@@ -1328,6 +1390,7 @@ def _run_content_extraction(captures, out_dir, kinds) -> None:
 
 def _check_dashboard_args(args) -> None:
     """Validations de l'issue #911."""
+    logger.debug("_check_dashboard_args: entrée")
     if (args.dashboard_segment or args.dashboard_host or args.dashboard_protocol) and not args.dashboard:
         print("--dashboard-segment/--dashboard-host/--dashboard-protocol necessitent --dashboard.", file=sys.stderr)
         sys.exit(1)
@@ -1336,6 +1399,7 @@ def _check_dashboard_args(args) -> None:
 
 def _check_stats_args(args) -> None:
     """Validations de l'issue #912."""
+    logger.debug("_check_stats_args: entrée")
     modifies = (
         args.stats_group_by != "endpoint"
         or args.stats_sort != "bytes"
@@ -1353,6 +1417,7 @@ def _check_stats_args(args) -> None:
 
 def comm_map_protocols(values) -> list[str] | None:
     """Protocoles de --comm-map-protocol (repetable, virgules acceptees)."""
+    logger.debug("comm_map_protocols: entrée")
     protos = [p.strip() for v in values or [] for p in v.split(",") if p.strip()]
     logger.debug("comm_map_protocols: retour protos or None")
     return protos or None
@@ -1360,6 +1425,7 @@ def comm_map_protocols(values) -> list[str] | None:
 
 def _check_comm_map_args(args) -> None:
     """Validations de l'issue #909."""
+    logger.debug("_check_comm_map_args: entrée")
     filtres = args.comm_map_protocol or args.comm_map_top_n is not None or args.comm_map_anomalies_only
     if filtres and not args.comm_map:
         print("--comm-map-protocol/--comm-map-top-n/--comm-map-anomalies-only necessitent --comm-map.", file=sys.stderr)
@@ -1396,6 +1462,7 @@ def _check_live_report_args(args) -> None:
 
 def _start_live_report(args):
     """(LiveReporter | None, serveur HTTP | None) pour --live-report."""
+    logger.debug("_start_live_report: entrée")
     if not args.live_report:
         logger.debug("_start_live_report: si not args.live_report -> retour tuple de 2")
         return None, None
@@ -1432,6 +1499,7 @@ def _start_live_report(args):
 def _check_ai_args(args):
     """Validations de l'issue #146, AVANT l'analyse (echec immediat plutot
     qu'apres de longues minutes de lecture de capture)."""
+    logger.debug("_check_ai_args: entrée")
     requested = (
         args.ai_baseline_save or args.ai_anomalies or args.ai_training_export or args.ai_classify or args.ai_summary
     )
@@ -1482,6 +1550,7 @@ def _check_ai_args(args):
 
 
 def _run_ai(args, ai_options, report, all_packets) -> None:
+    logger.debug("_run_ai: entrée")
     import json
 
     from netcross_ai.pipeline import format_ai, run_ai
@@ -1507,6 +1576,7 @@ def _run_ai(args, ai_options, report, all_packets) -> None:
 
 def main():
     # `netcross lua-doc ...` : documentation hors ligne de l'API Lua Wireshark (issue #388)
+    logger.debug("main: entrée")
     if sys.argv[1:2] == ["lua-doc"]:
         from netcross_lua_doc_cli import main as lua_doc_main
 
@@ -1779,6 +1849,22 @@ def main():
         "(defaut: 200ms, a elargir si la latence WAN est plus grande)",
     )
     ap.add_argument(
+        "--streaming",
+        action="store_true",
+        help="Correle aussi les points en flux (issue #1022) : fusion k voies des points tries par temps, "
+        "fenetre glissante, memoire proportionnelle a la fenetre. Compteurs dans le rapport texte et la cle "
+        "`streaming` de --json-report ; toute troncature (paquet arrive apres la fermeture de son groupe) y "
+        "est signalee. Voir docs/correlation-en-flux.md.",
+    )
+    ap.add_argument(
+        "--streaming-window",
+        type=float,
+        default=DEFAULT_WINDOW_SECONDS,
+        metavar="SECONDES",
+        help=f"Largeur de la fenetre de --streaming (defaut : {DEFAULT_WINDOW_SECONDS:g} s) : au moins le "
+        "transit le plus long entre deux points, plus le delai de retransmission a rattacher.",
+    )
+    ap.add_argument(
         "--detect-duplicates",
         action="store_true",
         help="Detecte les paquets dupliques entre points de capture (meme payload "
@@ -2003,6 +2089,24 @@ def main():
         default="tsv",
         help="Format de --zeek-conn : `tsv` (defaut, en-tetes #fields/#types, lisible par zeek-cut) ou "
         "`json` (un objet par ligne, comme LogAscii::use_json).",
+    )
+    ap.add_argument(
+        "--prom-file",
+        metavar="FICHIER",
+        help="Ecrit les metriques de l'analyse au format texte Prometheus (issue #1112), pour le textfile "
+        "collector de node_exporter (fichier en .prom, ecriture atomique). Respecte --redact. "
+        "Voir docs/metriques-prometheus.md.",
+    )
+    ap.add_argument(
+        "--openmetrics-file",
+        metavar="FICHIER",
+        help="Ecrit les memes metriques au format OpenMetrics 1.0 (# UNIT, # EOF). Respecte --redact.",
+    )
+    ap.add_argument(
+        "--metrics-run",
+        metavar="ID",
+        default="netcross",
+        help="Valeur de l'etiquette `run` de --prom-file/--openmetrics-file (defaut : netcross).",
     )
     plug = ap.add_argument_group(
         "plugins (issue #284)",
@@ -2680,6 +2784,8 @@ def main():
                 ("--forensic-search", args.forensic_search),
                 ("--detail-csv", args.detail_csv),
                 ("--zeek-conn", args.zeek_conn),
+                ("--prom-file", args.prom_file),
+                ("--openmetrics-file", args.openmetrics_file),
                 ("--history-db", args.history_db),
                 ("--client-group", args.client_group),
                 ("--redact", args.redact),
@@ -2724,6 +2830,8 @@ def main():
                 ("--forensic-search", args.forensic_search),
                 ("--detail-csv", args.detail_csv),
                 ("--zeek-conn", args.zeek_conn),
+                ("--prom-file", args.prom_file),
+                ("--openmetrics-file", args.openmetrics_file),
                 ("--history-db", args.history_db),
                 ("--client-group", args.client_group),
                 ("--redact", args.redact),
@@ -2833,6 +2941,8 @@ def main():
                 ("--forensic-search", args.forensic_search),
                 ("--detail-csv", args.detail_csv),
                 ("--zeek-conn", args.zeek_conn),
+                ("--prom-file", args.prom_file),
+                ("--openmetrics-file", args.openmetrics_file),
                 ("--history-db", args.history_db),
                 ("--client-group", args.client_group),
                 ("--redact", args.redact),
@@ -3161,10 +3271,11 @@ def main():
     security_detections = []
     if args.security_report:
         for label, path in captures:
-            detections = security_findings.scan_capture_exploits(label, path)
+            detections = security_findings.scan_capture_exploits(label, path, **options_lecture(tls_keylogs, label))
             print(f"[{label}] {len(detections)} signature(s) d'exploit detectee(s) dans {path}")
             security_detections.extend(detections)
 
+    redactor = None
     if args.redact:
         redactor = redact_packets(all_packets)
         print(f"\n{len(redactor)} adresse(s) anonymisee(s) (IP/MAC) avant analyse.")
@@ -3232,6 +3343,7 @@ def main():
     if captures:
         r.capture_comments = read_capture_comments(captures)
         r.capture_infos = read_capture_infos(captures)
+        r.points_keylog = sorted(tls_keylogs)
         from netcross_core.link_speed import resolve_link_speeds
 
         r.link_speeds = resolve_link_speeds(captures, link_speed_overrides)
@@ -3244,6 +3356,8 @@ def main():
     if truncation_note:
         r.truncated = True
         r.truncation_note = truncation_note
+    if args.streaming:
+        _run_streaming(args, all_packets, points_order, r)
     marquer(mesures, "rapport")
     print_report(r)
     # Issue #910 : annotations des sidecars (GUI ou `netcross annotations`)
@@ -3418,8 +3532,8 @@ def main():
             sys.exit(1)
         quic_events = []
         for label, path in captures:
-            events = parse_quic_capture(label, path)
-            print(f"[{label}] {len(events)} paquets QUIC Initial trouves dans {path}")
+            events = parse_quic_capture(label, path, **options_lecture(tls_keylogs, label))
+            print(f"[{label}] {len(events)} paquets QUIC trouves dans {path}")
             quic_events.extend(events)
         quic_findings = diagnose_quic(quic_events, r.points)
         print_quic_diagnostics(quic_findings)
@@ -3437,6 +3551,8 @@ def main():
         zeek_records = build_conn_records(all_packets, r.points, points_order)
         write_zeek_conn(zeek_records, args.zeek_conn, args.zeek_format)
         print(f"\nJournal Zeek conn.log ({args.zeek_format}, {len(zeek_records)} ligne(s)) ecrit dans {args.zeek_conn}")
+    if args.prom_file or args.openmetrics_file:
+        _write_metrics_files(args, r, findings, redactor)
     if args.dashboard:
         import json as _json
 

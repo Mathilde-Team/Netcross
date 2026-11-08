@@ -100,6 +100,7 @@ class ModuleInfo:
 
 
 def _flatten_union(node: ast.expr) -> list[ast.expr]:
+    logger.debug("_flatten_union: entrée")
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
         logger.debug(
             "_flatten_union: si isinstance(node, ast.BinOp) and isinstance(node.op, ast.Bit… -> retour _flatten_union…"
@@ -110,6 +111,7 @@ def _flatten_union(node: ast.expr) -> list[ast.expr]:
 
 
 def _join_union(parts: list[str]) -> str:
+    logger.debug("_join_union: entrée")
     non_none = [p for p in parts if p != "None"]
     if len(non_none) == 1 and len(parts) == 2:
         logger.debug("_join_union: si len(non_none) == 1 and len(parts) == 2 -> retour non_none[0] + '?'")
@@ -120,6 +122,7 @@ def _join_union(parts: list[str]) -> str:
 
 def _annotation_text(node: ast.expr | None) -> str:
     """Rend une annotation en syntaxe mermaid (`list~str~`, `int?`)."""
+    logger.debug("_annotation_text: entrée")
     if node is None:
         logger.debug("_annotation_text: si node is None -> retour ''")
         return ""
@@ -184,6 +187,7 @@ def _safe(text: str) -> str:
 
 def _annotation_names(node: ast.expr | None) -> set[str]:
     """Tous les identifiants cites dans une annotation (y compris `\"Foo\"`)."""
+    logger.debug("_annotation_names: entrée")
     names: set[str] = set()
     if node is None:
         logger.debug("_annotation_names: si node is None -> retour names")
@@ -208,6 +212,7 @@ def _annotation_names(node: ast.expr | None) -> set[str]:
 
 def _iter_toplevel(body: list[ast.stmt]):
     """Instructions de premier niveau, y compris sous `if`/`try` (gardes d'import)."""
+    logger.debug("_iter_toplevel: entrée")
     for node in body:
         yield node
         if isinstance(node, ast.If):
@@ -223,6 +228,7 @@ def _iter_toplevel(body: list[ast.stmt]):
 
 
 def _decorator_name(dec: ast.expr) -> str:
+    logger.debug("_decorator_name: entrée")
     target = dec.func if isinstance(dec, ast.Call) else dec
     if isinstance(target, ast.Name):
         logger.debug("_decorator_name: si isinstance(target, ast.Name) -> retour target.id")
@@ -240,6 +246,7 @@ def _is_true(node: ast.expr) -> bool:
 
 
 def _function_line(fn: ast.FunctionDef | ast.AsyncFunctionDef, *, is_method: bool) -> str:
+    logger.debug("_function_line: entrée")
     params = [a.arg for a in (*fn.args.posonlyargs, *fn.args.args)]
     if is_method and params and params[0] in ("self", "cls"):
         params = params[1:]
@@ -256,6 +263,7 @@ def _function_line(fn: ast.FunctionDef | ast.AsyncFunctionDef, *, is_method: boo
 
 
 def _extract_class(node: ast.ClassDef, module: str) -> ClassInfo:
+    logger.debug("_extract_class: entrée")
     info = ClassInfo(
         name=node.name,
         module=module,
@@ -292,6 +300,7 @@ def _extract_class(node: ast.ClassDef, module: str) -> ClassInfo:
 
 
 def _first_sentence(doc: str | None, module_name: str) -> str:
+    logger.debug("_first_sentence: entrée")
     if not doc:
         logger.debug("_first_sentence: si not doc -> retour ''")
         return ""
@@ -311,6 +320,7 @@ def _first_sentence(doc: str | None, module_name: str) -> str:
 
 
 def _module_name(rel: Path) -> str:
+    logger.debug("_module_name: entrée")
     parts = list(rel.with_suffix("").parts)
     if parts[-1] == "__init__":
         parts = parts[:-1]
@@ -326,6 +336,7 @@ def _group_of(rel: Path) -> str:
 
 
 def extract_module(path: Path, src: Path) -> ModuleInfo:
+    logger.debug("extract_module: entrée")
     rel = path.relative_to(src)
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     name = _module_name(rel)
@@ -357,6 +368,7 @@ def collect_modules(src: Path) -> list[ModuleInfo]:
 
 
 def _group_sort_key(group: str) -> tuple[int, str]:
+    logger.debug("_group_sort_key: entrée")
     top = group.split(".")[0]
     if top in LAYER_ORDER:
         logger.debug("_group_sort_key: si top in LAYER_ORDER -> retour tuple de 2")
@@ -366,6 +378,7 @@ def _group_sort_key(group: str) -> tuple[int, str]:
 
 
 def _stereotype(cls: ClassInfo, local_names: set[str]) -> str:
+    logger.debug("_stereotype: entrée")
     parts: list[str] = []
     if cls.is_dataclass:
         parts.append("dataclass")
@@ -379,6 +392,7 @@ def _stereotype(cls: ClassInfo, local_names: set[str]) -> str:
 
 def _class_ids(modules: list[ModuleInfo]) -> dict[tuple[str, str], str]:
     """Identifiant mermaid par (module, classe) : le nom seul s'il est unique dans src/."""
+    logger.debug("_class_ids: entrée")
     counts: dict[str, int] = {}
     for m in modules:
         for c in m.classes:
@@ -393,6 +407,7 @@ def _class_ids(modules: list[ModuleInfo]) -> dict[tuple[str, str], str]:
 
 
 def _render_class(cls: ClassInfo, cid: str, local_names: set[str], indent: str = "    ") -> list[str]:
+    logger.debug("_render_class: entrée")
     head = f"{indent}class {cid}" if cid == cls.name else f'{indent}class {cid}["{cls.module}.{cls.name}"]'
     stereo = _stereotype(cls, local_names)
     members = [*cls.fields, *cls.methods]
@@ -409,6 +424,7 @@ def _render_class(cls: ClassInfo, cid: str, local_names: set[str], indent: str =
 
 
 def _render_block(modules: list[ModuleInfo], ids: dict[tuple[str, str], str]) -> str:
+    logger.debug("_render_block: entrée")
     lines = ["classDiagram", "    direction LR"]
     local: dict[str, tuple[ModuleInfo, ClassInfo]] = {}
     for m in modules:
@@ -453,6 +469,7 @@ def _render_block(modules: list[ModuleInfo], ids: dict[tuple[str, str], str]) ->
 
 def _chunk_modules(modules: list[ModuleInfo], ids: dict[tuple[str, str], str]) -> list[str]:
     """Blocs mermaid d'un groupe, coupes par modules entiers sous MAX_BLOCK_CHARS."""
+    logger.debug("_chunk_modules: entrée")
     drawable = [m for m in modules if m.classes or m.functions]
     blocks: list[str] = []
     chunk: list[ModuleInfo] = []
@@ -489,6 +506,7 @@ def _render_inter_module_relations(modules: list[ModuleInfo], ids: dict[tuple[st
     """
     # Index global : nom de classe -> (module, ClassInfo) pour résolution
     # des références (un nom peut exister dans plusieurs modules).
+    logger.debug("_render_inter_module_relations: entrée")
     global_index: dict[str, list[tuple[ModuleInfo, ClassInfo]]] = {}
     for m in modules:
         for c in m.classes:
@@ -552,6 +570,7 @@ def _render_inter_module_relations(modules: list[ModuleInfo], ids: dict[tuple[st
 
 
 def _render_package_graph(modules: list[ModuleInfo]) -> str:
+    logger.debug("_render_package_graph: entrée")
     counts: dict[tuple[str, str], int] = {}
     for m in modules:
         origin = m.group.split(".")[0] if m.group != CLI_GROUP else CLI_GROUP
@@ -571,6 +590,7 @@ def _render_package_graph(modules: list[ModuleInfo]) -> str:
 
 
 def render_document(modules: list[ModuleInfo]) -> str:
+    logger.debug("render_document: entrée")
     ids = _class_ids(modules)
     groups: dict[str, list[ModuleInfo]] = {}
     for m in modules:
@@ -648,6 +668,7 @@ def render_document(modules: list[ModuleInfo]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     parser = argparse.ArgumentParser(description="Genere docs/class-diagram.md depuis src/.")
     parser.add_argument("--src", type=Path, default=DEFAULT_SRC, help="racine des sources (defaut : src/)")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="fichier genere")

@@ -249,6 +249,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         "le délai bout en bout dépend du décalage d'horloge estimé par handshake",
     ),
     Detecteur(
+        "rtp_match",
+        PHASE,
+        FENETRE_BORNEE,
+        "par jambe RTP (point, 5-tuple, SSRC) : couples (séquence, horodatage RTP)",
+        "durée du flux RTP, plus 5 s de recouvrement entre jambes",
+        ("rtp_matches",),
+        "appariement entre points malgré NAT/SBC (#1121) : décalage constant de séquence et d'horodatage",
+    ),
+    Detecteur(
         "response_time",
         PHASE,
         FENETRE_BORNEE,
@@ -271,6 +280,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         "messages par Call-ID et par point",
         "durée de l'appel",
         ("sip_missing", "sip_setup_duration_ms", "sip_failed_calls"),
+    ),
+    Detecteur(
+        "sip_ladder",
+        PHASE,
+        FENETRE_BORNEE,
+        "messages par Call-ID, par message (méthode + CSeq) et par point",
+        "durée de l'appel",
+        ("sip_ladders",),
+        "échelle SIP multi-points (#1125) : message perdu, retransmis ou réécrit (SDP, Via, Contact)",
     ),
     Detecteur(
         "build_calls",

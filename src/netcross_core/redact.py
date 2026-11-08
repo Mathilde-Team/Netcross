@@ -87,6 +87,9 @@ _IPV4_BLOCK_SIZE = 254  # .1 a .254 par bloc -- .0/.255 evites (reseau/diffusion
 _IPV4_DOC_CAPACITY = len(_IPV4_DOC_BLOCKS) * _IPV4_BLOCK_SIZE  # 762
 
 _MAC_RE = re.compile(r"^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$")
+# Adresse IPv4, ou IPv6 entre crochets (forme imposee dans une URI SIP,
+# RFC 3261 25.1), dans le texte d'un en-tete Via/Contact (issue #1125).
+_SIP_ADDR_RE = re.compile(r"\[([0-9A-Fa-f:.]+)\]|(?<![\w.])(\d{1,3}(?:\.\d{1,3}){3})(?![\w.])")
 
 
 def _ipv4_pseudonym(index: int) -> str:
@@ -180,6 +183,20 @@ class AddressRedactor:
         logger.debug("AddressRedactor.pseudonymize_name: retour {}", summarize(pseudo, "pseudo"))
         return pseudo
 
+    def pseudonymize_address(self, value: str) -> str:
+        """Pseudonyme d'une adresse IP ou MAC isolee (meme table que les
+        paquets) ; une valeur qui n'est pas une adresse est rendue telle
+        quelle. Sert aux sorties dont une etiquette peut reprendre une
+        adresse, comme les metriques Prometheus (#1112)."""
+        logger.debug("AddressRedactor.pseudonymize_address: debut")
+        kind = "mac" if _is_mac(value) else _ip_kind(value)
+        if kind is None:
+            logger.debug("AddressRedactor.pseudonymize_address: si pas une adresse -> retour inchange")
+            return value
+        pseudo = self._pseudonym(value, kind)
+        logger.debug("AddressRedactor.pseudonymize_address: retour pseudonyme")
+        return pseudo
+
     def redact(self, packets) -> None:
         """Mutation en place de chaque paquet de `packets` (Pkt ou
         RawPacket, voir docstring de module)."""
@@ -222,11 +239,39 @@ class AddressRedactor:
                 for addr, port in sdp_media
             )
 
+        # Issue #1125 : adresses des en-tetes Via/Contact, meme pseudonyme
+        # que src/dst pour que la comparaison entre points reste exacte.
+        if getattr(pk, "sip_via", None):
+            pk.sip_via = self._redact_sip_header(pk.sip_via)
+        if getattr(pk, "sip_contact", None):
+            pk.sip_contact = self._redact_sip_header(pk.sip_contact)
+
         if pk.stp_root_id is not None and "/" in pk.stp_root_id:
             prio, _sep, mac = pk.stp_root_id.partition("/")
             if _is_mac(mac):
                 pk.stp_root_id = f"{prio}/{self._pseudonym(mac, 'mac')}"
         logger.debug("AddressRedactor._redact_one: fin")
+
+    def _redact_sip_header(self, text: str) -> str:
+        """Remplace chaque adresse IP d'un en-tete Via/Contact par son
+        pseudonyme ; le reste du texte (utilisateur, parametres) est garde,
+        comme les autres identifiants SIP (voir le perimetre ci-dessus)."""
+        logger.debug("AddressRedactor._redact_sip_header: entrée ({} caractere(s))", len(text))
+
+        def remplace(m: re.Match) -> str:
+            logger.debug("AddressRedactor._redact_sip_header.remplace: entrée")
+            addr = m.group(1) or m.group(2)
+            kind = _ip_kind(addr)
+            if kind is None:
+                logger.debug("AddressRedactor._redact_sip_header.remplace: si pas une IP -> retour texte inchange")
+                return m.group(0)
+            pseudo = self._pseudonym(addr, kind)
+            logger.debug("AddressRedactor._redact_sip_header.remplace: retour pseudonyme")
+            return f"[{pseudo}]" if m.group(1) else pseudo
+
+        resultat = _SIP_ADDR_RE.sub(remplace, text)
+        logger.debug("AddressRedactor._redact_sip_header: retour texte redige")
+        return resultat
 
     def entries(self):
         """Tuples (valeur_reelle, pseudonyme, type) : adresses triees par

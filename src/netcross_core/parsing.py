@@ -138,6 +138,8 @@ def _to_pkt(label: str, raw: RawPacket) -> Pkt:
         tcp_len=raw.tcp_len,
         dns_answers=raw.dns_answers,
         sip_sdp_media=raw.sip_sdp_media,
+        sip_via=raw.sip_via,
+        sip_contact=raw.sip_contact,
         radio=raw.radio,
         comment=raw.comment,
         ip_checksum=raw.ip_checksum,
@@ -146,6 +148,12 @@ def _to_pkt(label: str, raw: RawPacket) -> Pkt:
         tcp_checksum_bad=raw.tcp_checksum_bad,
         udp_checksum=raw.udp_checksum,
         udp_checksum_bad=raw.udp_checksum_bad,
+        tls_stream=raw.tls_stream,
+        tls_dechiffre=raw.tls_dechiffre,
+        quic_connexion=raw.quic_connexion,
+        quic_dechiffre=raw.quic_dechiffre,
+        quic_court=raw.quic_court,
+        quic_fermeture=raw.quic_fermeture,
         tls_cert_issuer=raw.tls_cert_issuer,
         tls_cert_subject=raw.tls_cert_subject,
         tls_cert_sig_hash=raw.tls_cert_sig_hash,
@@ -416,6 +424,7 @@ def parse_live_multi(interfaces, stop_event=None, *, bpf_filter=None):
 
 
 def parse_rtp(payload: bytes):
+    logger.debug("parse_rtp: entrée")
     from pcap_parser.protocols import _parse_rtp_heuristic
 
     logger.debug("parse_rtp: retour _parse_rtp_heuristic(…)")
@@ -423,6 +432,7 @@ def parse_rtp(payload: bytes):
 
 
 def parse_sip(payload: bytes):
+    logger.debug("parse_sip: entrée")
     from pcap_parser.protocols import _parse_sip_heuristic
 
     logger.debug("parse_sip: retour _parse_sip_heuristic(…)")

@@ -34,12 +34,14 @@ from pcap_parser.ek_fields import (
     layer,
 )
 from pcap_parser.protocols import (
+    extract_dechiffrement,
     extract_dhcp,
     extract_dns,
     extract_http,
     extract_rtp,
     extract_sdp_media,
     extract_sip,
+    extract_sip_route_headers,
     extract_tls_certificate,
     extract_tls_handshake,
 )
@@ -308,6 +310,10 @@ class RawPacket:
     # message SIP (issue #1120) : tuple vide hors SIP avec SDP. Voir
     # protocols.extract_sdp_media.
     sip_sdp_media: tuple[tuple[str, int], ...] = ()
+    # Premier en-tete Via et en-tete Contact d'un message SIP (issue
+    # #1125) : None hors SIP. Voir protocols.extract_sip_route_headers.
+    sip_via: str | None = None
+    sip_contact: str | None = None
     # Metadonnees radio 802.11 (RSSI, MCS, debit, retry, canal -- issue
     # #1142) : None hors capture 802.11. Voir pcap_parser.radio.
     radio: RadioInfo | None = None
@@ -331,6 +337,18 @@ class RawPacket:
     tcp_checksum_bad: bool | None = None
     udp_checksum: str | None = None
     udp_checksum_bad: bool | None = None
+    # -- Dechiffrement TLS/QUIC (issue #1043, voir protocols.
+    # extract_dechiffrement) : identifiant de session dans la capture
+    # (tls.stream, quic.connection.number) et preuve que tshark a dechiffre
+    # ce paquet (keylog ou DSB). None/False hors TLS/QUIC.
+    tls_stream: int | None = None
+    tls_dechiffre: bool = False
+    quic_connexion: int | None = None
+    quic_dechiffre: bool = False
+    # Issue #1045 : paquet a en-tete court (1-RTT), dechiffre ou non, et
+    # trame CONNECTION_CLOSE lisible (« applicatif 0x42 (raison) »).
+    quic_court: bool = False
+    quic_fermeture: str | None = None
 
 
 # Cles de couches EK dont le "_ws_expert" est collecte en plus des couches
@@ -544,6 +562,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
     dhcp_xid = dhcp_msg_type = dhcp_server_id = dhcp_vendor_class = None
     sip_call_id = sip_msg_type = sip_cseq = sip_user_agent = sip_server = None
     sip_sdp_media: tuple[tuple[str, int], ...] = ()
+    sip_via = sip_contact = None
     dns_txn_id = dns_qry_name = dns_rcode = None
     dns_is_response = False
     dns_answers: tuple[str, ...] = ()
@@ -681,6 +700,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
             sip_user_agent = _intern(sip["user_agent"])
             sip_server = _intern(sip["server"])
             sip_sdp_media = extract_sdp_media(payload)
+            sip_via, sip_contact = extract_sip_route_headers(payload)
 
     if proto in ("TCP", "UDP"):
         # Contrairement a extract_sip ci-dessus, extract_dns ne lit que la
@@ -789,6 +809,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
     )
 
     key_id = seq if proto == "TCP" else ip_id
+    dechiffrement = extract_dechiffrement(layers) or {}
     phash = hashlib.md5(payload).hexdigest() if payload else None
     # Issue #351 : entropie de Shannon sur les octets du payload
     pentropy = _byte_entropy(payload) if payload else 0.0
@@ -881,6 +902,8 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
         tcp_len=tcp_len,
         dns_answers=dns_answers,
         sip_sdp_media=sip_sdp_media,
+        sip_via=sip_via,
+        sip_contact=sip_contact,
         radio=extract_radio(layers),
         ip_checksum=ip_checksum,
         ip_checksum_bad=ip_checksum_bad,
@@ -888,4 +911,10 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
         tcp_checksum_bad=tcp_checksum_bad,
         udp_checksum=udp_checksum,
         udp_checksum_bad=udp_checksum_bad,
+        tls_stream=dechiffrement.get("tls_stream"),
+        tls_dechiffre=dechiffrement.get("tls_dechiffre", False),
+        quic_connexion=dechiffrement.get("quic_connexion"),
+        quic_dechiffre=dechiffrement.get("quic_dechiffre", False),
+        quic_court=dechiffrement.get("quic_court", False),
+        quic_fermeture=dechiffrement.get("quic_fermeture"),
     )

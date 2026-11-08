@@ -9,6 +9,7 @@ import csv
 import statistics
 from collections import Counter, defaultdict
 
+from netcross_core.dechiffrement import lignes as lignes_dechiffrement
 from netcross_core.forensic import annotations_by_tag
 from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import (
@@ -264,6 +265,14 @@ def print_report(r: Report):
             vitesse = f"{format_speed(speed)} (source : {fiche.get('speed_source')})" if speed else "inconnue"
             tick = f", horodatage au {resolution:g} s" if resolution else ""
             print(f"  {point_label} : {vitesse}{tick}")
+
+    couverture = lignes_dechiffrement(r)
+    if couverture:
+        # Issue #1043 : couverture du dechiffrement TLS/QUIC par point --
+        # section absente sans fichier de cles ni session dechiffree.
+        print("\n-- Dechiffrement TLS / QUIC --")
+        for ligne in couverture:
+            print(f"  {ligne}")
 
     if r.capture_infos:
         # Job 38/issue #158 -- metadonnees de capture (format, snaplen,
@@ -1056,6 +1065,7 @@ def load_capture_annotations(captures) -> dict[str, list[PacketAnnotation]]:
     regroupees par point (issue #910). Un point sans sidecar n'apparait pas ;
     un sidecar illisible est signale dans le journal et ignore -- une
     annotation reste facultative, elle n'interrompt jamais le rapport."""
+    logger.debug("load_capture_annotations: entrée")
     from netcross_core.forensic import read_annotations
 
     by_point: dict[str, list[PacketAnnotation]] = {}
@@ -1074,6 +1084,7 @@ def load_capture_annotations(captures) -> dict[str, list[PacketAnnotation]]:
 def print_capture_annotations(by_point: dict[str, list[PacketAnnotation]]) -> None:
     """Section annotations du rapport texte de la CLI (issue #910), un bloc
     par point annote ; rien n'est affiche s'il n'y a aucune annotation."""
+    logger.debug("print_capture_annotations: entrée")
     if not by_point:
         logger.debug("print_capture_annotations: aucune annotation -> retour")
         return

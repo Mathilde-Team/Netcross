@@ -45,3 +45,6 @@ mypy>=1.10
 # stix2-validator : validation des bundles STIX 2.1 dans les tests (issue
 # #279). 3.3.x est publie sans les schemas OASIS, d'ou la borne haute.
 stix2-validator>=3.2,<3.3
+# prometheus-client : parseurs de reference Prometheus / OpenMetrics pour
+# valider le fichier .prom et le texte OpenMetrics dans les tests (issue #1112).
+prometheus-client>=0.20

@@ -33,6 +33,7 @@ logger = get_logger(__name__)
 
 class AnnotationsPanel(Gtk.Box):
     def __init__(self):
+        logger.debug("__init__: entrée")
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         logger.debug("AnnotationsPanel: construction du panneau")
         for side in ("top", "bottom", "start", "end"):

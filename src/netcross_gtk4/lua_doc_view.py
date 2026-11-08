@@ -43,6 +43,7 @@ class LuaDocBrowser:
         source: str | Path | None = None,
         find_json: Callable[[], Path | None] | None = None,
     ) -> None:
+        logger.debug("__init__: entrée")
         json_path = Path(source) if source else (find_json or lua_doc.find_json)()
         if json_path is None or not json_path.is_file():
             emplacements = ", ".join(str(p) for p in lua_doc.json_candidates())

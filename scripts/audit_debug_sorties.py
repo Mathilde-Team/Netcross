@@ -33,6 +33,7 @@ RAISE_OK = {"debug", "info", "warning", "error", "exception", "critical"}
 
 
 def _log_level(stmt: ast.stmt | None) -> str | None:
+    logger.debug("_log_level: entrée")
     if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call) and isinstance(stmt.value.func, ast.Attribute):
         base = stmt.value.func.value
         # logger.debug(...) ou logger.opt(...).debug(...)
@@ -48,6 +49,7 @@ def _log_level(stmt: ast.stmt | None) -> str | None:
 
 
 def _can_fall_through(body: list[ast.stmt]) -> bool:
+    logger.debug("_can_fall_through: entrée")
     if not body:
         logger.debug("_can_fall_through: si not body -> retour True")
         return True
@@ -84,6 +86,7 @@ def _can_fall_through(body: list[ast.stmt]) -> bool:
 
 
 def _is_stub(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    logger.debug("_is_stub: entrée")
     for dec in fn.decorator_list:
         name = dec.attr if isinstance(dec, ast.Attribute) else getattr(dec, "id", None)
         if name == "overload":
@@ -108,6 +111,7 @@ def _is_stub(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
 def _blocks(node: ast.AST):
     """Tous les blocs d'instructions de la fonction, sans descendre dans
     les fonctions/classes imbriquées (elles sont auditées à part)."""
+    logger.debug("_blocks: entrée")
     for field in ("body", "orelse", "finalbody"):
         block = getattr(node, field, None)
         if isinstance(block, list) and block and isinstance(block[0], ast.stmt):
@@ -130,6 +134,7 @@ def _blocks(node: ast.AST):
 
 def audit_function(fn) -> tuple[int, list[tuple[int, str]]]:
     """Renvoie (nombre de sorties, sorties non conformes [(ligne, type)])."""
+    logger.debug("audit_function: entrée")
     exits = 0
     bad: list[tuple[int, str]] = []
     for block in _blocks(fn):
@@ -150,6 +155,8 @@ def audit_function(fn) -> tuple[int, list[tuple[int, str]]]:
 
 
 def qualname_walk(tree: ast.Module):
+    logger.debug("qualname_walk: entrée")
+
     def rec(node, prefix):
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):

@@ -46,6 +46,7 @@ logger = get_logger(__name__)
 
 
 def main():
+    logger.debug("main: entrée")
     ap = argparse.ArgumentParser(description="Interroge un historique netcross (--history-db) sans relancer d'analyse.")
     ap.add_argument(
         "--db",

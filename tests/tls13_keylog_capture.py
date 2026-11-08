@@ -130,19 +130,14 @@ def _trame(src, dst, seq: int, ack: int, drapeaux: int, charge: bytes, ident: in
     return dst[2] + src[2] + b"\x08\x00" + ip + tcp
 
 
-def ecrire_capture(dossier: Path) -> tuple[Path, Path]:
-    """Écrit ``tls13.pcap`` et ``keys.txt`` dans ``dossier`` ; renvoie leurs chemins."""
-    dossier.mkdir(parents=True, exist_ok=True)
-    keylog = dossier / "keys.txt"
-    echanges = _session_tls13(dossier, keylog)
-
+def _trames_session(client, echanges: list[tuple[bool, bytes]], ident: int) -> list[bytes]:
+    """Trames Ethernet/IPv4/TCP d'une session (SYN, SYN-ACK, ACK puis les échanges)."""
     seq = {True: 1000, False: 5000}
     trames: list[bytes] = []
-    ident = 1
 
     def ajouter(du_client: bool, drapeaux: int, charge: bytes = b"") -> None:
         nonlocal ident
-        src, dst = (CLIENT, SERVEUR) if du_client else (SERVEUR, CLIENT)
+        src, dst = (client, SERVEUR) if du_client else (SERVEUR, client)
         ack = seq[not du_client] if drapeaux & 0x10 else 0
         trames.append(_trame(src, dst, seq[du_client], ack, drapeaux, charge, ident))
         ident += 1
@@ -154,11 +149,41 @@ def ecrire_capture(dossier: Path) -> tuple[Path, Path]:
     for du_client, donnees in echanges:
         for debut in range(0, len(donnees), 1400):
             ajouter(du_client, 0x18, donnees[debut : debut + 1400])
+    return trames
 
-    capture = dossier / "tls13.pcap"
+
+def _ecrire_pcap(capture: Path, trames: list[bytes]) -> None:
     with capture.open("wb") as f:
         f.write(struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1))
         for i, trame in enumerate(trames):
             f.write(struct.pack("<IIII", 1_700_000_000, i * 1000, len(trame), len(trame)))
             f.write(trame)
+
+
+def ecrire_capture(dossier: Path) -> tuple[Path, Path]:
+    """Écrit ``tls13.pcap`` et ``keys.txt`` dans ``dossier`` ; renvoie leurs chemins."""
+    dossier.mkdir(parents=True, exist_ok=True)
+    keylog = dossier / "keys.txt"
+    echanges = _session_tls13(dossier, keylog)
+    capture = dossier / "tls13.pcap"
+    _ecrire_pcap(capture, _trames_session(CLIENT, echanges, 1))
     return capture, keylog
+
+
+def ecrire_capture_sessions(dossier: Path, n_sessions: int) -> tuple[Path, list[Path]]:
+    """Issue #1043 : ``n_sessions`` sessions TLS 1.3 successives (ports client
+    50000, 50001...) dans ``multi.pcap`` ; renvoie la capture et le fichier de
+    clés propre à chaque session (``keys-<i>.txt``), pour fabriquer un
+    keylog qui ne couvre qu'une partie des sessions."""
+    dossier.mkdir(parents=True, exist_ok=True)
+    trames: list[bytes] = []
+    keylogs: list[Path] = []
+    for i in range(n_sessions):
+        keylog = dossier / f"keys-{i}.txt"
+        echanges = _session_tls13(dossier, keylog)
+        client = (CLIENT[0], CLIENT[1] + i, CLIENT[2])
+        trames += _trames_session(client, echanges, len(trames) + 1)
+        keylogs.append(keylog)
+    capture = dossier / "multi.pcap"
+    _ecrire_pcap(capture, trames)
+    return capture, keylogs

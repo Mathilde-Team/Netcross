@@ -405,6 +405,7 @@ class _SegmentSink:
     un paquet ne se coupe pas)."""
 
     def __init__(self, prefix: str, ext: str, max_bytes: int):
+        logger.debug("__init__: entrée")
         self._prefix = prefix
         self._ext = ext
         self._max_bytes = max_bytes

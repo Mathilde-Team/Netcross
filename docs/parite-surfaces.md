@@ -14,7 +14,7 @@ ici fait donc échouer la CI.
 
 | Surface | Points d'entrée | Capacités |
 |---|---|---|
-| CLI | `cross_capture_analyzer_cli.py` (130 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
+| CLI | `cross_capture_analyzer_cli.py` (135 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 3 pages, 44 cases à cocher, 31 réglages numériques | Analyse interactive et exploration visuelle |
 | API | 62 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) |
 
@@ -46,6 +46,7 @@ actif, non réglable.
 | Ordre des points imposé | oui (ordre de la liste) | `--order` | `points_order` |
 | Topologie déduite automatiquement | oui (case « Deduire la topologie automatiquement ») | oui (sans `--order`) | oui (sans `points_order`) |
 | Tolérance NAT | oui (« Correlation tolérante au NAT ») | `--nat-tolerant`, `--nat-window-ms` (fenêtre : les trois surfaces, « Fenêtre NAT (ms) » dans la GUI) | `nat_tolerant`, `nat_window_ms` |
+| Corrélation en flux par fenêtre glissante | non | `--streaming`, `--streaming-window` (issue #1022) | non |
 | Doublons inter-captures | oui (« Détecter... », « Exclure... », seuil) | `--detect-duplicates`, `--exclude-duplicates`, `--duplicate-threshold-ms` | `detect_duplicates`, `exclude_duplicates`, `duplicate_threshold_ms` (#330, #841) |
 | Lecture parallèle | oui (« Lecture parallele des captures », nombre « Lecteurs paralleles » en analyse simple, issue #672) | `--parallel`, `--parallel-workers` | `parallel_workers` (issue #672) |
 | Fenêtre temporelle du débit | oui | `--bucket-ms` | `bucket_ms` (#330, #841) |
@@ -68,6 +69,7 @@ actif, non réglable.
 | Rapport de sécurité (détecteurs, signatures d'exploit, CVE) | oui (« Rapport de securite ») | `--security-report` | auto (toujours exécuté, sauf avec `redact`), `GET /analyses/{analysis_id}/security` |
 | Base CVE complète (NVD) | oui (« Base CVE... », avec « Rapport de securite » ; issue #672) | `--cve-db` | variable de serveur `NETCROSS_CVE_DB`, sinon base embarquée (issue #672) |
 | Déchiffrement TLS par fichier de clés (SSLKEYLOGFILE) | oui (« Cles TLS... » de la configuration : un fichier pour tous les points ; refusé avec l'anonymisation ; issue #1040) | `--tls-keylog FICHIER` (tous les points) ou `NOM=FICHIER` (un point), répétable, refusé avec `--redact` | `tls_keylog` (fichier(s) joint(s), copie temporaire 0600 supprimée en fin d'analyse) et `tls_keylog_labels` (un point par fichier, `*` = tous) ; refusé avec `redact` (issue #1040) |
+| Couverture du déchiffrement TLS/QUIC par point (« k/n sessions TLS déchiffrées au point X ») | oui (rapport texte et PDF de l'analyse ; issue #1043) | rapport texte, `--pdf-report`, `--json-report` (clé `decryption`) | rapport, PDF et JSON (clé `decryption`) |
 | Destinations et hôtes connus (sécurité) | oui (« Destinations connues... », « Hotes connus... », avec « Rapport de securite » ; issue #672) | `--known-destinations`, `--known-hosts` | `known_destinations`, `known_hosts` (fichiers joints, issue #672) |
 | Moteur de règles | oui (case « Moteur de regles », section du rapport ; issue #673) | `--rule-engine` | `rule_engine` (clé `rule_engine` de `/report`, issue #673) |
 | Section expertise détaillée | oui (case « Section expertise », section du rapport ; issue #673) | `--expert-section` | `expert_section` (issue #673) |
@@ -98,6 +100,7 @@ actif, non réglable.
 | Cartographie des communications (qui parle à qui, anomalies en rouge) | oui (vue « Cartographie » : filtres protocole, Top-N, « Anomalies seulement ») | `--comm-map FICHIER` (DOT Graphviz si `.dot`/`.gv`, JSON sinon), `--comm-map-protocol`, `--comm-map-top-n`, `--comm-map-anomalies-only` (issue #909) | `GET /analyses/{analysis_id}/comm-map` : `protocol`, `top_n`, `anomalies_only`, `format` (`json` ou `dot` ; issue #909) |
 | Export SIEM (CEF, LEEF, STIX) | oui (panneau « SIEM, ticket de support, historique » de la page Résultats, après un rapport de sécurité, même fichier ; issue #674) | `--siem-export`, `--siem-output` | `GET /analyses/{analysis_id}/siem` (issue #674), `format` |
 | Journaux de flux Zeek conn.log (TSV, JSON) | non | `--zeek-conn`, `--zeek-format` (issue #1115) | non |
+| Métriques Prometheus / OpenMetrics (fichier .prom) | non | `--prom-file`, `--openmetrics-file`, `--metrics-run` (issue #1112) | non |
 | Historique SQLite | oui (« Historique... » et « Etiquette » de la configuration, derniers runs dans le panneau « SIEM, ticket de support, historique » ; issue #674) | `--history-db`, `--history-label`, `--history-show` ; `netcross-history` | `history`, `history_label` de `POST /captures` et `POST /captures/multi` (base fixée par `NETCROSS_HISTORY_DB`, `history_id` ou `history_error` dans le résumé ; issue #890), consultation `GET /history` ; persistance propre des analyses (`NETCROSS_DB_PATH`), `GET /analyses` |
 | Ticket de support anonymisé | oui (case de consentement et « Ticket de support... » du panneau « SIEM, ticket de support, historique », ticket « diagnostic », toutes portées ; issue #674) | `--support-ticket`, `--support-consent`, `--support-scope`, `--support-map`, `--support-marker` | `POST /analyses/{analysis_id}/support-ticket` (issue #674), `consent`, `kind`, `scopes`, `marker`, `include_map` (issue #877) |
 
