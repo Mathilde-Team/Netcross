@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de couverture de netcross_core/analysis.py (issue #697, suite #665).
 
 Chemins rares, testes directement sur les fonctions internes :
@@ -184,7 +185,9 @@ def test_rtp_sequence_absente_rebouclage_arriere_et_decalage_horloge():
         make_pkt(point="B", ts=1.030, rtp_seq=65535, rtp_ts=0, **base),
     ]
     r = Report(points=["A", "B"], pairs=[("A", "B")])
-    r.clock_offset_estimate[("A", "B")] = (4.0, 0.0)
+    from netcross_core.clock_sync import EstimationHorloge
+
+    r.clock_offset_estimate[("A", "B")] = EstimationHorloge(decalage_ms=4.0, t0=1.0)
     analysis._analyse_rtp(r, pkts, ["A", "B"], ["A", "B"], 8000)
     (flux,) = r.rtp_streams
     assert flux["loss_pct"]["B"] == 0.0

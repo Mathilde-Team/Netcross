@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Coherence de l'API publique de pcap_parser (`__all__` vs imports reels).
 
 Regression : apres la fusion defectueuse f1f67dc (PR #190), `__all__` listait

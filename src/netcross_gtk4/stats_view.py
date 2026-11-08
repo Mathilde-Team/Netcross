@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.stats_view -- logique de presentation pour la vue
 d'exploration statistique (Job 27 / issue #22, section 6.8).
 
@@ -219,6 +220,7 @@ def build_events_by_segment(
     """Index evenement -> segment : voir netcross_core.stats (issue #912,
     meme calcul pour la GUI, la CLI et l'API). ``flows`` est garde pour
     compatibilite des appelants."""
+    logger.debug("build_events_by_segment: retour _core_events_by_segment(…)")
     return _core_events_by_segment(findings)
 
 

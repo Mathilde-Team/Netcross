@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.siem_export -- export des constats de securite pour
 integration SIEM : CEF (issue #170), LEEF 2.0 et STIX 2.1 (issue #279).

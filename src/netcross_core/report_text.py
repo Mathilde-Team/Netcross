@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.report_text -- mise en forme du Report en sortie texte
 console et en CSV de detail. Le rendu PDF (a venir) consommera le meme
@@ -144,24 +145,31 @@ def _print_multi_point_sections(r: Report):
             f"  {a} -> {b} : n={len(vals)}  moy={avg:.2f}ms  "
             f"min={min(vals):.2f}ms  max={max(vals):.2f}ms  gigue={jitter:.2f}ms"
         )
-        offset_info = r.clock_offset_estimate.get((a, b))
-        if offset_info:
-            mean_off, stdev_off, n_off = offset_info
-            corrected = avg - mean_off
+        estimation = r.clock_offset_estimate.get((a, b))
+        if estimation is not None:
+            temps_moyen = (min(vals) + max(vals)) / 2 if vals else 0.0
+            corrected = avg - estimation.decalage_a(temps_moyen)
             print(
-                f"      -> decalage d'horloge estime : {mean_off:+.2f}ms "
-                f"(ecart-type {stdev_off:.2f}ms, {n_off} handshake(s) TCP) "
+                f"      -> decalage d'horloge estime : {estimation.decalage_a(temps_moyen):+.2f}ms "
+                f"(derive {estimation.derive_ppm:+.1f}ppm, IC95% +-{estimation.ic_decalage_ms:.2f}ms, "
+                f"{estimation.n_echantillons} echantillon(s) TCP/DNS, {estimation.methode}) "
                 f"=> latence corrigee ~= {corrected:.2f}ms"
             )
 
     if r.clock_offset_estimate:
-        print("\n-- Decalage d'horloge estime entre points (via handshakes TCP) --")
-        print("   Hypothese : chemin reseau symetrique (delai aller = delai retour).")
-        print("   Un decalage important et instable indique une horloge non synchronisee")
-        print("   (NTP absent/casse) ou un chemin reellement asymetrique -> a prendre comme")
-        print("   indice, pas comme mesure de precision, surtout si l'ecart-type est eleve.")
-        for (a, b), (mean_off, stdev_off, n_off) in r.clock_offset_estimate.items():
-            print(f"  {a} <-> {b} : {mean_off:+.2f}ms (ecart-type {stdev_off:.2f}ms, n={n_off} handshake(s))")
+        print("\n-- Decalage d'horloge estime entre points (handshakes TCP + couples DNS) --")
+        print("   Estimation robuste (issue #996) : filtre au delai minimal (RFC 5905)")
+        print("   puis regression Theil-Sen -- decalage, derive (ppm) et intervalle de")
+        print("   confiance publies par paire. Un decalage important et instable indique")
+        print("   une horloge non synchronisee (NTP absent/casse) ou un chemin reellement")
+        print("   asymetrique -> a prendre comme indice, pas comme mesure de precision.")
+        for (a, b), estimation in r.clock_offset_estimate.items():
+            print(
+                f"  {a} <-> {b} : {estimation.decalage_ms:+.2f}ms "
+                f"(a t0={estimation.t0:.1f}s, derive {estimation.derive_ppm:+.1f}ppm, "
+                f"IC95% decalage +-{estimation.ic_decalage_ms:.2f}ms / derive +-{estimation.ic_derive_ppm:.1f}ppm, "
+                f"n={estimation.n_echantillons} dont {estimation.n_conserves} conserve(s), {estimation.methode})"
+            )
 
     print("\n-- Sauts de routeur (delta TTL) entre points --")
     for a, b in r.pairs:
@@ -243,6 +251,19 @@ def print_report(r: Report):
             print(f"  [section] {c}")
         for c in r.packet_comments:
             print(f"  [paquet] {c}")
+
+    if any(fiche.get("speed_bps") for fiche in r.link_speeds.values()):
+        # Issue #1132 : section absente tant qu'aucune vitesse n'est connue
+        # (sortie historique inchangee) ; la source est toujours affichee.
+        from netcross_core.link_speed import format_speed
+
+        print("\n-- Vitesse des liens --")
+        for point_label, fiche in r.link_speeds.items():
+            speed = fiche.get("speed_bps")
+            resolution = fiche.get("ts_resolution")
+            vitesse = f"{format_speed(speed)} (source : {fiche.get('speed_source')})" if speed else "inconnue"
+            tick = f", horodatage au {resolution:g} s" if resolution else ""
+            print(f"  {point_label} : {vitesse}{tick}")
 
     if r.capture_infos:
         # Job 38/issue #158 -- metadonnees de capture (format, snaplen,

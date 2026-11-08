@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Moteur du mode lot (issues #277, #872), commun à la CLI
 (``cross_capture_batch_cli.py``), à l'API (``POST /batches``) et à la GUI.
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.notifications -- notifications sortantes (webhook, Slack,
 courriel) apres une analyse de la GUI (issue #676).
 
@@ -40,6 +41,7 @@ def settings_from_widgets(
     """Reglages depuis les valeurs brutes des widgets (texte rogne, champ
     vide = canal non demande)."""
     threshold = THRESHOLD_CHOICES[threshold_index][0] if 0 <= threshold_index < len(THRESHOLD_CHOICES) else None
+    logger.debug("settings_from_widgets: retour NotifySettings(…)")
     return NotifySettings(
         threshold=threshold,
         webhook=webhook.strip() or None,

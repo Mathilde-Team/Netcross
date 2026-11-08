@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross annotations -- etiquettes et signets sur des trames, en CLI
 (issue #910).
 

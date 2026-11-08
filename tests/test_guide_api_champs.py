@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #465 / #841 lot 4 : chaque champ cité dans le tableau « Options
 d'analyse » du guide API existe réellement dans l'API.
 

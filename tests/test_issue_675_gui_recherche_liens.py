@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #675 : resultats de recherche forensic « cliquables vers le flux » --
 choix d'un resultat, filtre Wireshark, « Annoter la trame », « Ouvrir dans
 Wireshark » (wireshark -r FICHIER -g TRAME)."""

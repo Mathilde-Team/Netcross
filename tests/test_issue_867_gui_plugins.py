@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #867 (GUI) : plugins tiers, équivalent de --plugins / --plugin-path /
 --plugin-export / --list-plugins. Partie sans GTK : module et pipeline."""
 

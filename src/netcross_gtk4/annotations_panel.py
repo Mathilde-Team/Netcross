@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.annotations_panel -- panneau GTK des annotations (issue #363).
 
 Cablage GTK de `annotations_view` (Job 40 / issue #160) :

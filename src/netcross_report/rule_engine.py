@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.rule_engine -- premier PILOTE du moteur d'EXECUTION
 evoque comme premier chantier ouvert par CLAUDE.md/`Prochaine feature`

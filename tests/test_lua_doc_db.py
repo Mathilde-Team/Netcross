@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de la banque SQLite de l'API Lua Wireshark (issue #387)."""
 
 from __future__ import annotations

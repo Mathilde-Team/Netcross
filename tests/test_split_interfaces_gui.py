@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #474 lot 2 : capture unique et --split-interfaces dans la GUI.
 
 Partie 1 : pipeline (pur Python). Partie 2 : case de MainWindow, ignorée

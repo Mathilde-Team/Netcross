@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.protocol_mismatch -- issue #142 (FLOW-1, parent
 #141) : detection des flux cachés où un protocole utilise un port non

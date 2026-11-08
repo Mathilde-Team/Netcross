@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_flow_view.py -- tests du FlowView (netcross_core.flow_view,
 Job 9/issue #6).

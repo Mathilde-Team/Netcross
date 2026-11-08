@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 r"""
 netcross_core.flow_timeline -- vue temporelle detaillee d'un flux
 (Job 13/issue #10, section 6.4 de FEATURES.md).

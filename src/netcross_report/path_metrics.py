@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.path_metrics -- metriques de qualite par segment du chemin
 observe (Job 16/issue #12, FEATURES.md section 6.7).
@@ -69,6 +70,12 @@ class SegmentMetrics:
     loss_pct: float | None = None
     # -- debit moyen observe au point aval (bits/s), None si non mesure --
     throughput_bps: float | None = None
+    # -- estimation d'horloge du segment (issue #996) --
+    clock_offset_ms: float | None = None
+    clock_drift_ppm: float | None = None
+    clock_ci_ms: float | None = None
+    clock_samples: int | None = None
+    clock_method: str | None = None
     # -- compteurs deja agreges par segment dans Report --
     dscp_changes: int = 0
     frag_new: int = 0
@@ -193,6 +200,13 @@ def build_path_metrics(report) -> list[SegmentMetrics]:
         if hop_deltas:
             seg.hops = int(statistics.median(hop_deltas))
         seg.hop_outliers = report.hop_delta_outliers.get((a, b), 0)
+        estimation = report.clock_offset_estimate.get((a, b))
+        if estimation is not None:
+            seg.clock_offset_ms = estimation.decalage_ms
+            seg.clock_drift_ppm = estimation.derive_ppm
+            seg.clock_ci_ms = estimation.ic_decalage_ms
+            seg.clock_samples = estimation.n_echantillons
+            seg.clock_method = estimation.methode
         metrics.append(seg)
     logger.debug("build_path_metrics: retour metrics={}", summarize(metrics, "metrics"))
     return metrics

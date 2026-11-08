@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #675 : comparaison de postes dans la GUI (equivalent de
 --client-group / --client-reference / --client-diff-csv). Partie sans GTK."""
 

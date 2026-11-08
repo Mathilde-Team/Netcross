@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de couverture de netcross_gtk4/analysis_pipeline.py (issue #711, suite #665).
 
 Chemins rares, sans GTK ni tshark (tout est doublé) :

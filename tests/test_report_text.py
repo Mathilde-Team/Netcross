@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.report_text -- mise en forme texte/CSV d'un Report. On ne
 teste pas la mise en page caractere pres (fragile, sans valeur), mais
@@ -11,6 +12,7 @@ import csv
 from conftest import make_pkt
 
 from netcross_core.analysis import analyse
+from netcross_core.clock_sync import EstimationHorloge
 from netcross_core.correlate import correlate
 from netcross_core.models import PacketAnnotation
 from netcross_core.report_text import print_annotations, print_report, write_detail_csv
@@ -634,10 +636,14 @@ def test_print_report_topology_ambiguous_isolated_conflicts(capsys):
 
 
 def test_print_report_latency_avec_clock_offset(capsys):
-    """Lines 242-244 : latency avec clock_offset_estimate."""
+    """Latence avec estimation d'horloge : correction au temps du paquet."""
     r = _r(
         latency={("A", "B"): [1.0, 2.0, 3.0]},
-        clock_offset_estimate={("A", "B"): (0.5, 0.1, 3)},
+        clock_offset_estimate={
+            ("A", "B"): EstimationHorloge(
+                decalage_ms=0.5, t0=2.0, derive_ppm=10.0, ic_decalage_ms=0.1, n_echantillons=3
+            )
+        },
     )
     print_report(r)
     out = capsys.readouterr().out
@@ -646,12 +652,26 @@ def test_print_report_latency_avec_clock_offset(capsys):
 
 
 def test_print_report_clock_offset_section(capsys):
-    """Lines 251-257 : section decalage d'horloge."""
-    r = _r(clock_offset_estimate={("A", "B"): (1.5, 0.2, 5)})
+    """Section decalage d'horloge : decalage, derive, IC et methode."""
+    r = _r(
+        clock_offset_estimate={
+            ("A", "B"): EstimationHorloge(
+                decalage_ms=1.5,
+                t0=0.0,
+                derive_ppm=12.0,
+                ic_decalage_ms=0.2,
+                ic_derive_ppm=1.0,
+                n_echantillons=5,
+                n_conserves=3,
+                methode="filtre au délai minimal + Theil-Sen",
+            )
+        }
+    )
     print_report(r)
     out = capsys.readouterr().out
     assert "Decalage d'horloge estime" in out
     assert "A <-> B : +1.50ms" in out
+    assert "derive +12.0ppm" in out
 
 
 def test_print_report_hop_delta_avec_outliers(capsys):

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests for the GTK4 duplicate status formatter.
 
 The formatter is deliberately pure Python, so these tests do not require GTK.

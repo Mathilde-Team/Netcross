@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.correlate -- correlation des paquets entre points de
 capture (par 5-tuple strict ou par hash de payload en mode NAT-tolerant)

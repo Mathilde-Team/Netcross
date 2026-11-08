@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests supplementaires pour netcross_core/baseline_diff.py -- issue #705 (suite de #665).
 

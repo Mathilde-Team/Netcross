@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_capwap_validation.py — Validation de la détection CAPWAP/DTLS
 (issue #29).

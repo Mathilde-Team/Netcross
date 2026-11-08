@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests des libelles de lignes de la GUI (`netcross_gtk4/row_labels.py`).
 

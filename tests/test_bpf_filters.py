@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de netcross_core.bpf_filters et de BPFFilter (Job 47 / issue #167) :
 sauvegarde/rechargement de filtres BPF dans un fichier JSON sidecar,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.compliance -- evaluate_compliance() (Session 36, objets
 ReferenceProfile/ComplianceResult de la Session 0). Verifie le calcul des

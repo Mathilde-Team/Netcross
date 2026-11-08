@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #872 (API) : lots de captures, équivalent de ``cross_capture_batch_cli.py``.
 
 ``POST /batches`` (captures ou archive ZIP) puis ``GET /batches/{id}``,

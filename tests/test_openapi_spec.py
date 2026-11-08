@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de la generation et du controle de fraicheur de docs/openapi.yaml
 (issue #209, dernieres cases : script + verification en CI).

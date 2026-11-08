@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #278 de bout en bout sur une vraie capture (tshark requis, CI) :
 SIP/SDP + RTP G.711 avec pertes, et un PDF telecharge en HTTP."""
 

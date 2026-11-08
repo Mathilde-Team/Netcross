@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Couverture GTK4 de app.py, lot 8 (issue #429, sous-issue de #421).
 
 Portee : export JSON des statistiques (_on_stats_export_json,

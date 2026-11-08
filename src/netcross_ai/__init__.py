@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_ai -- module IA/ML **optionnel et local** (issue #146, FLOW-5).
 

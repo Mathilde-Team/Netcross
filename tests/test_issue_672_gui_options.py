@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #672 : options d'analyse avancees dans la GUI (--max-packets,
 --sample, --parallel-workers, --test-net-external, --known-destinations,
 --known-hosts, --cve-db). Partie sans GTK, puis fenetre."""

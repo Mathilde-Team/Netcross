@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """#441, lot 5 : journalisation de tls_diagnostics et quic_diagnostics."""
 
 from __future__ import annotations

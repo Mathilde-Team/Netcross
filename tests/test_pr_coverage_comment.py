@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de scripts/pr_coverage_comment.py (couverture incrementale par PR).
 
 Le script publie un commentaire sur la PR via l'API GitHub -- reseaux

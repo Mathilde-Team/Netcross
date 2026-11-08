@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests app.py -- lot 6/10 (issue #427, sous-issue de #421) : threads
 d'analyse/diff + export CSV/PDF, pilotes via pygobject.

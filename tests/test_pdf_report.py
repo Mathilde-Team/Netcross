@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests du rendu PDF (`netcross_report/pdf.py`) -- issue #286.
 

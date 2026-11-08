@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests pour l'issue #671 : plusieurs fichiers par point et split_interfaces."""
 
 from __future__ import annotations

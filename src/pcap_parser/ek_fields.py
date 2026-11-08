@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.ek_fields -- couche 2 : acces bas niveau aux champs d'un
 paquet EK. Aucune connaissance protocolaire ici, juste les mecanismes

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """tests/test_session_objects_couverture.py -- couverture >= 98 % de netcross_report/session_objects.py (issue #731).
 
 Complete tests/test_session_objects.py sur les branches du rendu console et de

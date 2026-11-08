@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ruff: noqa: F811 -- fixtures pytest importées de test_issue_902_api_live
 """Issue #904 : POST /live-captures/{id}/stop renvoie l'analysis_id ;
 DELETE /live-captures/{id} abandonne sans analyser. Issue #903 : la borne

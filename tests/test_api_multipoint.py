@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """POST /captures/multi : analyse croisee entre points via l'API (issue #354).
 
 parse_capture est remplace par des paquets synthetiques par etiquette :

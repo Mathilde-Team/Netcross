@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.lateral_movement -- tests (issue #149, SCENARIO-3).
 

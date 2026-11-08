@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.plugin_settings -- plugins tiers dans la GUI (issue #867).
 
 Equivalent GUI de ``--plugins``, ``--plugin-path``, ``--plugin-export`` et
@@ -52,6 +53,7 @@ class PluginSettings:
 
     @property
     def active(self) -> bool:
+        logger.debug("PluginSettings.active: retour bool(…)")
         return bool(self.names)
 
 
@@ -69,10 +71,12 @@ def _names(text: str) -> tuple[str, ...]:
         name = part.strip()
         if name and name not in seen:
             seen.append(name)
+    logger.debug("_names: retour tuple(…)")
     return tuple(seen)
 
 
 def _items(text: str) -> tuple[str, ...]:
+    logger.debug("_items: retour tuple(…)")
     return tuple(p.strip() for p in _SEPARATORS.split(text) if p.strip())
 
 

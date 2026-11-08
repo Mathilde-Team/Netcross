@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.ring_recorders -- rotation de capture (ring buffer) de la
 GUI en capture en direct (issue #676).
 
@@ -61,6 +62,9 @@ def start_ring_recorders(
         except (CaptureSourceError, TsharkNotFoundError, OSError) as exc:
             logger.warning("start_ring_recorders: point {} refuse ({})", label, exc)
             stop_ring_recorders(recorders)
+            logger.debug(
+                "start_ring_recorders: except (CaptureSourceError, TsharkNotFoundErro… -> levée RingRecorderError"
+            )
             raise RingRecorderError(f"[{label}] {exc}") from exc
         recorders[label] = (proc, directory)
         messages.append(

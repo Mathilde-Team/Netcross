@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_api.batches -- lots de captures de l'API (issue #872).
 

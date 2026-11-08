@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests app.py -- Lot 10/10 : fin export securite + NetcrossApp/main
 (issue #431, sous-issue de #421).
 

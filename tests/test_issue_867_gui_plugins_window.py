@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #867 : champs « Plugins » de la fenetre principale, bouton
 « Lister », validation avant lancement et transmission au thread d'analyse.
 

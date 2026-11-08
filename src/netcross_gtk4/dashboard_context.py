@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_gtk4.dashboard_context -- alias de netcross_core.dashboard.
 

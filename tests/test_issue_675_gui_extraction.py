@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #675 : extraction des contenus depuis la GUI (equivalent de
 --extract-contents / --extract-kinds). Partie sans GTK."""
 

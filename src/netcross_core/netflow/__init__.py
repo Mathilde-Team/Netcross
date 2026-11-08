@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.netflow -- ingestion NetFlow/sFlow comme source de
 donnees alternative aux captures pcap (Job 32, issue #32).
