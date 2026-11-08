@@ -8,6 +8,11 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Vue « Chemin » du rapport HTML autonome (#1075) : les points de capture dans l'ordre du chemin, reliés par leurs
+  segments. Le survol, le focus clavier ou le clic sur un segment affichent son détail (délai, P50/P95/P99, gigue,
+  pertes, débit, sauts, horloge). Les flèches, Début et Fin passent d'un segment à l'autre. Un segment sans mesure est
+  marqué « non mesurable » (en texte, avec une bordure pointillée). Le rendu sans JavaScript contient un tableau
+  équivalent. Le JSON du rapport gagne la clé `path_metrics`, avec les mêmes chiffres que le PDF.
 - `--prom-file` et `--openmetrics-file` (#1112) : métriques de l'analyse au format texte Prometheus (textfile
   collector de node_exporter, écriture atomique) et OpenMetrics 1.0 ; `--metrics-run` fixe l'étiquette `run` ;
   `--redact` anonymise les adresses présentes dans les étiquettes. Voir docs/metriques-prometheus.md.
