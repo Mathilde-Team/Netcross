@@ -13,6 +13,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   pertes, débit, sauts, horloge). Les flèches, Début et Fin passent d'un segment à l'autre. Un segment sans mesure est
   marqué « non mesurable » (en texte, avec une bordure pointillée). Le rendu sans JavaScript contient un tableau
   équivalent. Le JSON du rapport gagne la clé `path_metrics`, avec les mêmes chiffres que le PDF.
+- Diagnostics sur le contenu déchiffré (#1045) : avec un fichier de clés, le certificat TLS 1.3 est lu (détection de
+  substitution entre points), les paquets QUIC 1-RTT et leurs fermetures (CONNECTION_CLOSE) donnent des constats,
+  et les signatures d'exploits sont aussi appliquées au contenu TLS en clair. Voir `docs/couverture-dechiffrement.md`.
 - Couverture du déchiffrement TLS/QUIC (#1043) : le rapport texte, le PDF et le JSON (`decryption.by_point`)
   indiquent par point « 42/50 sessions TLS déchiffrées au point CLIENT » (et de même pour QUIC) dès qu'un fichier de
   clés ou des blocs DSB sont fournis. Voir docs/couverture-dechiffrement.md.

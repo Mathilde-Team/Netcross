@@ -485,6 +485,23 @@ def _certificate_details(tls: dict) -> dict:
     }
 
 
+def _couche_certificat(layers: dict) -> dict | None:
+    """Couche tls portant le message Certificate (issue #1045).
+
+    Une trame TLS 1.3 dechiffree (fichier de cles) porte souvent plusieurs
+    enregistrements -- EncryptedExtensions, Certificate, CertificateVerify,
+    Finished -- que tshark rend comme autant d'occurrences de la couche
+    ``tls`` : la derniere (``innermost``) est alors CertificateVerify, sans
+    certificat. On prend la derniere occurrence qui porte des dates X.509,
+    a defaut la plus interne (comportement historique).
+    """
+    logger.debug("_couche_certificat: entrée")
+    occurrences = all_occurrences(layers, "tls")
+    avec_dates = [t for t in occurrences if isinstance(t, dict) and "x509af_x509af_utcTime" in t]
+    logger.debug("_couche_certificat: retour ({} occurrence(s), {} avec certificat)", len(occurrences), len(avec_dates))
+    return avec_dates[-1] if avec_dates else innermost(layers, "tls")
+
+
 def extract_tls_certificate(layers: dict) -> dict | None:
     """
     Lit la dissection X.509 native de tshark au sein d'un message TLS
@@ -542,7 +559,7 @@ def extract_tls_certificate(layers: dict) -> dict | None:
     ou sur un TLS 1.3 dont les cles ont ete fournies a tshark
     (SSLKEYLOGFILE), cas rare pour une capture passive sur le terrain.
     """
-    tls = innermost(layers, "tls")
+    tls = _couche_certificat(layers)
     if tls is None:
         logger.debug("extract_tls_certificate: si tls is None -> retour None")
         return None
@@ -661,18 +678,44 @@ def extract_dechiffrement(layers: dict) -> dict | None:
     tls_dechiffre = tls is not None and "tls_tls_record_sequence_number" in tls
     quic_connexion = None
     quic_dechiffre = False
+    quic_court = False
+    quic_fermeture = None
     for quic in quics:
         if quic_connexion is None:
             quic_connexion = hex_or_dec_to_int(_premier(g(quic, "quic_quic_connection_number")))
         if _quic_1rtt_dechiffre(quic):
             quic_dechiffre = True
+        quic_court = quic_court or (isinstance(quic, dict) and "quic_quic_short" in quic)
+        quic_fermeture = quic_fermeture or _quic_fermeture(quic)
     logger.debug("extract_dechiffrement: retour (tls {}, quic {})", tls_dechiffre, quic_dechiffre)
     return {
         "tls_stream": tls_stream,
         "tls_dechiffre": tls_dechiffre,
         "quic_connexion": quic_connexion,
         "quic_dechiffre": quic_dechiffre,
+        "quic_court": quic_court,
+        "quic_fermeture": quic_fermeture,
     }
+
+
+def _quic_fermeture(quic) -> str | None:
+    """Issue #1045 -- trame CONNECTION_CLOSE lisible (dechiffree ou Initial) :
+    « applicatif 0x42 (netcross) » (type 0x1d) ou « transport 0x0a » (0x1c).
+    Seuls le code et la raison publiee par le pair sont repris."""
+    logger.debug("_quic_fermeture: entrée")
+    if not isinstance(quic, dict):
+        logger.debug("_quic_fermeture: couche invalide -> retour None")
+        return None
+    code_app = hex_or_dec_to_int(_premier(g(quic, "quic_quic_cc_error_code_app")))
+    code_transport = hex_or_dec_to_int(_premier(g(quic, "quic_quic_cc_error_code")))
+    if code_app is None and code_transport is None:
+        logger.debug("_quic_fermeture: pas de CONNECTION_CLOSE -> retour None")
+        return None
+    nature, code = ("applicatif", code_app) if code_app is not None else ("transport", code_transport)
+    raison = _premier(g(quic, "quic_quic_cc_reason_phrase"))
+    texte = f"{nature} 0x{code:x}" + (f" ({raison})" if raison else "")
+    logger.debug("_quic_fermeture: retour {}", texte)
+    return texte
 
 
 def _quic_1rtt_dechiffre(quic: dict) -> bool:

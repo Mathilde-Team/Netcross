@@ -223,6 +223,8 @@ class Pkt:
     tls_dechiffre: bool = False
     quic_connexion: int | None = None
     quic_dechiffre: bool = False
+    quic_court: bool = False
+    quic_fermeture: str | None = None
     # -- empreintes JA4/HASSH (FLOW-2, issue #143, parent #141) : calculees
     # par netcross_core.fingerprint.report.compute_pkt_fingerprints depuis
     # RawPacket.payload (les octets ne sont plus disponibles ensuite --
