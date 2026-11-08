@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.history -- persiste un resume de chaque run (analyse ou
 diff) dans une base SQLite locale, pour observer une tendance dans le

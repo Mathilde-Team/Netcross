@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Checksums IP/TCP/UDP (Job 43, issue #163).
 

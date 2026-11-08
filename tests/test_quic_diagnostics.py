@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.quic_diagnostics -- derivation de cles QUIC v1 validee
 contre les vecteurs de test OFFICIELS de la RFC 9001 Annexe A.2/A.3 (pas

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests du harnais de tests réels scripts/pcap_reels.py (issue #1008).
 
 La vraie banque (/app/pcaps) n'existe que sur la VM du runner : ici, une

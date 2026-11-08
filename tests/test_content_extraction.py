@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #278 : extraction des contenus (audio, video, documents),
 analyse qualitative et rappel de l'usage raisonne. Sans tshark : les
 datagrammes sont fabriques, tshark --export-objects est simule."""

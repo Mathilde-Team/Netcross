@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Jeux synthétiques multi-points déterministes (issue #1015, banc #994).
 
 Produit, pour un chemin linéaire de N points de capture ``P1 → … → PN``,

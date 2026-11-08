@@ -4867,9 +4867,10 @@ les deux conditions ci-dessus, absentes dans le cas normal).
   cet environnement ; `rpmbuild` lui-même absent depuis la Session 30.
 - **`FIXME`/licence** — placeholders nécessitant les vraies coordonnées
   du mainteneur (email, compte GitHub), non renseignables sans inventer
-  une fausse information. `LICENSE` elle-même est déjà complète (MIT,
-  nom et année présents, aucun placeholder) — seuls `debian/control`,
-  `debian/changelog` et `netcross.spec` portent encore le FIXME.
+  une fausse information. `LICENSE` était alors complète (MIT, nom et
+  année présents, aucun placeholder) ; le projet est passé en
+  **GPL-3.0-or-later** (PR #989) et plus aucun FIXME de licence ne
+  subsiste dans `LICENSE`, `debian/control` ou `netcross.spec`.
 - **Mesure du gain `--parallel` sur un hôte multi-cœurs réel** — le
   mécanisme reste architecturalement sain (voir "Résultat mesuré"
   ci-dessus) mais aucun hôte de ce type n'était disponible cette

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests du rapport HTML autonome (issue #1073)."""
 
 from __future__ import annotations

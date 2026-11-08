@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_core.packet_limits -- ``--max-packets`` et ``--sample`` (issue
 #283), partages par la CLI et la GUI (issue #672).
 

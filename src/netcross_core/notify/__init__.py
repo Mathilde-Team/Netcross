@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.notify -- notifications sortantes sur seuil de gravite
 (webhook, Slack, courriel), issue #280. Voir docs/notifications.md.

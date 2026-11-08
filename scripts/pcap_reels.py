@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests réels : analyse de la banque de pcap de la VM runner (issue #1008).
 
 La banque (``/app/pcaps`` sur la VM ``ubuntu`` du runner ``docker``) contient

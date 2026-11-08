@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issues #359, #360, #361 : chronologie des flux, recherche forensique et
 statistiques tshark accessibles depuis le CLI, avec sortie JSON.
 

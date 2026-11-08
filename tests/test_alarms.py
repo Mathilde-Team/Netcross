@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.alarms -- tests du moteur d'alarmes et surveillance de
 seuils (§6.16, issue #26).

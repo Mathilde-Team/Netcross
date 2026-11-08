@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.active.planner -- planificateur « constat localise -> mesure
 active proposee » (issue #1063, sous-issue 1/5 du chantier #999).

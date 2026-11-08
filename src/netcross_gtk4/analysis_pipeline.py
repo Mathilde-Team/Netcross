@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_gtk4.analysis_pipeline -- pipeline d'analyse extrait de MainWindow
 (issue #246, #285 -- lot supplémentaire).

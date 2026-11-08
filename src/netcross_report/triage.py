@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.triage -- agrege les Finding (ou DiffFinding) produits
 par ailleurs pour repondre a une question que synthesis.py ne pose pas :

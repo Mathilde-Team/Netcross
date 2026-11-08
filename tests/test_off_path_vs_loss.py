@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #352 : distinguer trafic hors chemin et pertes dans l'analyse croisee.
 
 Scenario de l'issue, en miniature : trois points LAN -> WAN -> DC (ordre

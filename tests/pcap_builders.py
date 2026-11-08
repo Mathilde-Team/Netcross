@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Fabriques et lecteurs pcap / pcapng SYNTHETIQUES pour les tests de
 decoupage (test_capfile.py, test_split_capture.py) : aucun outil externe

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Mesures par étape du pipeline (issue #1016)."""
 
 from __future__ import annotations

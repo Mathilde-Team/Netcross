@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Boite d'envoi hors connexion des paquets de modeles (issue #271).
 
 Les remontees vers le depot peuvent devoir attendre une connexion : un

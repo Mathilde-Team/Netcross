@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.security.dga -- issue #152 (SCENARIO-6, parent #141) :
 detection de domaines generes algorithmiquement (DGA).

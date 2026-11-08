@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Exploration statistique interactive (Job 27 / issue #22, section 6.8).
 
 Couche generique d'exploration statistique sur les donnees deja calculees

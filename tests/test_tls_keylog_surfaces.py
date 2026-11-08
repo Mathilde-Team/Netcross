@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """--tls-keylog sur les quatre surfaces (issue #1040) : CLI d'analyse, CLI de
 différentiel, API et GUI. Capture TLS 1.3 réelle (tests/tls13_keylog_capture.py)
 quand tshark est présent, doubles sinon.

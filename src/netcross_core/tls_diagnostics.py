@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.tls_diagnostics -- extrait l'etat des handshakes TLS
 (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de

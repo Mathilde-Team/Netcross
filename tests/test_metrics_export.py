@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Catalogue des metriques Prometheus et cardinalite bornee (issue #1110)."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.client_diff -- comparaison "client vs client" : meme
 capture, memes points, seule la source (l'IP du poste) change. Troisieme

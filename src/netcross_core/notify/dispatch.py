@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.notify.dispatch -- repartition, garde-fous et tracabilite
 des notifications (issue #280).

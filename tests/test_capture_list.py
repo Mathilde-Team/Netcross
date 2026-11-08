@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de l'enumeration, de l'ordre et du retrait des lignes des panneaux de
 captures (`netcross_gtk4.capture_list`, issue #285, cinquieme lot).

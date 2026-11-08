@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.active -- confirmation active du diagnostic passif (chantier
 #999, parent #993).

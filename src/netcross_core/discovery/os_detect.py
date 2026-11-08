@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.discovery.os_detect -- identification passive de systeme
 d'exploitation par TTL et options TCP (empreinte type p0f), SCENARIO-5

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.metrics_export -- catalogue des metriques Prometheus /
 OpenMetrics de Netcross et production des series depuis un rapport

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """API deployable (issue #356) : jeton, limite d'upload, analyse en tache
 de fond avec statut, persistance SQLite optionnelle.
 

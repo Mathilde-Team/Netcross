@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.batch_window -- fenetre « Analyse d'un dossier » (issue
 #872), equivalent de ``cross_capture_batch_cli.py`` : choix du dossier,
 regroupement, nombre de taches, sortie, avancement ligne a ligne.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """#441, lot 6 : journalisation de exploit_signatures et application/banners."""
 
 from __future__ import annotations

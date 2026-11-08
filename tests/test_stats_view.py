@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """tests/test_stats_view.py -- tests du module netcross_gtk4.stats_view.
 
 Logique de presentation pour la vue d'exploration statistique (Job 27).

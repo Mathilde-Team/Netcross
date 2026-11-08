@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #362 : ingestion NetFlow accessible depuis le CLI, avec sortie JSON."""
 
 from __future__ import annotations

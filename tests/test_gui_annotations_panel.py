@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Test GUI (pygobject) du panneau d'annotations (issue #363).
 
 Ignore si GTK4/pygobject ou un affichage manquent (CI sans libgtk-4) ;

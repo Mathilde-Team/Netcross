@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_compliance_deviation.py -- tests du statut DEVIATION
 (netcross_core.compliance, Job 11/issue #8).

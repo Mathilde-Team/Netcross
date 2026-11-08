@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #760 : SSH HASSH ne doit pas planter sur des donnees non-SSH."""
 
 from netcross_core.fingerprint.ssh_hassh import identify, parse_kexinit

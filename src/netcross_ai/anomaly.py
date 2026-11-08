@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Detection d'anomalies de flux par rapport a une baseline (Isolation Forest).
 
 La baseline est un fichier JSON de **caracteristiques** (jamais un modele

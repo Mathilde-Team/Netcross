@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #672 (API) : parallel_workers, base CVE NETCROSS_CVE_DB, et note de
 troncature de max_packets/sample comme la CLI."""
 

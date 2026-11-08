@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Inventaire mesure de ``src/netcross_gtk4/app.py`` (issue #285).
 
 Classe chaque methode selon qu'elle nomme directement ``Gtk``/``Gio``/

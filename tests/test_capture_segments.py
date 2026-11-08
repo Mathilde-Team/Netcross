@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Captures segmentees (rotation tcpdump/tshark) sur --capture
 (cross_capture_analyzer_cli.py) et --baseline/--current

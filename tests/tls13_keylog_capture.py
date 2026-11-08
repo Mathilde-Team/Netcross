@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Capture TLS 1.3 + fichier de clés (SSLKEYLOGFILE) générés pour les tests (issue #1040).
 
 Une vraie session TLS 1.3 (module ``ssl``, certificat autosigné éphémère) est

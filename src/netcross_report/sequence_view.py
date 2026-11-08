@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.sequence_view -- diagramme de sequence multi-hotes
 (Job 14/issue #11, FEATURES.md section 6.5).

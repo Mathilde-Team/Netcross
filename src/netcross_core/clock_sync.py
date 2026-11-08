@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.clock_sync -- estimation robuste du decalage et de la derive
 d'horloge entre deux points de capture (issue #996).

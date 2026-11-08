@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Modèle de transaction HTTP commun et adaptateur HTTP/1.x (issue #1051).
 
 Non-régression : build_http_transactions passe désormais par HttpTransaction ;

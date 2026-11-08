@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_report.lua_dissectors_text -- rendu texte du catalogue des
 dissecteurs Lua (issue #917), partagé par ``netcross-lua-doc --dissectors``
 et la fenêtre « Documentation Lua » de la GUI. Prend les documents JSON de

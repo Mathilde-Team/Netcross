@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de l'etat de resultat de la GUI (`netcross_gtk4/run_outcome.py`).
 

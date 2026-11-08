@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """#441 : résumé sûr des arguments et instrumentation assistée."""
 
 from __future__ import annotations

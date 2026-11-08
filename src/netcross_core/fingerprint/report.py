@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.fingerprint.report -- consolidation des empreintes JA4/
 HASSH vues par paquet en entrees pretes pour `Report.service_fingerprints`

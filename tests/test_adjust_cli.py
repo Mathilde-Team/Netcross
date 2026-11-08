@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de l'integration CLI de --adjust-time-output (issue #165, Job 45).
 On simule editcap (absente dans le CI) et on verifie la logique de

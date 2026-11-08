@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Instrumentation « un logger.debug() à chaque sortie » (issues de suite #441).
 
 Pour chaque fonction d'un module, ajoute un ``logger.debug(...)`` juste

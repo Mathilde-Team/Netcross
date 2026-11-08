@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """--tls-keylog (issue #1040) : spécifications, refus, transmission à tshark.
 
 Les tests « réels » utilisent une vraie session TLS 1.3 générée en mémoire

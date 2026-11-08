@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.synthesis.build_findings -- chaque regle est tracable a
 un chiffre du Report ; on construit des Report minimalistes cible par
