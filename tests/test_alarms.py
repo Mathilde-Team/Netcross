@@ -46,6 +46,43 @@ def test_signal_isole_ne_leve_pas_alarme():
     assert engine.active_alarms == []
 
 
+def test_event_porte_la_severite_du_signal():
+    """Issue #1087 : l'AlarmEvent « raised » porte la sévérité du signal
+    à l'origine de l'alarme — nécessaire au gel rétroactif pour filtrer
+    sur une sévérité minimale sans importer netcross_report. Le
+    « cleared » porte la dernière sévérité connue."""
+    cfg = AlarmConfig(
+        rule_id="loss_per_segment",
+        segment="A",
+        window_seconds=60.0,
+        min_persistence_seconds=0.0,
+        min_sample_ratio=0.5,
+    )
+    engine = AlarmEngine([cfg])
+
+    # Un signal « à surveiller » lève l'alarme avec SA sévérité.
+    engine.feed(0.0, [AlarmSignal(rule_id="loss_per_segment", segment="A", severity="a_surveiller")])
+    raised = [e for e in engine.events if e.state == "raised"]
+    assert len(raised) == 1
+    assert raised[0].severity == "a_surveiller"
+
+    # Puis le signal devient « info » (dernier signal vu -> sévérité
+    # mémorisée), puis disparaît -> cleared porte cette sévérité.
+    engine.feed(1.0, [AlarmSignal(rule_id="loss_per_segment", segment="A", severity="info")])
+    engine.feed(2.0, [])
+    cleared = [e for e in engine.events if e.state == "cleared"]
+    assert len(cleared) == 1
+    assert cleared[0].severity == "info"
+
+    # Comportement inchangé pour les alarmes levées avec la sévérité par
+    # défaut du module (« anomalie »).
+    engine2 = AlarmEngine([cfg])
+    engine2.feed(0.0, [_signal("loss_per_segment", "A")])
+    raised2 = [e for e in engine2.events if e.state == "raised"]
+    assert len(raised2) == 1
+    assert raised2[0].severity == "anomalie"
+
+
 def test_persistance_continue_leve_alarme():
     """Un signal présent à CHAQUE cycle pendant au moins
     min_persistence_seconds lève une alarme."""
