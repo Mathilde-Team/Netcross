@@ -87,6 +87,7 @@ nav:
       - Rule engine: architecture-rule-engine.md
       - Mesures actives: mesures-actives.md
       - Échelle SIP multi-points: echelle-sip.md
+      - Appariement RTP entre points: appariement-rtp.md
   - Architecture:
       - Diagramme de classes: class-diagram.md
       - Internationalisation: i18n.md
