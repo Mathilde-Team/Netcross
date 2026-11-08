@@ -30,7 +30,17 @@ Socle du futur ``--html-report FICHIER.html`` (branchement CLI, API, GUI et
    est place dans ``<noscript>`` : impression, lecteurs restreints,
    accessibilite. Tous les constats du JSON y figurent.
 
-5. **Accessibilite de base et i18n.** ``lang`` du document, titres
+5. **Vue « Chemin » (issue #1075).** Les points de capture dans l'ordre du
+   chemin deduit, relies par leurs segments (cle ``path_metrics`` du JSON,
+   memes chiffres que le PDF). Chaque segment est un bouton : survol, focus
+   clavier ou clic affichent son detail (delai, percentiles, gigue, pertes,
+   debit, sauts, horloge) dans un panneau ``aria-live``. Fleches, Debut et
+   Fin passent d'un segment a l'autre. Un segment sans aucune mesure est
+   ecrit « non mesurable » (texte et bordure pointillee, jamais la seule
+   couleur) et ses valeurs « non mesure » : une valeur inconnue ne
+   s'affiche jamais comme un zero.
+
+6. **Accessibilite de base et i18n.** ``lang`` du document, titres
    hierarchises, tableaux avec ``<caption>`` et ``scope``, region
    ``aria-live`` pour la synthese, severite toujours ecrite en texte (pas
    seulement en couleur). Libelles en francais par defaut, traduits via
@@ -64,6 +74,28 @@ _HEALTH_LABELS = {
 }
 _SEVERITY_ORDER = ("anomalie", "a_surveiller", "info")
 
+# Detail d'un segment de la vue chemin (#1075) : cle de path_metrics,
+# libelle (traduit dans _labels), unite et nombre de decimales.
+_SEGMENT_FIELDS = (
+    {"cle": "samples", "libelle": N_("Echantillons")},
+    {"cle": "delay_avg_ms", "libelle": N_("Delai moyen"), "unite": "ms", "decimales": 3},
+    {"cle": "delay_p50_ms", "libelle": N_("Delai P50"), "unite": "ms", "decimales": 3},
+    {"cle": "delay_p95_ms", "libelle": N_("Delai P95"), "unite": "ms", "decimales": 3},
+    {"cle": "delay_p99_ms", "libelle": N_("Delai P99"), "unite": "ms", "decimales": 3},
+    {"cle": "jitter_ms", "libelle": N_("Gigue"), "unite": "ms", "decimales": 3},
+    {"cle": "loss_count", "libelle": N_("Paquets perdus")},
+    {"cle": "loss_pct", "libelle": N_("Taux de perte"), "unite": "%", "decimales": 2},
+    {"cle": "throughput_bps", "libelle": N_("Debit au point aval"), "format": "debit"},
+    {"cle": "retrans", "libelle": N_("Retransmissions")},
+    {"cle": "dscp_changes", "libelle": N_("Changements DSCP")},
+    {"cle": "frag_new", "libelle": N_("Fragmentations nouvelles")},
+    {"cle": "pmtud_blackhole", "libelle": N_("Trous noirs PMTUD")},
+    {"cle": "hops", "libelle": N_("Sauts IP")},
+    {"cle": "hop_outliers", "libelle": N_("Ecarts de sauts")},
+    {"cle": "clock_offset_ms", "libelle": N_("Decalage d'horloge"), "unite": "ms", "decimales": 3},
+    {"cle": "clock_drift_ppm", "libelle": N_("Derive d'horloge"), "unite": "ppm", "decimales": 2},
+)
+
 _CSS = """
 :root { color-scheme: light; }
 * { box-sizing: border-box; }
@@ -88,6 +120,18 @@ th { background: #f9fafb; font-weight: 600; color: #374151; }
 .sante-bon { color: #14532d; } .sante-a_surveiller { color: #854d0e; }
 .sante-degrade { color: #9a3412; } .sante-critique { color: #7f1d1d; }
 .vide { color: #4b5563; font-style: italic; }
+.chemin { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; padding: 0; margin: 0; }
+.chemin .point { font-weight: 650; padding: .45rem .8rem; border: 2px solid #374151; border-radius: 8px; }
+.chemin .segment { font: inherit; font-size: .82rem; cursor: pointer; background: #f9fafb; color: #111827;
+  border: 2px solid #2563eb; border-radius: 99px; padding: .3rem .8rem; }
+.chemin .segment::before { content: "\\2192  "; }
+.chemin .segment:hover, .chemin .segment:focus-visible, .chemin .segment[aria-pressed="true"] {
+  background: #dbeafe; outline: 3px solid #1d4ed8; outline-offset: 2px; }
+.chemin .segment.non-mesurable { border-style: dashed; border-color: #6b7280; color: #374151; }
+.detail-segment { margin-top: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; padding: .85rem 1rem; }
+.detail-segment h3 { font-size: 1rem; margin: 0 0 .5rem; }
+.detail-segment dl { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1.25rem; margin: 0; }
+.detail-segment dt { color: #4b5563; } .detail-segment dd { margin: 0; font-variant-numeric: tabular-nums; }
 @media print { body { padding: 0; } th { position: static; } }
 """
 
@@ -153,6 +197,86 @@ _JS = """
   }
   racine.appendChild(synthese);
 
+  // -- Vue chemin (issue #1075) --
+  function fixe(v, n) { return Number(v).toFixed(n).replace(".", L.decimal); }
+  function valeur(seg, champ) {
+    var v = seg[champ.cle];
+    if (v === null || v === undefined) { return L.not_measured; }
+    if (champ.format === "debit") {
+      if (v >= 1e6) { return fixe(v / 1e6, 2) + " Mbit/s"; }
+      return fixe(v / 1e3, 1) + " kbit/s";
+    }
+    if (champ.decimales !== undefined) { v = fixe(v, champ.decimales); }
+    return String(v) + (champ.unite ? " " + champ.unite : "");
+  }
+  function resume(seg) {
+    if (!seg.measured) { return L.not_measurable; }
+    var morceaux = [];
+    if (seg.delay_avg_ms !== null && seg.delay_avg_ms !== undefined) {
+      morceaux.push(fixe(seg.delay_avg_ms, 2) + " ms");
+    }
+    if (seg.loss_pct !== null && seg.loss_pct !== undefined) {
+      morceaux.push(fixe(seg.loss_pct, 1) + " % " + L.losses);
+    }
+    return morceaux.length ? morceaux.join(" / ") : L.measured;
+  }
+  var segments = doc.path_metrics || [];
+  var chemin = el("section", {"aria-labelledby": "titre-chemin"});
+  chemin.appendChild(el("h2", {"id": "titre-chemin"}, L.path));
+  if (!segments.length) {
+    chemin.appendChild(el("p", {"class": "vide"}, L.no_path));
+  } else {
+    chemin.appendChild(el("p", {"class": "sous-titre", "id": "aide-chemin"}, L.path_help));
+    var liste = chemin.appendChild(el("ol", {"class": "chemin", "id": "vue-chemin", "aria-label": L.path}));
+    var detail = el("div", {"class": "detail-segment", "id": "detail-segment", "aria-live": "polite"});
+    detail.appendChild(el("p", {"class": "vide"}, L.path_hint));
+    var boutons = [];
+    var dernier = null;
+    function montrer(i) {
+      var seg = segments[i];
+      while (detail.firstChild) { detail.removeChild(detail.firstChild); }
+      detail.setAttribute("data-segment", seg.segment);
+      detail.appendChild(el("h3", null, L.segment + " " + seg.segment + " : "
+        + (seg.measured ? L.measured : L.not_measurable)));
+      if (!seg.measured) { detail.appendChild(el("p", null, L.not_measurable_help)); }
+      var dl = detail.appendChild(el("dl"));
+      L.segment_fields.forEach(function (champ) {
+        dl.appendChild(el("dt", null, champ.libelle));
+        dl.appendChild(el("dd", {"data-champ": champ.cle}, valeur(seg, champ)));
+      });
+      boutons.forEach(function (b, j) { b.setAttribute("aria-pressed", j === i ? "true" : "false"); });
+    }
+    function point(nom) {
+      liste.appendChild(el("li", {"class": "point"}, nom));
+      dernier = nom;
+    }
+    segments.forEach(function (seg, i) {
+      if (seg.upstream !== dernier) { point(seg.upstream); }
+      var li = liste.appendChild(el("li"));
+      var b = li.appendChild(el("button", {
+        "type": "button", "class": "segment" + (seg.measured ? "" : " non-mesurable"),
+        "data-index": String(i), "aria-pressed": "false", "aria-controls": "detail-segment",
+        "aria-describedby": "aide-chemin",
+        "aria-label": L.segment + " " + seg.segment + " : " + resume(seg)
+      }, resume(seg)));
+      boutons.push(b);
+      b.addEventListener("mouseenter", function () { montrer(i); });
+      b.addEventListener("focus", function () { montrer(i); });
+      b.addEventListener("click", function () { montrer(i); });
+      b.addEventListener("keydown", function (ev) {
+        var cible = null;
+        if (ev.key === "ArrowRight" || ev.key === "ArrowDown") { cible = Math.min(i + 1, boutons.length - 1); }
+        if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") { cible = Math.max(i - 1, 0); }
+        if (ev.key === "Home") { cible = 0; }
+        if (ev.key === "End") { cible = boutons.length - 1; }
+        if (cible !== null) { ev.preventDefault(); boutons[cible].focus(); }
+      });
+      point(seg.downstream);
+    });
+    chemin.appendChild(detail);
+  }
+  racine.appendChild(chemin);
+
   var triage = el("section", {"aria-labelledby": "titre-triage"});
   triage.appendChild(el("h2", {"id": "titre-triage"}, L.triage));
   triage.appendChild(tableau(L.triage_caption, [L.segment, L.score, L.categories, L.findings_count],
@@ -193,6 +317,22 @@ def _labels() -> dict:
         "message": _("Message"),
         "no_findings": _("Aucun constat : rien d'anormal detecte."),
         "no_triage": _("Aucun segment a prioriser."),
+        "path": _("Chemin observe"),
+        "path_help": _("Survoler un segment, ou le selectionner au clavier (Tab puis fleches), pour voir son detail."),
+        "path_hint": _("Aucun segment selectionne."),
+        "no_path": _("Aucun segment : une seule capture, ou aucun couple de points correle."),
+        "path_caption": _("Metriques par segment, dans l'ordre du chemin"),
+        "measured": _("mesure"),
+        "not_measurable": _("non mesurable"),
+        "not_measurable_help": _(
+            "Aucun paquet correle ni aucune perte observee sur ce segment : ses valeurs sont inconnues, pas nulles."
+        ),
+        "not_measured": _("non mesure"),
+        "losses": _("pertes"),
+        "state": _("Etat"),
+        # Separateur decimal des valeurs affichees (« . » en anglais).
+        "decimal": _(","),
+        "segment_fields": [{**champ, "libelle": _(champ["libelle"])} for champ in _SEGMENT_FIELDS],
         "severities": {k: _(v) for k, v in _SEVERITY_LABELS.items()},
         "health": {k: _(v) for k, v in _HEALTH_LABELS.items()},
         "severity_order": list(_SEVERITY_ORDER),
@@ -237,6 +377,46 @@ def _static_table(caption: str, headers: list[str], rows: list[list[str]], empty
     return f"<table><caption>{_e(caption)}</caption><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table>"
 
 
+def _static_value(seg: dict, champ: dict, labels: dict) -> str:
+    """Valeur affichee d'une metrique de segment, meme format que le JS."""
+    logger.debug("_static_value: entrée ({})", champ["cle"])
+    v = seg.get(champ["cle"])
+    if v is None:
+        logger.debug("_static_value: si valeur inconnue -> retour libelle non mesure")
+        return labels["not_measured"]
+    if champ.get("format") == "debit":
+        texte = f"{v / 1e6:.2f} Mbit/s" if v >= 1e6 else f"{v / 1e3:.1f} kbit/s"
+        logger.debug("_static_value: si debit -> retour {}", texte)
+        return texte.replace(".", labels["decimal"])
+    texte = f"{v:.{champ['decimales']}f}".replace(".", labels["decimal"]) if "decimales" in champ else str(v)
+    if champ.get("unite"):
+        texte += " " + champ["unite"]
+    logger.debug("_static_value: retour {}", texte)
+    return texte
+
+
+def _static_path(doc: dict, labels: dict) -> str:
+    """Vue chemin sans JavaScript : un tableau, une ligne par segment."""
+    logger.debug("_static_path: entrée")
+    segments = doc.get("path_metrics") or []
+    champs = labels["segment_fields"]
+    tableau = _static_table(
+        labels["path_caption"],
+        [labels["segment"], labels["state"], *(c["libelle"] for c in champs)],
+        [
+            [
+                _e(s.get("segment")),
+                _e(labels["measured"] if s.get("measured") else labels["not_measurable"]),
+                *(_e(_static_value(s, c, labels)) for c in champs),
+            ]
+            for s in segments
+        ],
+        labels["no_path"],
+    )
+    logger.debug("_static_path: retour ({} segment(s))", len(segments))
+    return f"<h2>{_e(labels['path'])}</h2>{tableau}"
+
+
 def _static_body(doc: dict, labels: dict) -> str:
     """Rendu sans JavaScript (``<noscript>``) : synthese, score, triage, constats."""
     logger.debug("_static_body: entrée")
@@ -278,6 +458,7 @@ def _static_body(doc: dict, labels: dict) -> str:
         f"<p>{_e(labels['health_score'])} : {_e(doc.get('health_score'))}/100 ({_e(label_sante)})</p>"
         f"<p>{_e(labels['points'])} : {_e(' -> '.join(doc.get('points') or []))}</p>"
         f"<p>{_e(labels['findings_count'])} : {len(findings)} ({_e(resume)})</p>"
+        f"{_static_path(doc, labels)}"
         f"<h2>{_e(labels['triage'])}</h2>{triage}"
         f"<h2>{_e(labels['findings'])}</h2>{constats}"
     )
