@@ -12,6 +12,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   authentifiées) à un réflecteur et rend délai aller-retour corrigé du temps de traitement, délais aller et retour,
   pertes, gigue et TTL reçu. Sans réflecteur (aucune réponse, port fermé, cible injoignable), le résultat l'indique
   au lieu d'échouer. 10 sondes/s au plus, chaque mesure journalisée. Voir docs/mesures-actives.md.
+- Diagnostics sur le contenu déchiffré (#1045) : avec un fichier de clés, le certificat TLS 1.3 est lu (détection de
+  substitution entre points), les paquets QUIC 1-RTT et leurs fermetures (CONNECTION_CLOSE) donnent des constats,
+  et les signatures d'exploits sont aussi appliquées au contenu TLS en clair. Voir `docs/couverture-dechiffrement.md`.
 - Couverture du déchiffrement TLS/QUIC (#1043) : le rapport texte, le PDF et le JSON (`decryption.by_point`)
   indiquent par point « 42/50 sessions TLS déchiffrées au point CLIENT » (et de même pour QUIC) dès qu'un fichier de
   clés ou des blocs DSB sont fournis. Voir docs/couverture-dechiffrement.md.

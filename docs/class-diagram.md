@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-220 modules · 317 classes · 805 fonctions publiques de module.
+221 modules · 317 classes · 808 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -46,7 +46,7 @@ flowchart TD
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"48 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"23 imports"| pcap_parser
+    netcross_core -->|"24 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -144,6 +144,7 @@ flowchart LR
 | `pcap_parser.capfile` | couche 1 bis : cadrage binaire minimal des fichiers pcap / pcapng. |
 | `pcap_parser.capinfos_source` | lecture du commentaire de SECTION pcapng (Section Header Block, "capture comment") d'un fichier de capture, via `capinfos -k`. |
 | `pcap_parser.capture` | couche 6 (orchestration) : point d'entree public du package. |
+| `pcap_parser.decrypted` | contenu TLS déchiffré par tshark, trame par trame (issue #1045, chantier #997). |
 | `pcap_parser.ek_fields` | couche 2 : acces bas niveau aux champs d'un paquet EK. |
 | `pcap_parser.ek_source` | couche 1 : execution de tshark -T ek et lecture du flux NDJSON qui en resulte, fichier pcap ou interface live. |
 | `pcap_parser.packet` | couche 5 : assemblage d'un RawPacket normalise a partir des couches EK d'un paquet, une fois l'encapsulation detectee (tunnels.py) et les protocoles applicatifs extraits (protocols.py). |
@@ -294,6 +295,13 @@ classDiagram
         +export_json(path_in, path_out) None
     }
 
+    %% ===== pcap_parser.decrypted =====
+    class mod_pcap_parser_decrypted["pcap_parser.decrypted"] {
+        <<module>>
+        +parse_hex_dump(lignes) dict~int, bytes~
+        +read_decrypted_tls(path, tls_keylog) dict~int, bytes~
+    }
+
     %% ===== pcap_parser.ek_fields =====
     class mod_pcap_parser_ek_fields["pcap_parser.ek_fields"] {
         <<module>>
@@ -434,6 +442,8 @@ classDiagram
         +bool tls_dechiffre
         +int? quic_connexion
         +bool quic_dechiffre
+        +bool quic_court
+        +str? quic_fermeture
     }
     class mod_pcap_parser_packet["pcap_parser.packet"] {
         <<module>>
@@ -1131,6 +1141,7 @@ classDiagram
         +str? payload_hash
         +str evidence
         +str point
+        +bool decrypted
     }
     class netcross_core_exploit_signatures__FlowState["netcross_core.exploit_signatures._FlowState"] {
         <<dataclass, slots>>
@@ -1662,6 +1673,8 @@ classDiagram
         +bool tls_dechiffre
         +int? quic_connexion
         +bool quic_dechiffre
+        +bool quic_court
+        +str? quic_fermeture
         +str? tls_ja4
         +str? tls_ja4_readable
         +str? ssh_hassh
@@ -1951,12 +1964,16 @@ classDiagram
         +str? sni
         +str? tls_version
         +str quic_version
+        +str kind
+        +int? connexion
+        +str? fermeture
     }
     class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
         <<module>>
         +derive_initial_secrets(dcid, version) tuple~bytes, bytes~
         +derive_packet_protection_keys(secret, version) tuple~bytes, bytes, bytes~
-        +parse_quic_capture(label, path) list~QuicEvent~
+        +parse_quic_capture(label, path, tls_keylog) list~QuicEvent~
+        +constats_1rtt(events) list
         +diagnose_quic(events, points_order)
         +print_quic_diagnostics(findings) None
     }
@@ -3205,7 +3222,7 @@ classDiagram
     %% ===== netcross_core.security.findings =====
     class mod_netcross_core_security_findings["netcross_core.security.findings"] {
         <<module>>
-        +scan_capture_exploits(label, path, signatures) list~Detection~
+        +scan_capture_exploits(label, path, signatures, tls_keylog) list~Detection~
         +exploit_findings(detections) list~dict~str, Any~~
         +anomaly_findings(suspicions) list~dict~str, Any~~
         +dns_tunnel_findings(suspicions) list~dict~str, Any~~
@@ -4940,7 +4957,7 @@ classDiagram
         +load_packets(captures, parallel, on_progress, max_workers, tls_keylog) list
         +run_analysis_pipeline(captures, options, on_progress) AnalysisResult
         +expand_split_interfaces(captures, workdir, log) list~tuple~str, str~~
-        +run_security_analysis(report, all_packets, captures, log, known_destinations, known_hosts, test_net_external, cve_db, plugins)
+        +run_security_analysis(report, all_packets, captures, log, known_destinations, known_hosts, test_net_external, cve_db, plugins, tls_keylog)
     }
 
     %% ===== netcross_gtk4.annotations_panel =====
