@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-222 modules · 320 classes · 811 fonctions publiques de module.
+222 modules · 320 classes · 815 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -32,7 +32,7 @@ flowchart TD
     netcross_ai["netcross_ai"]
     netcross_core["netcross_core"]
     pcap_parser["pcap_parser"]
-    CLI -->|"25 imports"| netcross_report
+    CLI -->|"26 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
     CLI -->|"56 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
@@ -1983,6 +1983,7 @@ classDiagram
     %% ===== netcross_core.redact =====
     class AddressRedactor {
         +pseudonymize_name(name) str
+        +pseudonymize_address(value) str
         +redact(packets) None
         +entries()
         +mapping() dict~str, str~
@@ -4192,6 +4193,10 @@ classDiagram
         +series_upper_bound(n_points, n_segments) int
         +segment_label(a, b) str
         +collect_samples(r, run, findings, max_points, max_segments) list~Sample~
+        +render_prometheus_text(samples, comment) str
+        +render_openmetrics(samples) str
+        +write_prom_file(texte, path) str
+        +redact_samples(samples, redactor) list~Sample~
     }
 
     %% ===== netcross_report.path_metrics =====
