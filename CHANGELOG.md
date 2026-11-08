@@ -8,6 +8,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Non-régression de performance (#1019) : `scripts/bench.py --reference benchmarks/reference.json` compare le banc
+  à une référence versionnée (durée totale et pics RSS, seuils `--seuil-duree`/`--seuil-memoire`, 20 % par défaut,
+  code 3 sur régression ; `--resultat` pour comparer sans relancer, `--resume` pour le résumé du job). Workflow
+  `bench.yml` hebdomadaire et à la demande (jamais sur les PR), résultat publié en artefact.
 - Empreinte de paquet invariante (#1021) : `netcross_core.empreinte` projette la clé de corrélation sur 64 bits
   stables (BLAKE2b, indépendants de `PYTHONHASHSEED`), avec `apparier()` et `comparer_appariements()` pour vérifier
   l'équivalence avec `correlate()`. Limites (NAT, fragmentation, réécritures) dans docs/empreinte-paquet.md.
