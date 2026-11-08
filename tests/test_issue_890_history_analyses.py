@@ -122,7 +122,7 @@ def test_findings_tls_quic_transmis_comme_la_cli(db):
     assert rep.json()["history_id"] == 7
     kwargs = record.call_args.kwargs
     assert {"findings", "tls_findings", "quic_findings", "label", "meta"} <= set(kwargs)
-    assert kwargs["meta"] == {"Anonymisation": "adresses IP/MAC anonymisees (--redact)"}
+    assert kwargs["meta"] == {"Anonymisation": "adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (--redact)"}
 
 
 def test_options_enregistrees_avec_l_analyse(db):

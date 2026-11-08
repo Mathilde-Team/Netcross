@@ -793,7 +793,7 @@ def _analyse_captures(
         findings = build_findings(report)
         meta = {"Source": "API REST"}
         if options.redact:
-            meta["Anonymisation"] = "adresses IP/MAC anonymisees (redact)"
+            meta["Anonymisation"] = "adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (redact)"
         # Issue #673 : sections d'expertise (équiv. --rule-engine,
         # --expert-section, --media-quality, --tshark-stats, --flow-timeline)
         rule_engine_findings = None
@@ -1714,7 +1714,7 @@ async def get_analysis_markdown(
         rule_engine_findings = {rule_id: evaluate(rule_id, report) for rule_id in available_rule_ids()}
     meta = {"Source": "API REST"}
     if options.get("redact"):
-        meta["Anonymisation"] = "adresses IP/MAC anonymisees (redact)"
+        meta["Anonymisation"] = "adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (redact)"
     document = build_markdown_report_document(
         report,
         meta=meta,

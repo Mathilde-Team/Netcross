@@ -23,6 +23,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Query
 
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.redact import SCOPE_ALL, scope_label
 
 logger = get_logger(__name__)
 
@@ -65,7 +66,7 @@ def record_comparison(findings, baseline_report, current_report, label: str | No
             baseline_report,
             current_report,
             path,
-            meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if redact else None,
+            meta={"Anonymisation": scope_label(SCOPE_ALL)} if redact else None,
             label=label,
         )
     except HistoryDatabaseError as exc:
@@ -94,7 +95,7 @@ def record_analysis(report, findings, tls_findings, quic_findings, label: str | 
             findings=findings,
             tls_findings=tls_findings,
             quic_findings=quic_findings,
-            meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if redact else None,
+            meta={"Anonymisation": scope_label(SCOPE_ALL)} if redact else None,
             label=label,
         )
     except HistoryDatabaseError as exc:

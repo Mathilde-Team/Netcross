@@ -138,7 +138,7 @@ def test_pdf_genere_puis_dependances_absentes(lance, monkeypatch, tmp_path, caps
     monkeypatch.setattr(netcross_report, "generate_diff_pdf", lambda *a, **kw: appels.append(kw["meta"]))
     pdf = tmp_path / "diff.pdf"
     lance("--pdf-report", pdf, "--redact")
-    assert appels == [{"Anonymisation": "adresses IP/MAC anonymisees (--redact)"}]
+    assert appels == [{"Anonymisation": "adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (--redact)"}]
     assert f"Rapport PDF ecrit dans {pdf}" in capsys.readouterr().out
 
     monkeypatch.delattr(netcross_report, "generate_diff_pdf")

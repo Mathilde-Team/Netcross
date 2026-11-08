@@ -49,7 +49,7 @@ Options principales :
 | Corrélation tolérante au NAT | Nécessaire si un NAT est traversé entre deux points | `--nat-tolerant` |
 | Lecture parallèle des captures | Plus rapide sur une machine multicœur | `--parallel` |
 | Détecter / Exclure les doublons inter-captures | Repère les paquets vus deux fois (miroir mal configuré) | `--detect-duplicates`, `--exclude-duplicates` |
-| Anonymiser les adresses IP/MAC | Rapport partageable sans adresses réelles | `--redact` |
+| Anonymiser les adresses IP/MAC | Rapport partageable sans adresses ni noms réels (DNS, HTTP, TLS, SIP ; portée « tout » de `--redact-scope`) | `--redact` |
 | Cles TLS... | Fichier de clés TLS (format `SSLKEYLOGFILE`) transmis à tshark pour déchiffrer les sessions TLS de toutes les captures. Un fichier absent ou combiné à l'anonymisation bloque le lancement | `--tls-keylog` |
 | Diagnostic TLS, Diagnostic QUIC/HTTP3 | Certificats, négociations, QUIC | `--tls`, `--quic` |
 | Rapport de sécurité | Vulnérabilités et tentatives d'attaque | `--security-report` |
