@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-210 modules · 304 classes · 746 fonctions publiques de module.
+213 modules · 309 classes · 758 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -34,7 +34,7 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"24 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"53 imports"| netcross_core
+    CLI -->|"55 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"32 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
@@ -46,7 +46,7 @@ flowchart TD
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"42 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"22 imports"| pcap_parser
+    netcross_core -->|"23 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -168,6 +168,8 @@ classDiagram
         +int? received
         +int? dropped_by_interface
         +int? dropped_by_os
+        +int? speed_bps
+        +float ts_resolution
     }
     class CaptureStructure {
         <<dataclass, frozen>>
@@ -188,6 +190,7 @@ classDiagram
         +detect_format(path) str?
         +format_extension(fmt) str
         +has_packets(path) bool
+        +tsresol_seconds(value) float
         +read_structure(path) CaptureStructure?
         +split_by_size(path, out_prefix, max_bytes) list~str~
         +first_timestamp(path) float
@@ -231,6 +234,16 @@ classDiagram
         +rotate(now) str
         +maybe_rotate(now) str?
     }
+    class RingFile {
+        <<dataclass, frozen>>
+        +str path
+        +int index
+        +float? start
+        +float? end
+        +int? packet_count
+        +known() bool
+        +covers(start, end) bool
+    }
     class TcpreplayNotFoundError {
         <<RuntimeError>>
     }
@@ -263,6 +276,8 @@ classDiagram
         +ring_recorder_args(interface, directory, max_files, max_duration_per_file, prefix, bpf_filter) list
         +start_ring_recorder(interface, directory, max_files, max_duration_per_file, prefix, bpf_filter) subprocess.Popen
         +stop_ring_recorder(proc, timeout) str
+        +ring_inventory(directory, prefix, reader) list~RingFile~
+        +select_ring_files(inventory, start, end, include_unknown) list~RingFile~
         +merge_captures(paths, output_path, dedup) None
         +replay_capture(path, interface, speed, loop) None
         +replay_command(path, interface, speed, loop) list~str~
@@ -515,6 +530,7 @@ classDiagram
 | `netcross_core.forensic` | index de correlation bidirectionnel evenement ↔ flow ↔ paquet (Job 8/issue #5, §6.3 et §6.14 de FEATURES.md). |
 | `netcross_core.forensic_search` | moteur de recherche analytique post-capture transversal (Job 17 / issue #16, section 6.13 de FEATURES.md). |
 | `netcross_core.i18n` | internationalisation par GNU gettext (issue #299). |
+| `netcross_core.link_speed` | Vitesse de lien et resolution d'horodatage par point (issue #1132). |
 | `netcross_core.live_diff` | Capture en continu + diff en direct (Job 33, issue #33). |
 | `netcross_core.live_report` | issue #274 : export / rapport temps reel du mode ``--live``. |
 | `netcross_core.logging_config` | configuration centrale du logging (issue #245). |
@@ -1268,6 +1284,15 @@ classDiagram
         +N_(message) str
     }
 
+    %% ===== netcross_core.link_speed =====
+    class mod_netcross_core_link_speed["netcross_core.link_speed"] {
+        <<module>>
+        +parse_link_speed(text) int
+        +parse_link_speed_specs(specs, points) dict~str, int~
+        +resolve_link_speeds(captures, overrides) dict~str, dict~
+        +format_speed(bps) str
+    }
+
     %% ===== netcross_core.live_diff =====
     class LiveDiffConfig {
         <<dataclass, frozen>>
@@ -1737,6 +1762,7 @@ classDiagram
         +list~str~ capture_comments
         +list~str~ packet_comments
         +list~dict~ capture_infos
+        +dict~str, dict~ link_speeds
         +list~ChecksumError~ checksum_errors
     }
     class PacketAnnotation {
@@ -1751,29 +1777,6 @@ classDiagram
         +str name
         +str expression
         +str description
-    }
-
-    %% ===== netcross_core.naming =====
-    class NameEntry {
-        <<dataclass, frozen>>
-        +str name
-        +str? address
-        +str? mac
-        +str type
-        +str? site
-        +str? role
-        +str? comment
-        +matches(address, mac) bool
-    }
-    class NameTable {
-        +add(entry) None
-        +resolve(address) NameEntry?
-        +resolve_mac(mac) NameEntry?
-        +display(address) str
-        +to_list() list~dict~
-        +from_list(items)$ NameTable
-        +load(path)$ NameTable
-        +save(path) None
     }
 
     %% ===== relations =====
@@ -1821,6 +1824,29 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_core.naming =====
+    class NameEntry {
+        <<dataclass, frozen>>
+        +str name
+        +str? address
+        +str? mac
+        +str type
+        +str? site
+        +str? role
+        +str? comment
+        +matches(address, mac) bool
+    }
+    class NameTable {
+        +add(entry) None
+        +resolve(address) NameEntry?
+        +resolve_mac(mac) NameEntry?
+        +display(address) str
+        +to_list() list~dict~
+        +from_list(items)$ NameTable
+        +load(path)$ NameTable
+        +save(path) None
+    }
 
     %% ===== netcross_core.packet_limits =====
     class mod_netcross_core_packet_limits["netcross_core.packet_limits"] {
@@ -2041,6 +2067,51 @@ classDiagram
     }
 ```
 
+## `netcross_core.active`
+
+| Module | Rôle |
+|---|---|
+| `netcross_core.active` | confirmation active du diagnostic passif (chantier #999, parent #993). |
+| `netcross_core.active.planner` | planificateur « constat localise -> mesure active proposee » (issue #1063, sous-issue 1/5 du chantier #999). |
+
+### Diagramme
+
+```mermaid
+classDiagram
+    direction LR
+
+    %% ===== netcross_core.active.planner =====
+    class FiveTuple {
+        <<dataclass, frozen>>
+        +str proto
+        +str src
+        +int? sport
+        +str dst
+        +int? dport
+    }
+    class ProposedMeasurement {
+        <<dataclass>>
+        +str kind
+        +FiveTuple five_tuple
+        +str protocol
+        +int? target_port
+        +str reason
+        +list~str~ rule_ids
+        +list~str~ segments
+        +to_dict() dict
+    }
+    class mod_netcross_core_active_planner["netcross_core.active.planner"] {
+        <<module>>
+        +five_tuple_from_flow_key(key) FiveTuple?
+        +ineligibility_reason(event) str?
+        +plan_measurements(events, max_flows_per_event) list~ProposedMeasurement~
+        +plan_from_diagnoses(diagnoses, max_flows_per_event) list~ProposedMeasurement~
+    }
+
+    %% ===== relations =====
+    ProposedMeasurement --> FiveTuple : five_tuple
+```
+
 ## `netcross_core.application`
 
 | Module | Rôle |
@@ -2086,6 +2157,7 @@ classDiagram
     %% ===== netcross_core.application.http =====
     class mod_netcross_core_application_http["netcross_core.application.http"] {
         <<module>>
+        +http1_transactions(packets) list~HttpTransaction~
         +build_http_transactions(packets, network_signals) list~ApplicationTransaction~
     }
 
@@ -2115,9 +2187,41 @@ classDiagram
         +TransactionClassification classification
         +to_dict() dict
     }
+    class HttpConnection {
+        <<dataclass, frozen, slots>>
+        +str transport
+        +str client
+        +str server
+        +int? client_port
+        +int? server_port
+        +key() FlowKey
+    }
+    class HttpTransaction {
+        <<dataclass, slots>>
+        +str version
+        +str point
+        +HttpConnection connection
+        +int? stream_id
+        +str? method
+        +str? target
+        +str? authority
+        +str? path
+        +int? status
+        +float? request_ts
+        +float? first_byte_ts
+        +float? end_ts
+        +float? server_time_ms
+        +from_target(version, point, connection, target, champs)$
+        +answered() bool
+        +ttfb_ms() float?
+        +total_ms() float?
+        +request_summary() str
+        +to_application_transaction(network_signals)
+    }
 
     %% ===== relations =====
     ApplicationTransaction --> TransactionClassification : classification
+    HttpTransaction --> HttpConnection : connection
 ```
 
 ## `netcross_core.discovery`
