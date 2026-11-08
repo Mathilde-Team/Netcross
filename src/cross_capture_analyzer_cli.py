@@ -3232,6 +3232,7 @@ def main():
     if captures:
         r.capture_comments = read_capture_comments(captures)
         r.capture_infos = read_capture_infos(captures)
+        r.points_keylog = sorted(tls_keylogs)
         from netcross_core.link_speed import resolve_link_speeds
 
         r.link_speeds = resolve_link_speeds(captures, link_speed_overrides)

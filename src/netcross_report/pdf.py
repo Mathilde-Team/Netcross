@@ -22,6 +22,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from netcross_core.dechiffrement import lignes as lignes_dechiffrement
 from netcross_core.logging_config import get_logger, summarize
 from netcross_report.charts import (
     DIFF_SEVERITY_SCHEME,
@@ -1253,6 +1254,13 @@ def generate_pdf(
                 if counts:
                     rows.append((p, ", ".join(f"{k}={v}" for k, v in sorted(counts.items()))))
             story.append(_kv_table(rows, styles) if rows else Paragraph("Rien.", styles["Normal"]))
+
+        couverture = lignes_dechiffrement(r)
+        if couverture:
+            # Issue #1043 : couverture du dechiffrement TLS/QUIC par point.
+            story.append(Spacer(1, 0.3 * cm))
+            story.append(Paragraph("Déchiffrement TLS / QUIC", styles["H2b"]))
+            story.extend(Paragraph(ligne, styles["Normal"]) for ligne in couverture)
 
         if tls_findings or quic_findings:
             story.append(Spacer(1, 0.3 * cm))

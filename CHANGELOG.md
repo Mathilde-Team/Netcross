@@ -8,6 +8,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Couverture du déchiffrement TLS/QUIC (#1043) : le rapport texte, le PDF et le JSON (`decryption.by_point`)
+  indiquent par point « 42/50 sessions TLS déchiffrées au point CLIENT » (et de même pour QUIC) dès qu'un fichier de
+  clés ou des blocs DSB sont fournis. Voir docs/couverture-dechiffrement.md.
 - Empreinte de paquet invariante (#1021) : `netcross_core.empreinte` projette la clé de corrélation sur 64 bits
   stables (BLAKE2b, indépendants de `PYTHONHASHSEED`), avec `apparier()` et `comparer_appariements()` pour vérifier
   l'équivalence avec `correlate()`. Limites (NAT, fragmentation, réécritures) dans docs/empreinte-paquet.md.

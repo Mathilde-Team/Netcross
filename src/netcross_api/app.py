@@ -750,6 +750,7 @@ def _analyse_captures(
         if truncation_note:
             report.truncated = True
             report.truncation_note = truncation_note
+        report.points_keylog = sorted({label for label, _ in options.tls_keylogs})
         security_report = None
         if not options.redact:
             # CVE-2 : scanner les exploits sur chaque fichier. Pas avec redact :

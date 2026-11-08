@@ -384,6 +384,8 @@ def _run_pipeline(
 
         report.capture_comments = read_capture_comments(captures)
         report.capture_infos = read_capture_infos(captures)
+        if advanced.tls_keylog:
+            report.points_keylog = sorted({label for label, _ in captures})
 
     # 8. Rapport texte
     _log("Mise en forme du rapport...")
