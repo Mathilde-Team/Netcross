@@ -14,6 +14,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   Server SIP (`agent-N`), avec la table de noms commune (#1151), ainsi que les IP du SAN. Les pseudonymes restent
   stables pendant le run (dialogues SIP, certificats auto-signés). `--redact-map` exporte ces tables ; la GUI, l'API et
   `cross_capture_diff_cli.py` appliquent la portée « tout ». `--redact-scope adresses` rend le comportement antérieur.
+- Appariement des flux RTP entre points (#1121) : le même flux est reconnu à plusieurs points malgré un NAT ou un SBC
+  (ports, adresses, SSRC, séquence et horodatage RTP réécrits), par SSRC puis par couples (séquence, horodatage RTP)
+  avec décalage constant. Clé `rtp_matches` de `--json-report` : jambes par point, méthode, `nat_rewritten`, pertes
+  entre jambes. Voir docs/appariement-rtp.md.
 - Corrélation en flux (#1022) : `--streaming` fusionne les points en k voies par temps (`heapq.merge`) et ferme
   chaque groupe après `--streaming-window` secondes ; la mémoire suit la fenêtre, pas le nombre de paquets. Paquets
   désordonnés rattachés dans la fenêtre, troncature (paquet arrivé après la fermeture de son groupe) signalée dans
