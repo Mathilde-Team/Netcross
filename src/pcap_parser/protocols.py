@@ -270,6 +270,42 @@ def extract_sdp_media(payload: bytes) -> tuple[tuple[str, int], ...]:
     return tuple(endpoints)
 
 
+SIP_HEADER_MAX_LEN = 200
+"""Longueur maximale conservee d'un en-tete Via ou Contact (issue #1125) :
+assez pour comparer l'adresse et les parametres, sans garder en memoire un
+en-tete demesure par paquet."""
+
+
+def extract_sip_route_headers(payload: bytes) -> tuple[str | None, str | None]:
+    """En-tetes ``Via`` (le premier, celui du dernier saut) et ``Contact``
+    d'un message SIP, tels qu'ecrits dans la charge utile (issue #1125).
+
+    Ils servent a reperer, d'un point de capture a l'autre, un message
+    reecrit par un ALG ou un SBC. Formes compactes ``v`` et ``m`` (RFC 3261,
+    7.3.3) acceptees ; lecture arretee a la fin des en-tetes. Valeurs
+    tronquees a ``SIP_HEADER_MAX_LEN`` caracteres ; ``None`` si absent."""
+    logger.debug("extract_sip_route_headers: debut ({} octets)", len(payload) if payload else 0)
+    if not payload:
+        logger.debug("extract_sip_route_headers: si not payload -> retour (None, None)")
+        return None, None
+    text = payload.decode("utf-8", errors="replace")
+    via: str | None = None
+    contact: str | None = None
+    for line in text.replace("\r\n", "\n").split("\n")[1:]:
+        if not line.strip():
+            break
+        name, sep, value = line.partition(":")
+        if not sep:
+            continue
+        key = name.strip().lower()
+        if key in ("via", "v") and via is None:
+            via = value.strip()[:SIP_HEADER_MAX_LEN]
+        elif key in ("contact", "m") and contact is None:
+            contact = value.strip()[:SIP_HEADER_MAX_LEN]
+    logger.debug("extract_sip_route_headers: retour (via, contact)")
+    return via, contact
+
+
 def extract_dns(layers: dict) -> dict | None:
     """Lit la dissection DNS native de tshark (reconnue sur le port 53,
     UDP comme TCP, entre autres). Renvoie None si le paquet n'est pas du

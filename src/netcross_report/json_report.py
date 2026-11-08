@@ -439,6 +439,9 @@ def build_json_report_document(
     if getattr(r, "voip_calls", None):
         doc["voip_calls"] = list(r.voip_calls)
         doc["voip_quality_distribution"] = dict(r.voip_quality_distribution)
+    # Echelle SIP multi-points (issue #1125), omise sans SIP.
+    if getattr(r, "sip_ladders", None):
+        doc["sip_ladders"] = list(r.sip_ladders)
     if tls_findings is not None:
         doc["tls_findings"] = [_finding_dict(f) for f in tls_findings]
     if quic_findings is not None:
