@@ -8,6 +8,11 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Échelle SIP multi-points (#1125) : pour chaque appel, une ligne par message SIP et une colonne par point de capture,
+  dans le PDF, le rapport HTML (avec ou sans JavaScript) et le JSON (`sip_ladders`). Un message perdu entre deux
+  points (« ABSENT »), retransmis ou réécrit (SDP, premier Via, Contact modifiés par un ALG ou un SBC) est mis en
+  évidence ; les `100 Trying`, produits à chaque saut, ne sont jamais déclarés perdus. Les en-têtes Via et Contact
+  sont désormais extraits, et `--redact` anonymise leurs adresses. Voir docs/echelle-sip.md.
 - Vue « Chemin » du rapport HTML autonome (#1075) : les points de capture dans l'ordre du chemin, reliés par leurs
   segments. Le survol, le focus clavier ou le clic sur un segment affichent son détail (délai, P50/P95/P99, gigue,
   pertes, débit, sauts, horloge). Les flèches, Début et Fin passent d'un segment à l'autre. Un segment sans mesure est

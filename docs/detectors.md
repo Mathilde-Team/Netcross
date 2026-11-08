@@ -106,6 +106,7 @@ celui que produit `tableau_markdown()`.
 | `response_time` | phase | fenetre_bornee | client de chaque connexion (SYN) et dernière requête en attente de réponse | temps de réponse serveur ; client connu pendant la vie de la connexion | `server_think_time` |  |
 | `dhcp` | phase | fenetre_bornee | messages par xid et par point | durée d'une transaction DHCP | `dhcp_missing`, `dhcp_duration_ms` |  |
 | `sip` | phase | fenetre_bornee | messages par Call-ID et par point | durée de l'appel | `sip_missing`, `sip_setup_duration_ms`, `sip_failed_calls` |  |
+| `sip_ladder` | phase | fenetre_bornee | messages par Call-ID, par message (méthode + CSeq) et par point | durée de l'appel | `sip_ladders` | échelle SIP multi-points (#1125) : message perdu, retransmis ou réécrit (SDP, Via, Contact) |
 | `build_calls` | phase | fenetre_bornee | signalisation par Call-ID et résumés des flux RTP | appel + 300 s après le dernier message SIP sans BYE | `voip_calls` |  |
 | `dns` | phase | fenetre_bornee | requêtes par dns.id et par point | délai de réponse DNS ; « sans réponse » décidé à l'expiration | `dns_missing`, `dns_timeout`, `dns_duration_ms` |  |
 | `http` | phase | fenetre_bornee | requêtes HTTP/1.x en attente de réponse, par point | délai de réponse HTTP ; « sans réponse » décidé à l'expiration | `http_missing`, `http_timeout`, `http_response_time_ms` |  |
@@ -141,7 +142,7 @@ celui que produit `tableau_markdown()`.
 | `quic_diagnostics` | diagnostic | seconde_passe | paquets QUIC Initial de chaque point | capture entière |  | --quic : relit les fichiers avec tshark |
 | `greffons` | greffon | seconde_passe | DetectorContext : tous les paquets et le rapport, en lecture seule | capture entière |  | contrat de netcross_core.plugins.api ; un mode en flux devra proposer un contrat incrémental |
 
-Total : 58 détecteurs -- incremental : 28, fenetre_bornee : 24, seconde_passe : 6.
+Total : 59 détecteurs -- incremental : 28, fenetre_bornee : 25, seconde_passe : 6.
 
 <!-- inventaire-detecteurs:fin -->
 

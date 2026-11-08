@@ -273,6 +273,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         ("sip_missing", "sip_setup_duration_ms", "sip_failed_calls"),
     ),
     Detecteur(
+        "sip_ladder",
+        PHASE,
+        FENETRE_BORNEE,
+        "messages par Call-ID, par message (méthode + CSeq) et par point",
+        "durée de l'appel",
+        ("sip_ladders",),
+        "échelle SIP multi-points (#1125) : message perdu, retransmis ou réécrit (SDP, Via, Contact)",
+    ),
+    Detecteur(
         "build_calls",
         PHASE,
         FENETRE_BORNEE,

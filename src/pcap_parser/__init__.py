@@ -94,6 +94,7 @@ from pcap_parser.protocols import (
     extract_dns,
     extract_rtp,
     extract_sip,
+    extract_sip_route_headers,
     extract_tls_certificate,
 )
 from pcap_parser.tunnels import detect_encapsulation, is_tunnel, select_innermost_layers
@@ -130,6 +131,7 @@ __all__ = [
     "extract_dns",
     "extract_rtp",
     "extract_sip",
+    "extract_sip_route_headers",
     "extract_tls_certificate",
     "first_timestamp",
     "is_tunnel",

@@ -455,6 +455,10 @@ def analyse(
         _analyse_dhcp(r, all_packets, points, points_order)
     with _phase("sip"):
         _analyse_sip(r, all_packets, points, points_order)
+    from netcross_core.sip_ladder import build_sip_ladders
+
+    with _phase("sip_ladder"):
+        r.sip_ladders = build_sip_ladders(all_packets, points if points_order else None)
     from netcross_core.voip import build_calls
 
     with _phase("build_calls"):
