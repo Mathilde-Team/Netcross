@@ -101,6 +101,16 @@ DETECTEURS: tuple[Detecteur, ...] = (
         ("application_transactions",),
     ),
     Detecteur(
+        "clock_sync",
+        PHASE,
+        SECONDE_PASSE,
+        "échanges SYN / SYN-ACK et copies d'un même paquet entre paires de points",
+        "capture entière",
+        ("clock_offset_estimate", "clock_offset_samples"),
+        "estimateur robuste (Theil-Sen, #996) calculé avant la boucle des flux : "
+        "la latence par segment est corrigée au temps de chaque paquet",
+    ),
+    Detecteur(
         "pmtud",
         PHASE,
         FENETRE_BORNEE,

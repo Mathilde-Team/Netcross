@@ -86,6 +86,7 @@ celui que produit `tableau_markdown()`.
 | `compute_throughput` | phase | incremental | octets par (point, tranche) | aucune | `throughput` |  |
 | `detect_extracted_files` | phase | fenetre_bornee | charges utiles en cours de réassemblage par flux | durée du transfert de l'objet | `extracted_files` |  |
 | `application_transactions` | phase | fenetre_bornee | requêtes HTTP/DNS en attente de réponse | seuil de réponse du protocole ; « réponse manquante » décidée à l'expiration | `application_transactions` |  |
+| `clock_sync` | phase | seconde_passe | échanges SYN / SYN-ACK et copies d'un même paquet entre paires de points | capture entière | `clock_offset_estimate`, `clock_offset_samples` | estimateur robuste (Theil-Sen, #996) calculé avant la boucle des flux : la latence par segment est corrigée au temps de chaque paquet |
 | `pmtud` | phase | fenetre_bornee | segments retransmis en amont, par flux ; drapeau « ICMP trop grand vu » par point | durée des retransmissions d'un segment | `pmtud_blackhole` | l'absence d'ICMP « sur toute la capture » est un drapeau par point, finalisé en fin de capture |
 | `idle_timeout` | phase | fenetre_bornee | plus long silence et reprise par connexion TCP (5-tuple orienté) | vie de la connexion, potentiellement toute la capture | `idle_timeout_dropped` | connexions longues : candidat au débordement sur disque (#1024) |
 | `arp_ip_conflict` | phase | incremental | adresses MAC revendiquées par IP, par point | aucune | `arp_ip_conflict` |  |
@@ -140,7 +141,7 @@ celui que produit `tableau_markdown()`.
 | `quic_diagnostics` | diagnostic | seconde_passe | paquets QUIC Initial de chaque point | capture entière |  | --quic : relit les fichiers avec tshark |
 | `greffons` | greffon | seconde_passe | DetectorContext : tous les paquets et le rapport, en lecture seule | capture entière |  | contrat de netcross_core.plugins.api ; un mode en flux devra proposer un contrat incrémental |
 
-Total : 57 détecteurs -- incremental : 28, fenetre_bornee : 24, seconde_passe : 5.
+Total : 58 détecteurs -- incremental : 28, fenetre_bornee : 24, seconde_passe : 6.
 
 <!-- inventaire-detecteurs:fin -->
 
