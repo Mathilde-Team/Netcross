@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-210 modules · 302 classes · 749 fonctions publiques de module.
+212 modules · 308 classes · 756 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -229,6 +229,16 @@ classDiagram
         +rotate(now) str
         +maybe_rotate(now) str?
     }
+    class RingFile {
+        <<dataclass, frozen>>
+        +str path
+        +int index
+        +float? start
+        +float? end
+        +int? packet_count
+        +known() bool
+        +covers(start, end) bool
+    }
     class TcpreplayNotFoundError {
         <<RuntimeError>>
     }
@@ -261,6 +271,8 @@ classDiagram
         +ring_recorder_args(interface, directory, max_files, max_duration_per_file, prefix, bpf_filter) list
         +start_ring_recorder(interface, directory, max_files, max_duration_per_file, prefix, bpf_filter) subprocess.Popen
         +stop_ring_recorder(proc, timeout) str
+        +ring_inventory(directory, prefix, reader) list~RingFile~
+        +select_ring_files(inventory, start, end, include_unknown) list~RingFile~
         +merge_captures(paths, output_path, dedup) None
         +replay_capture(path, interface, speed, loop) None
         +replay_command(path, interface, speed, loop) list~str~
@@ -506,7 +518,7 @@ classDiagram
 | `netcross_core.packet_limits` | ``--max-packets`` et ``--sample`` (issue #283), partages par la CLI et la GUI (issue #672). |
 | `netcross_core.parsing` | adaptateur entre pcap_parser (decodage via tshark -T ek) et le modele Pkt de netcross_core. |
 | `netcross_core.profiling` | Mesure par étape du pipeline d'analyse (issue #1016, banc #994). |
-| `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial (RFC 9000/9001), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP brut. |
+| `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial v1 et v2 (RFC 9000/9001/9369), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP… |
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
@@ -1847,6 +1859,15 @@ classDiagram
     }
 
     %% ===== netcross_core.quic_diagnostics =====
+    class QuicVersion {
+        <<dataclass, frozen>>
+        +int number
+        +str name
+        +str rfc
+        +bytes initial_salt
+        +str label_prefix
+        +int initial_type
+    }
     class QuicEvent {
         <<dataclass>>
         +str point
@@ -1859,11 +1880,12 @@ classDiagram
         +bool decryptable
         +str? sni
         +str? tls_version
+        +str quic_version
     }
     class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
         <<module>>
-        +derive_initial_secrets(dcid) tuple~bytes, bytes~
-        +derive_packet_protection_keys(secret) tuple~bytes, bytes, bytes~
+        +derive_initial_secrets(dcid, version) tuple~bytes, bytes~
+        +derive_packet_protection_keys(secret, version) tuple~bytes, bytes, bytes~
         +parse_quic_capture(label, path) list~QuicEvent~
         +diagnose_quic(events, points_order)
         +print_quic_diagnostics(findings) None
@@ -2021,6 +2043,51 @@ classDiagram
     }
 ```
 
+## `netcross_core.active`
+
+| Module | Rôle |
+|---|---|
+| `netcross_core.active` | confirmation active du diagnostic passif (chantier #999, parent #993). |
+| `netcross_core.active.planner` | planificateur « constat localise -> mesure active proposee » (issue #1063, sous-issue 1/5 du chantier #999). |
+
+### Diagramme
+
+```mermaid
+classDiagram
+    direction LR
+
+    %% ===== netcross_core.active.planner =====
+    class FiveTuple {
+        <<dataclass, frozen>>
+        +str proto
+        +str src
+        +int? sport
+        +str dst
+        +int? dport
+    }
+    class ProposedMeasurement {
+        <<dataclass>>
+        +str kind
+        +FiveTuple five_tuple
+        +str protocol
+        +int? target_port
+        +str reason
+        +list~str~ rule_ids
+        +list~str~ segments
+        +to_dict() dict
+    }
+    class mod_netcross_core_active_planner["netcross_core.active.planner"] {
+        <<module>>
+        +five_tuple_from_flow_key(key) FiveTuple?
+        +ineligibility_reason(event) str?
+        +plan_measurements(events, max_flows_per_event) list~ProposedMeasurement~
+        +plan_from_diagnoses(diagnoses, max_flows_per_event) list~ProposedMeasurement~
+    }
+
+    %% ===== relations =====
+    ProposedMeasurement --> FiveTuple : five_tuple
+```
+
 ## `netcross_core.application`
 
 | Module | Rôle |
@@ -2066,6 +2133,7 @@ classDiagram
     %% ===== netcross_core.application.http =====
     class mod_netcross_core_application_http["netcross_core.application.http"] {
         <<module>>
+        +http1_transactions(packets) list~HttpTransaction~
         +build_http_transactions(packets, network_signals) list~ApplicationTransaction~
     }
 
@@ -2095,9 +2163,41 @@ classDiagram
         +TransactionClassification classification
         +to_dict() dict
     }
+    class HttpConnection {
+        <<dataclass, frozen, slots>>
+        +str transport
+        +str client
+        +str server
+        +int? client_port
+        +int? server_port
+        +key() FlowKey
+    }
+    class HttpTransaction {
+        <<dataclass, slots>>
+        +str version
+        +str point
+        +HttpConnection connection
+        +int? stream_id
+        +str? method
+        +str? target
+        +str? authority
+        +str? path
+        +int? status
+        +float? request_ts
+        +float? first_byte_ts
+        +float? end_ts
+        +float? server_time_ms
+        +from_target(version, point, connection, target, champs)$
+        +answered() bool
+        +ttfb_ms() float?
+        +total_ms() float?
+        +request_summary() str
+        +to_application_transaction(network_signals)
+    }
 
     %% ===== relations =====
     ApplicationTransaction --> TransactionClassification : classification
+    HttpTransaction --> HttpConnection : connection
 ```
 
 ## `netcross_core.discovery`
