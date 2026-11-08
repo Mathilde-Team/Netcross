@@ -441,26 +441,55 @@ def _path_table(metrics, styles):
             "Aucun segment exploitable : ni topologie deduite, ni couple de points fourni.",
             styles["Normal"],
         )
-    data = [["Segment", "Delai moy / P95 / P99 (ms)", "Gigue", "Perte aval", "Debit aval", "DSCP / frag", "Sauts"]]
+    data = [
+        [
+            "Segment",
+            "Delai moy / P95 / P99 (ms)",
+            "Gigue",
+            "Perte aval",
+            "Debit aval",
+            "DSCP / frag",
+            "Sauts",
+            "Horloge (decalage / derive)",
+        ]
+    ]
     ranked = rank_path_segments(metrics)
     pire = ranked[0].label if ranked else None
     for seg in metrics:
         delays = " / ".join(_fmt_num(v) for v in (seg.delay_avg_ms, seg.delay_p95_ms, seg.delay_p99_ms))
         label = f'<b><font color="#b91c1c">{seg.label}</font></b>' if seg.label == pire else seg.label
         perte = "\u2014" if seg.loss_pct is None else f"{seg.loss_pct:.2f}% ({seg.loss_count})"
+        # Issue #996 : un segment dont l'incertitude d'horloge depasse la
+        # latence mesuree est non mesurable (tiret cadratin, convention du
+        # tableau) -- mieux vaut ne rien affirmer qu'affirmer faux.
+        non_mesurable = (
+            seg.clock_ci_ms is not None and seg.delay_avg_ms is not None and seg.clock_ci_ms > abs(seg.delay_avg_ms)
+        )
+        horloge = "\u2014"
+        if seg.clock_offset_ms is not None:
+            horloge = (
+                f"{seg.clock_offset_ms:+.2f}ms / {seg.clock_drift_ppm:+.1f}ppm "
+                f"(IC95% \u00b1{seg.clock_ci_ms:.2f}ms, n={seg.clock_samples})"
+            )
+            if non_mesurable:
+                horloge += " \u2192 non mesurable"
         data.append(
             [
                 Paragraph(label, styles["Cell"]),
-                Paragraph(delays if seg.samples else "\u2014", styles["Cell"]),
+                Paragraph("\u2014" if (not seg.samples or non_mesurable) else delays, styles["Cell"]),
                 Paragraph(_fmt_num(seg.jitter_ms), styles["Cell"]),
                 Paragraph(perte, styles["Cell"]),
                 Paragraph(_fmt_bps(seg.throughput_bps), styles["Cell"]),
                 Paragraph(f"{seg.dscp_changes} / {seg.frag_new}", styles["Cell"]),
                 Paragraph("\u2014" if seg.hops is None else str(seg.hops), styles["Cell"]),
+                Paragraph(horloge, styles["Cell"]),
             ]
         )
     logger.debug("_path_table: retour _grid_table(…)")
-    return _grid_table(data, [3.4 * cm, 3.8 * cm, 1.5 * cm, 2.3 * cm, 2.3 * cm, 2.3 * cm, 1.4 * cm])
+    return _grid_table(
+        data,
+        [2.6 * cm, 3.4 * cm, 1.3 * cm, 2.1 * cm, 2.1 * cm, 1.9 * cm, 1.2 * cm, 3.6 * cm],
+    )
 
 
 def path_section_story(metrics, styles, chart_path=None):

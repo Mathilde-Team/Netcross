@@ -36,6 +36,7 @@ class ExpertiseSettings:
 
     @property
     def active(self) -> bool:
+        logger.debug("ExpertiseSettings.active: retour self.rule_engine or self.expert_section or self.m…")
         return self.rule_engine or self.expert_section or self.media_quality or self.tshark_stats or self.flow_timeline
 
 
@@ -57,20 +58,28 @@ def validate_settings(settings: ExpertiseSettings, *, live: bool = False) -> Non
     """Mêmes refus que la CLI : fenêtre > 0 ; qualité média et statistiques
     tshark relisent les fichiers, donc indisponibles en capture en direct."""
     if settings.flow_timeline and settings.flow_timeline_window <= 0:
+        logger.debug(
+            "validate_settings: si settings.flow_timeline and settings.flow_timeline_window <=… -> levée ExpertiseSet…"
+        )
         raise ExpertiseSettingsError("la fenetre de la chronologie des flux doit etre positive")
     if live and settings.media_quality:
+        logger.debug("validate_settings: si live and settings.media_quality -> levée ExpertiseSettingsError")
         raise ExpertiseSettingsError("la qualite media relit les fichiers de capture : indisponible en direct")
     if live and settings.tshark_stats:
+        logger.debug("validate_settings: si live and settings.tshark_stats -> levée ExpertiseSettingsError")
         raise ExpertiseSettingsError(
             "les statistiques tshark relisent les fichiers de capture : indisponibles en direct"
         )
+    logger.debug("validate_settings: fin")
 
 
 def timeline_summary(doc: dict | None) -> str:
     if not doc:
+        logger.debug('timeline_summary: si not doc -> retour "Chronologie des flux : non calculee (c…')
         return "Chronologie des flux : non calculee (cochez « Chronologie des flux » puis relancez l'analyse)."
     flows = doc.get("flows") or []
     points = sorted({f.get("point") for f in flows if f.get("point")})
+    logger.debug("timeline_summary: retour chaîne formatée")
     return (
         f"Chronologie des flux : {len(flows)} conversation(s), {len(points)} point(s), fenetre {doc.get('window_s')} s."
     )
@@ -78,6 +87,7 @@ def timeline_summary(doc: dict | None) -> str:
 
 def tshark_stats_summary(doc: dict | None) -> str:
     if not doc:
+        logger.debug('tshark_stats_summary: si not doc -> retour "Statistiques tshark : non calculees (c…')
         return "Statistiques tshark : non calculees (cochez « Statistiques tshark » puis relancez l'analyse)."
     captures = doc.get("captures") or []
     errors = [c for c in captures if "error" in c]
@@ -85,6 +95,7 @@ def tshark_stats_summary(doc: dict | None) -> str:
     if errors:
         details = "; ".join(f"{c['label']} : {c['error']}" for c in errors)
         line += f", {len(errors)} en echec ({details})"
+    logger.debug("tshark_stats_summary: retour line + '.'")
     return line + "."
 
 
