@@ -20,6 +20,12 @@ from netcross_core.application import (
     build_http_transactions,
     classify_transaction,
 )
+from netcross_core.clock_sync import (
+    EchantillonHorloge,
+    analyser_decalages_manuels,
+    estimation_manuelle,
+    estimer_decalage,
+)
 from netcross_core.content import extract_http_objects
 from netcross_core.correlate import TOPN_DIMENSIONS, compute_throughput, compute_topn_series
 from netcross_core.extract.carver import detect_extracted_files
@@ -75,6 +81,7 @@ def analyse(
     idle_timeout_seconds=None,
     exclude_duplicates=False,
     duplicate_counts=None,
+    clock_offsets=None,
 ):
     # Job 41/issue #161 : exclude_duplicates (defaut False -> comportement
     # historique inchange) retire de `flows` ET de `all_packets` les paquets
@@ -172,6 +179,7 @@ def analyse(
         r.topology_order_conflicts = _check_order_consistency(points_order, topo_edges)
 
     for pk in all_packets:
+        r.packet_count[pk.point] += 1
         if pk.vlan_id is not None:
             r.vlan_seen[pk.point].add(pk.vlan_id)
         if pk.encap_tags:
@@ -181,6 +189,21 @@ def analyse(
         r.seen_count[point] = 0
 
     conversation_points = _conversation_points(flows)
+
+    # Estimation des horloges AVANT la boucle des flux : la latence par
+    # segment (calculee dans cette boucle) doit etre corrigee au temps de
+    # chaque paquet, donc l'estimation doit deja etre disponible.
+    with _phase("clock_sync"):
+        _estimer_horloges(
+            r,
+            flows,
+            all_packets,
+            points,
+            pairs,
+            points_order,
+            nat_tolerant,
+            clock_offsets,
+        )
 
     for key, per_point in flows.items():
         present_points = [p for p in points if p in per_point]
@@ -248,6 +271,11 @@ def analyse(
                 pkt_b = min(per_point[b], key=lambda pkt: pkt.ts)
 
                 lat_ms = (pkt_b.ts - pkt_a.ts) * 1000.0
+                # Correction au temps du paquet (#996) : decalage estime a
+                # t0 PLUS derive x duree ecoulee -- pas une constante.
+                estimation = r.clock_offset_estimate.get((a, b))
+                if estimation is not None:
+                    lat_ms -= estimation.decalage_a(pkt_a.ts)
                 r.latency[(a, b)].append(lat_ms)
                 r.latency_by_bucket[(a, b)][int(pkt_a.ts // bucket_seconds)].append(lat_ms)
 
@@ -1339,6 +1367,142 @@ def _analyse_bufferbloat(r: Report):
     logger.debug("_analyse_bufferbloat: {}", _resume(r, "bufferbloat_hint"))
 
 
+def _estimer_horloges(
+    r: Report,
+    flows,
+    all_packets,
+    points,
+    pairs,
+    points_order,
+    nat_tolerant,
+    clock_offsets,
+):
+    """
+    Estime le decalage et la derive d'horloge de chaque paire de points
+    (issue #996), AVANT le calcul des latences par segment qui utilise
+    le resultat pour corriger chaque paquet au temps ou il a ete observe.
+
+    Deux sources d'echantillons, meme formule NTP
+    ``decalage = ((t2-t1)-(t4-t3))/2`` sur un aller-retour complet vu
+    des deux cotes :
+
+    - handshakes TCP : SYN (t1/t2) et SYN-ACK (t3/t4) tous deux vus aux
+      deux points de la paire (reprise du couplage SYN/SYN-ACK par
+      ``ack == seq+1`` de _analyse_handshake) ;
+    - couples requete/reponse DNS apparies par ``dns.id`` : requete
+      (t1/t2) et reponse (t3/t4) vus aux deux points -- UDP, donc
+      disponible meme sans aucun handshake TCP (trafic DNS pur).
+
+    Chaque echantillon porte aussi le delai aller-retour apparent
+    ``(t4-t1)-(t3-t2)``, exploite par le filtre au delai minimal de
+    clock_sync.estimer_decalage (les echanges qui ont subi une file
+    d'attente biaisent la formule NTP, qui suppose un chemin symetrique).
+
+    ``clock_offsets`` impose des valeurs connues (option
+    ``--clock-offset A:B=+12.5ms``, cas PTP) : l'estimation est desactivee
+    pour ces paires, et le rapport l'annonce (methode « valeur imposee »).
+
+    Args:
+        r (Report): Rapport en cours de construction ; remplit
+            ``clock_offset_samples`` et ``clock_offset_estimate``.
+        flows: Flux correles (correlate()).
+        all_packets: Paquets bruts (pour DNS).
+        points: Liste des points.
+        pairs: Paires de points a couvrir.
+        points_order: Ordre des points (None si non fourni).
+        nat_tolerant: Mode --nat-tolerant (correlation lachee : le
+            couplage SYN/SYN-ACK par ack est omis, seuls les echantillons
+            DNS restent).
+        clock_offsets: Decalages imposes (dict ou liste brute, voir
+            la docstring de analyse()).
+    """
+    logger.debug("_estimer_horloges: entrée")
+    imposes: dict[tuple[str, str], float] = {}
+    if clock_offsets:
+        if isinstance(clock_offsets, dict):
+            imposes = dict(clock_offsets)
+        else:
+            imposes = analyser_decalages_manuels(list(clock_offsets))
+
+    echantillons: defaultdict[tuple[str, str], list[EchantillonHorloge]] = defaultdict(list)
+
+    # -- source TCP : couplage SYN / SYN-ACK (ak == seq+1) --
+    if not nat_tolerant and points_order:
+        synack_lookup = defaultdict(list)
+        syn_entries = []
+        for key, per_point in flows.items():
+            if key[0] != "TCP":
+                continue
+            _, src, sport, dst, dport, _key_id = key
+            sample = next(iter(per_point.values()))[0]
+            flags = sample.flags or ""
+            if "S" in flags and "A" in flags:
+                synack_lookup[(src, sport, dst, dport)].append((sample.ack, per_point))
+            elif "S" in flags and "A" not in flags:
+                syn_entries.append((src, sport, dst, dport, sample.seq, per_point))
+        for _src, _sport, _dst, _dport, seq, per_point in syn_entries:
+            if seq is None:
+                continue
+            expected_ack = seq + 1
+            candidats = [
+                (ack_val, pp)
+                for (ack_val, pp) in synack_lookup.get((_dst, _dport, _src, _sport), [])
+                if ack_val == expected_ack
+            ]
+            if not candidats:
+                continue
+            matched = candidats[0][1]
+            reply_points = set(matched.keys())
+            syn_points_set = set(per_point.keys())
+            for a, b in pairs:
+                if a in syn_points_set and b in syn_points_set and a in reply_points and b in reply_points:
+                    t1 = min(pkt.ts for pkt in per_point[a])
+                    t2 = min(pkt.ts for pkt in per_point[b])
+                    t3 = min(pkt.ts for pkt in matched[b])
+                    t4 = min(pkt.ts for pkt in matched[a])
+                    decalage_ms = ((t2 - t1) - (t4 - t3)) / 2 * 1000.0
+                    delai_ms = ((t4 - t1) - (t3 - t2)) * 1000.0
+                    echantillons[(a, b)].append(EchantillonHorloge(t=t1, decalage_ms=decalage_ms, delai_ms=delai_ms))
+
+    # -- source UDP : couples requete/reponse DNS apparies par dns.id --
+    dns_tx: defaultdict[int, defaultdict[str, list[Pkt]]] = defaultdict(lambda: defaultdict(list))
+    for pk in all_packets:
+        if pk.dns_txn_id is not None:
+            dns_tx[pk.dns_txn_id][pk.point].append(pk)
+    for per_point in dns_tx.values():
+        requetes = {p: [pk for pk in pkts if not pk.dns_is_response] for p, pkts in per_point.items()}
+        reponses = {p: [pk for pk in pkts if pk.dns_is_response] for p, pkts in per_point.items()}
+        for a, b in pairs:
+            if a in requetes and b in requetes and a in reponses and b in reponses:
+                if not requetes[a] or not requetes[b] or not reponses[a] or not reponses[b]:
+                    continue
+                t1 = min(pk.ts for pk in requetes[a])
+                t2 = min(pk.ts for pk in requetes[b])
+                t3 = min(pk.ts for pk in reponses[b])
+                t4 = min(pk.ts for pk in reponses[a])
+                decalage_ms = ((t2 - t1) - (t4 - t3)) / 2 * 1000.0
+                delai_ms = ((t4 - t1) - (t3 - t2)) * 1000.0
+                echantillons[(a, b)].append(EchantillonHorloge(t=t1, decalage_ms=decalage_ms, delai_ms=delai_ms))
+
+    for paire, valeurs in echantillons.items():
+        r.clock_offset_samples[paire] = valeurs
+        estimation = estimer_decalage(valeurs)
+        if estimation is not None:
+            r.clock_offset_estimate[paire] = estimation
+    for paire, decalage_ms in imposes.items():
+        # Valeur imposee (--clock-offset) : desactive l'estimation pour
+        # cette paire et l'annonce dans le rapport (derive nulle).
+        echantillons_paire = echantillons.get(paire, [])
+        if echantillons_paire:
+            r.clock_offset_samples[paire] = echantillons_paire
+        r.clock_offset_estimate[paire] = estimation_manuelle(decalage_ms)
+    logger.debug(
+        "_estimer_horloges: sortie {} paire(s), {} imposée(s)",
+        len(r.clock_offset_estimate),
+        len(imposes),
+    )
+
+
 def _analyse_handshake(r: Report, flows, points, points_order, nat_tolerant):
     """
     Relie chaque SYN a son eventuelle reponse SYN-ACK (via ack == seq+1) pour
@@ -1382,28 +1546,15 @@ def _analyse_handshake(r: Report, flows, points, points_order, nat_tolerant):
             r.syn_no_synack[farthest] += 1
         else:
             reply_points = set(matched.keys())
-            syn_points_set = set(per_point.keys())
             for p in syn_points:
                 if p not in reply_points:
                     r.syn_reply_missing[p] += 1
 
-            # decalage d'horloge : formule NTP classique offset = ((t2-t1)-(t4-t3))/2,
-            # necessite que le SYN ET le SYN-ACK soient tous deux vus aux deux points
-            # de la paire (aller-retour complet visible des deux cotes)
-            for a, b in r.pairs:
-                if a in syn_points_set and b in syn_points_set and a in reply_points and b in reply_points:
-                    t1 = min(pkt.ts for pkt in per_point[a])
-                    t2 = min(pkt.ts for pkt in per_point[b])
-                    t3 = min(pkt.ts for pkt in matched[b])
-                    t4 = min(pkt.ts for pkt in matched[a])
-                    offset_ms = ((t2 - t1) - (t4 - t3)) / 2 * 1000.0
-                    r.clock_offset_samples[(a, b)].append(offset_ms)
+            # Les echantillons d'horloge (decalage NTP de chaque
+            # aller-retour complet) sont collectes par _estimer_horloges
+            # (issue #996) ; il ne reste ici que les compteurs SYN.
 
-    for pair, samples in r.clock_offset_samples.items():
-        mean_off = statistics.mean(samples)
-        stdev_off = statistics.pstdev(samples) if len(samples) > 1 else 0.0
-        r.clock_offset_estimate[pair] = (mean_off, stdev_off, len(samples))
-    logger.debug("_analyse_handshake: {}", _resume(r, "clock_offset_estimate", "syn_no_synack", "syn_reply_missing"))
+    logger.debug("_analyse_handshake: {}", _resume(r, "syn_no_synack", "syn_reply_missing"))
 
 
 def _analyse_tcp_options(r: Report, flows, pairs, nat_tolerant, points_order):
@@ -1527,8 +1678,10 @@ def _analyse_rtp(r: Report, all_packets, points, points_order, clock_rate):
                 t_b = min(pkt.ts for pkt in per_point[b_n])
                 delay_ms = (t_b - t_a) * 1000.0
                 offset_info = r.clock_offset_estimate.get((a0, b_n))
-                if offset_info:
-                    delay_ms -= offset_info[0]
+                if offset_info is not None:
+                    # #996 : correction au temps du premier paquet du flux,
+                    # pas une constante -- la derive est integree.
+                    delay_ms -= offset_info.decalage_a(t_a)
 
         r_factor = mos = None
         ref_point = points[-1] if points_order and points[-1] in loss_pct else None
