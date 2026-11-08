@@ -1,21 +1,34 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""tests/test_retro_capture.py — gel rétroactif sur alarme (issue #1087).
+"""tests/test_retro_capture.py — gel rétroactif sur alarme (issues #1087
+et #1090).
 
 Tests du module netcross_core.retro_capture : déclenchement à l'alarme
 « raised », réglages (sévérité minimale, délai entre deux gels), fenêtre
 gelée, décalage d'horloge, protection par lien dur et survie à la
-rotation du tampon. Cablage LiveDiffEngine -> GelManager en fin de
+rotation du tampon, puis découpe editcap et manifeste d'incident
+(empreintes SHA-256). Cablage LiveDiffEngine -> GelManager au milieu du
 fichier.
 """
 
+import hashlib
 import os
 
+import pytest
 from test_live_diff import _pkt, _stub_analyse_et_correlate
 
 from netcross_core.alarms import AlarmConfig, AlarmEngine, AlarmEvent
 from netcross_core.live_diff import LiveDiffConfig, LiveDiffEngine
 from netcross_core.models import Report
-from netcross_core.retro_capture import GelConfig, GelManager, GelReport, PointDeGel
+from netcross_core.retro_capture import (
+    GelConfig,
+    GelManager,
+    GelReport,
+    ManifesteIncident,
+    PointDeGel,
+    archiver_incident,
+    empreinte_sha256,
+    verifier_manifeste,
+)
 from pcap_parser.capture import RingFile
 
 
@@ -311,3 +324,138 @@ def test_live_diff_sans_gel_comportement_inchange():
     assert engine.gel is None
     engine._add_packet(_pkt(ts=1.0))
     assert engine._evaluate_diff() == []
+
+
+# -- Découpe, archivage et manifeste d'incident (issue #1090) -------------------
+
+
+def test_cut_capture_window_passe_les_bornes_a_editcap(monkeypatch, tmp_path):
+    """Critère d'acceptation de l'issue #1090 : découpe précise —
+    cut_capture_window transmet à editcap les bornes -A/-B en epoch et
+    crée le répertoire de sortie."""
+    from pcap_parser import capture as module_capture
+
+    appels: list[list[str]] = []
+
+    def faux_run(args: list[str]) -> None:
+        appels.append(list(map(str, args)))
+        # Simule editcap : écrit un fichier de sortie.
+        with open(args[-1], "wb") as fic:
+            fic.write(b"pcapng decoupe")
+
+    monkeypatch.setattr(module_capture, "_wireshark_tool_path", lambda nom: nom)
+    monkeypatch.setattr(module_capture, "_run_wireshark_tool", faux_run)
+
+    sortie = str(tmp_path / "incident" / "LAN" / "segment.pcapng")
+    module_capture.cut_capture_window("tampon.pcapng", sortie, 940.0, 1030.0)
+
+    assert len(appels) == 1
+    args = appels[0]
+    assert args[0] == "editcap"
+    assert args[args.index("-A") + 1] == "940.0"
+    assert args[args.index("-B") + 1] == "1030.0"
+    assert args[args.index("-A") - 1] != "-A"  # ordre invariable : -A puis -B
+    assert args[-2] == "tampon.pcapng"
+    assert args[-1] == sortie
+    assert os.path.exists(sortie)  # le faux editcap a bien écrit
+
+
+def test_archiver_incident_decoupe_et_signe(tmp_path):
+    """Critère d'acceptation de l'issue #1090 : l'archive d'incident
+    découpe chaque fichier protégé sur la fenêtre DU POINT (décalage
+    d'horloge pris en compte), calcule les empreintes SHA-256 et écrit
+    le manifeste."""
+    tampon = _FauxTampon(tmp_path)
+    # Horloge du point « LAN » en avance de 120 s : fenêtre point [1060, 1150].
+    tampon.ajouter("capture_00001_20260101115900.pcapng", 1050.0, 1090.0, contenu=b"paquets A")
+    tampon.ajouter("capture_00002_20260101120030.pcapng", 1090.0, 1140.0, contenu=b"paquets B")
+
+    gel = GelManager(
+        GelConfig(),
+        str(tmp_path / "archives"),
+        {"LAN": PointDeGel(inventory=tampon.inventaire, offset_vers_point=120.0)},
+    )
+    rapport = gel.on_alarm(_alarme(timestamp=1000.0))
+    assert rapport is not None
+    assert rapport.horodatage_alarme == 1000.0
+    # Fenêtre du point = fenêtre d'analyse + décalage.
+    assert rapport.fenetres["LAN"] == (1060.0, 1150.0)
+
+    decoupes: list[tuple[str, str, float, float]] = []
+
+    def faux_decoupeur(source: str, destination: str, debut: float, fin: float) -> None:
+        decoupes.append((source, destination, debut, fin))
+        # Simule editcap : le segment contient les octets de la source.
+        with open(destination, "wb") as fic, open(source, "rb") as src:
+            fic.write(src.read())
+
+    manifeste = archiver_incident(rapport, decoupeur=faux_decoupeur)
+
+    # Un segment par fichier protégé, découpé sur la fenêtre DU POINT.
+    assert len(decoupes) == 2
+    for _, _, debut, fin in decoupes:
+        assert (debut, fin) == (1060.0, 1150.0)
+
+    # Empreintes SHA-256 des segments (contenu = source, via le faux editcap).
+    assert len(manifeste.fichiers) == 2
+    for f in manifeste.fichiers:
+        assert f.empreinte == empreinte_sha256(f.segment)
+        with open(f.source, "rb") as src:
+            assert f.empreinte == hashlib.sha256(src.read()).hexdigest()
+        assert f.point == "LAN"
+
+    # Manifeste écrit dans l'archive, avec l'alarme et l'horodatage.
+    chemin_manifeste = tmp_path / "archives" / "gel-1" / "incident" / "manifeste.json"
+    assert chemin_manifeste.exists()
+    relu = ManifesteIncident.depuis_json(chemin_manifeste.read_text(encoding="utf-8"))
+    assert relu == manifeste
+    assert relu.alarme["rule_id"] == "loss_per_segment"
+    assert relu.alarme["timestamp"] == 1000.0
+    assert relu.fenetre == (940.0, 1030.0)
+
+    # Chaîne de preuve intacte : rien à signaler.
+    assert verifier_manifeste(manifeste) == []
+
+
+def test_verifier_manifeste_detecte_altération_et_absence(tmp_path):
+    """Critère d'acceptation de l'issue #1090 : les empreintes du
+    manifeste sont vérifiées — un segment altéré (ou supprimé) est
+    signalé, un segment intact ne l'est pas."""
+    tampon = _FauxTampon(tmp_path)
+    tampon.ajouter("capture_00001_20260101115900.pcapng", 950.0, 990.0, contenu=b"integre")
+
+    gel = GelManager(GelConfig(), str(tmp_path / "archives"), {"LAN": PointDeGel(inventory=tampon.inventaire)})
+    rapport = gel.on_alarm(_alarme(timestamp=1000.0))
+    assert rapport is not None
+
+    def faux_decoupeur(source: str, destination: str, debut: float, fin: float) -> None:
+        with open(source, "rb") as src, open(destination, "wb") as fic:
+            fic.write(src.read())
+
+    manifeste = archiver_incident(rapport, decoupeur=faux_decoupeur)
+    segment = manifeste.fichiers[0].segment
+    assert verifier_manifeste(manifeste) == []
+
+    # Altération : le contenu du segment ne correspond plus à l'empreinte.
+    with open(segment, "wb") as fic:
+        fic.write(b"truque")
+    assert verifier_manifeste(manifeste) == [segment]
+
+    # Absence : le segment a disparu de l'archive.
+    os.unlink(segment)
+    assert verifier_manifeste(manifeste) == [segment]
+
+
+def test_archiver_incident_sans_dossier_refuse():
+    """Cas défensif : un GelReport sans répertoire d'archives (fabriqué à
+    la main) est refusé — le gel doit venir de GelManager."""
+    rapport = GelReport(
+        rule_id="loss_per_segment",
+        segment="LAN",
+        start=940.0,
+        end=1030.0,
+        files={},
+        message="",
+    )
+    with pytest.raises(ValueError, match="dossier"):
+        archiver_incident(rapport, decoupeur=lambda *a: None)

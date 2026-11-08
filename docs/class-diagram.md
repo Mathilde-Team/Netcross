@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-223 modules · 322 classes · 813 fonctions publiques de module.
+224 modules · 327 classes · 820 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -34,7 +34,7 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"26 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"55 imports"| netcross_core
+    CLI -->|"56 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"32 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
@@ -283,6 +283,7 @@ classDiagram
         +ring_inventory(directory, prefix, reader) list~RingFile~
         +select_ring_files(inventory, start, end, include_unknown) list~RingFile~
         +merge_captures(paths, output_path, dedup) None
+        +cut_capture_window(path, output_path, start, end) None
         +replay_capture(path, interface, speed, loop) None
         +replay_command(path, interface, speed, loop) list~str~
         +start_replay(path, interface, speed, loop) subprocess.Popen
@@ -570,6 +571,7 @@ classDiagram
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
+| `netcross_core.streaming` | correlation des points en flux, par fenetre glissante (issue #1022, sous-issue 3/6 du chantier #995). |
 | `netcross_core.tls_diagnostics` | extrait l'etat des handshakes TLS (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de capture et localise le segment ou un handshake qui reussissait en amont se met a echouer. |
 | `netcross_core.tls_keylog` | Fichiers de clés TLS (SSLKEYLOGFILE) par point de capture (issue #1040, chantier #997). |
 | `netcross_core.voip` | Analyse VoIP orientee appel, association SIP/RTP par SDP. |
@@ -1833,6 +1835,7 @@ classDiagram
         +bool duplicates_excluded
         +bool truncated
         +str truncation_note
+        +dict streaming
         +list~dict~ http_objects
         +list~dict~ extracted_files
         +list~dict~ application_transactions
@@ -2034,10 +2037,35 @@ classDiagram
         +float end
         +Mapping~str, Sequence~str~~ files
         +str message
+        +Mapping~str, tuple~float, float~~ fenetres
+        +str dossier
+        +float? horodatage_alarme
         +str? ignored_reason
     }
     class GelManager {
         +on_alarm(event) GelReport?
+    }
+    class FichierIncident {
+        <<dataclass, frozen>>
+        +str point
+        +str source
+        +str segment
+        +str empreinte
+    }
+    class ManifesteIncident {
+        <<dataclass, frozen>>
+        +str incident
+        +Mapping~str, object~ alarme
+        +tuple~float, float~ fenetre
+        +tuple~FichierIncident, ...~ fichiers
+        +vers_json() str
+        +depuis_json(texte)$ ManifesteIncident
+    }
+    class mod_netcross_core_retro_capture["netcross_core.retro_capture"] {
+        <<module>>
+        +empreinte_sha256(chemin) str
+        +archiver_incident(rapport, decoupeur) ManifesteIncident
+        +verifier_manifeste(manifeste) list~str~
     }
 
     %% ===== netcross_core.rtp_match =====
@@ -2096,6 +2124,43 @@ classDiagram
         +explore_stats(flows, report, findings, group_by, sort_by, top_n) list~StatRow~
         +stats_format_for(path, fmt) str
         +render_stats(rows, fmt) str
+    }
+
+    %% ===== netcross_core.streaming =====
+    class StreamingResult {
+        <<dataclass>>
+        +float window_seconds
+        +list~str~ points
+        +Counter packet_count
+        +Counter seen_count
+        +Counter retrans
+        +Counter dup_ack
+        +Counter loss_count
+        +Counter off_path_count
+        +dict latency_sum_ms
+        +Counter latency_n
+        +int groups
+        +int out_of_order
+        +int late_packets
+        +int open_at_end
+        +int peak_open_groups
+        +truncated() bool
+        +mean_latency_ms(a, b) float?
+        +to_dict() dict
+        +summary_lines() list~str~
+    }
+    class _Group {
+        <<__slots__>>
+    }
+    class StreamingCorrelator {
+        +feed(pk) None
+        +finish() StreamingResult
+    }
+    class mod_netcross_core_streaming["netcross_core.streaming"] {
+        <<module>>
+        +merge_points(sources) Iterator~Pkt~
+        +correlate_streaming(sources, points_order, window_seconds, nat_tolerant, nat_window_ms, exclude_duplicates) StreamingResult
+        +sources_by_point(all_packets) dict~str, list~Pkt~~
     }
 
     %% ===== netcross_core.tls_diagnostics =====
@@ -2194,6 +2259,7 @@ classDiagram
     Pkt --> Banner : service_banners
     Report --> ChecksumError : checksum_errors
     Report --> SequenceGap : sequence_gaps
+    ManifesteIncident --> FichierIncident : fichiers
 ```
 
 ## `netcross_core.active`
