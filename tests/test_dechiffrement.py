@@ -264,11 +264,22 @@ def test_compteur_keylog_complet_et_absent(deux_sessions, tmp_path):
 DONNEES = Path(__file__).parent / "data"
 
 
+@pytest.fixture
+def quic_reel(tmp_path):
+    """Copie de la capture QUIC et de ses clés dans un répertoire temporaire :
+    sous Ubuntu, le profil AppArmor de tshark lui refuse la lecture directe
+    d'un fichier hors des emplacements usuels (cas du checkout CI sous /__w),
+    alors que la capture, elle, lui est passée par un tube."""
+    for nom in ("quic-1rtt.pcap", "quic-1rtt-keys.txt"):
+        shutil.copy(DONNEES / nom, tmp_path / nom)
+    return tmp_path
+
+
 @avec_tshark
 @pytest.mark.parametrize(("avec_cle", "attendu"), [(True, 1), (False, 0)])
-def test_compteur_quic_reel(avec_cle, attendu):
+def test_compteur_quic_reel(quic_reel, avec_cle, attendu):
     from netcross_core.parsing import parse_capture
 
-    options = {"tls_keylog": str(DONNEES / "quic-1rtt-keys.txt")} if avec_cle else {}
-    paquets = parse_capture("CLIENT", str(DONNEES / "quic-1rtt.pcap"), **options)
+    options = {"tls_keylog": str(quic_reel / "quic-1rtt-keys.txt")} if avec_cle else {}
+    paquets = parse_capture("CLIENT", str(quic_reel / "quic-1rtt.pcap"), **options)
     assert compter_sessions(paquets) == {"CLIENT": {"quic": {"sessions": 1, "dechiffrees": attendu}}}
