@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Test de lint AST (issue #390) : interdit les appels logger.* dont le message
 contient des accolades de format sans arguments correspondants, et les

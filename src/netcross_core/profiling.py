@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Mesure par étape du pipeline d'analyse (issue #1016, banc #994).
 
 Chronomètre « au tour » : :meth:`MesuresPipeline.etape` clôt l'étape en

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.capfile -- couche 1 bis : cadrage binaire minimal des
 fichiers pcap / pcapng. AUCUNE dissection : on ne lit que la structure

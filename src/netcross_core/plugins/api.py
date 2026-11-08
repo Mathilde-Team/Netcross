@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.plugins.api -- contrat des plugins (issue #284).
 

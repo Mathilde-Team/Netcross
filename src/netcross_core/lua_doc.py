@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.lua_doc -- banque SQLite locale de l'API Lua Wireshark
 (issue #387, rattachee a #331).

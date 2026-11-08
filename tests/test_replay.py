@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.capture.replay_capture (Job 44, issue #164) -- rejeu de
 trafic controle via tcpreplay. Meme discipline que pour merge_captures

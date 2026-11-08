@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Issue #330 (écart 3 de docs/parite-surfaces.md) : réglages fins de la CLI
 dans la GUI -- fenêtre NAT (--nat-window-ms), coupure silencieuse

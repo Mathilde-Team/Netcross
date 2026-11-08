@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests des decisions du panneau de filtres BPF (`netcross_gtk4.bpf_panel`,
 issue #285, quatrieme lot).

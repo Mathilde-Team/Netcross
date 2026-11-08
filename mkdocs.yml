@@ -74,6 +74,7 @@ nav:
       - Estimation d'horloge: estimation-horloge.md
       - Rapport de sécurité: security-report.md
       - Export SIEM (CEF, LEEF, STIX): siem-export.md
+      - Journaux Zeek conn.log: zeek-export.md
       - Notifications: notifications.md
       - Plugins: plugins.md
       - Empreintes JA4/HASSH: fingerprints-ja4-hassh.md

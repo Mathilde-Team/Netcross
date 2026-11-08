@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser -- decodage de captures reseau via tshark -T ek (moteur
 Wireshark en ligne de commande).

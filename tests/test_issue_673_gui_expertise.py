@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #673 : sections d'expertise dans la GUI (--rule-engine,
 --expert-section, --media-quality, --tshark-stats, --flow-timeline).
 Partie sans GTK : reglages, pipeline, documents JSON ; puis panneau GTK."""

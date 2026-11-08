@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #346 : comptages justes et attribues a un point pour les
 mouvements lateraux et flow_stats."""
 

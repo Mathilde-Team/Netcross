@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #676 : --ring-buffer enregistre reellement la capture en rotation.
 
 Avant ce correctif, l'option creait des repertoires temporaires vides et

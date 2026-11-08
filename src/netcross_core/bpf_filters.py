@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.bpf_filters -- catalogue de filtres BPF predefinis et filtres
 sauvegardes par l'utilisateur (Job 47 / issue #167).

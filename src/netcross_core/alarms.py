@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.alarms -- alarmes et surveillance de seuils en analyse live
 (§6.16, Session 11).

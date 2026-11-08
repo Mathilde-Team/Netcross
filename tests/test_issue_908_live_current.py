@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ruff: noqa: F811 -- fixtures pytest importées de test_issue_902_api_live
 """Issue #908 : POST /comparisons avec current_live (équiv. --live-current) :
 le baseline en fichiers, le courant capturé en direct sur le serveur."""

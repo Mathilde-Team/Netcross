@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Job 42 (issue #162) -- detection des trous de sequence TCP.
 

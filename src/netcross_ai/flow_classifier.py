@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Classification de flux avec score de confiance (foret aleatoire).
 
 Jeu d'entrainement : JSON ``netcross.ai.training/1`` -- une liste

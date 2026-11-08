@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_core.i18n -- internationalisation par GNU gettext (issue #299).
 
 Les chaines destinees a l'utilisateur sont ecrites en francais (langue

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Wrapper installe dans /usr/bin/netcross-history par le paquet Debian/RPM.
 # Interrogation seule d'un historique --history-db, sans relancer d'analyse.
 export PYTHONPATH="/usr/share/netcross:${PYTHONPATH:-}"

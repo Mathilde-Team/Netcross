@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.discovery -- decouverte et cartographie passive des actifs
 reseau (SCENARIO-5, issue #151, parent #141).

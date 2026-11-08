@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de couverture de netcross_report/stix_export.py (issue #713, suite #665).
 
 Complète tests/test_stix_leef_export.py par les entrées incomplètes ou

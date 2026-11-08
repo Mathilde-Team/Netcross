@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #1151 : module commun de pseudonymisation (adresses + noms)."""
 
 from __future__ import annotations

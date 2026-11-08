@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de la reconnaissance de QUIC v2 (RFC 9369) -- issue #1061.
 
 Les vecteurs (secrets, cles, en-tetes, paquet protege complet) sont

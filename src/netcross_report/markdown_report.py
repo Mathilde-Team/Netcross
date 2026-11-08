@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.markdown_report -- generation d'un rapport au format Markdown
 (issue #761).

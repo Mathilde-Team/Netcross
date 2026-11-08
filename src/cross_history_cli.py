@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 cross_history_cli.py -- interroge une base d'historique SQLite deja
 alimentee par cross_capture_analyzer_cli.py/cross_capture_diff_cli.py

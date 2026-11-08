@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de netcross_report.path_metrics et de la section PDF
 "Chemin observe" (Job 16/issue #12).
 

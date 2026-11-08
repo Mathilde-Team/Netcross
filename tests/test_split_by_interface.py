@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Plusieurs captures dans un seul fichier pcapng (issue #474) :
 pcap_parser.capture.list_interfaces / split_by_interface et l'option
 --split-interfaces de cross_capture_analyzer_cli.py.

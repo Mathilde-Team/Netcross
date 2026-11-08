@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.expert_rules -- verifie le contrat `Rule` (calque exact sur
 le schema de la section 6.2 de FEATURES.md : id/domaine/preconditions/

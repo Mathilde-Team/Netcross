@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 pcap_parser.capture.convert_capture / export_csv / export_json
 (Job 49, issue #169) -- conversion de formats et export structure.

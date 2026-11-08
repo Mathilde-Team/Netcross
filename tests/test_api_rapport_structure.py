@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Issue #330 (écart 1 de docs/parite-surfaces.md) : l'API sert le même
 rapport structuré que ``netcross --json-report`` et l'export JSON de la GUI.

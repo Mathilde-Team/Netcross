@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Job 38/issue #158 -- metadonnees de capture : pcap_parser.capinfos_source.
 read_capture_info et pcap_parser.capfile.read_structure.

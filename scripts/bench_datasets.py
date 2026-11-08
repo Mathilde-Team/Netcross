@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """scripts/bench_datasets.py -- jeux pcapng multi-points déterministes (issue #1015).
 
 Mince enveloppe autour de :func:`netcross_core.testing.synth.main` ; toute la

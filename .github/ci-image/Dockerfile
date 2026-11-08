@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Image de CI préconstruite de Netcross (issue #968).
 #
 # Regroupe les paquets apt que les jobs en conteneur de ci.yml (quality, gtk4,

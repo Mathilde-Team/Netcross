@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests du générateur de jeux synthétiques multi-points (issue #1015).
 
 La relecture des fichiers passe par ``tests/pcap_builders.read_pcapng``,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests du script d'inventaire de app.py (issue #285)."""
 
 from __future__ import annotations

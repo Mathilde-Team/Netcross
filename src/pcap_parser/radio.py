@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """pcap_parser.radio -- metadonnees radio 802.11 par paquet (issue #1142).
 
 Premiere brique du chantier « Wi-Fi en mode moniteur » (#1006) : une

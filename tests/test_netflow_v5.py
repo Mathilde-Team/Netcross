@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 tests/test_netflow_v5.py -- tests du parseur NetFlow v5 et de
 l'adaptateur FlowRecord -> Pkt (Job 32/issue #32, Phases 1-2 de

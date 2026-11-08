@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.wireshark_expert -- Session 1 de FEATURES.md section 13.3
 ("exploitation de l'expertise Wireshark/TShark") : convertit les signaux

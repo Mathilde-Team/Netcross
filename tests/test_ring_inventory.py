@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Inventaire horodate du tampon circulaire et selection par fenetre (issue #1086)."""
 
 from __future__ import annotations

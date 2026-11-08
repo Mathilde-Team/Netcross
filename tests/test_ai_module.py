@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #146 (FLOW-5) : module IA/ML optionnel et local.
 
 Les tests ML sont ignores si scikit-learn est absent ; le reste (features,

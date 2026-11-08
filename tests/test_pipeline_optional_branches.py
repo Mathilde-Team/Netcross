@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests pour les branches optionnelles des pipelines (#246).
 
 Couvre les chemins rarement exécutés :

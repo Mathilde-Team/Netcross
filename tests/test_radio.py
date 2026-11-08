@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #1142 : capture 802.11 radiotap comme point de capture, lecture
 par trame du RSSI, du MCS, du debit, du retry et du canal."""
 

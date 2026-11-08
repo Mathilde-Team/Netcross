@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de netcross_core.security.flow_stats (issue #145, FLOW-4).
 Analyse statistique des flux : SPLT, entropie, ratio up/down,

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """netcross_gtk4.lua_doc_window -- fenetre « Documentation Lua » (issue
 #873) : equivalent GUI de ``netcross-lua-doc``. Logique dans
 ``lua_doc_view``. Issue #917 : mode « Dissecteurs Lua » (catalogue,

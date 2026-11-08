@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Fichiers de clés TLS (SSLKEYLOGFILE) par point de capture (issue #1040, chantier #997).
 
 ``--tls-keylog FICHIER`` vaut pour tous les points, ``--tls-keylog NOM=FICHIER``

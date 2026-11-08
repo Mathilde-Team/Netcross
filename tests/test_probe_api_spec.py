@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Validation du contrat agent netcross-probe <-> collecteur (issue #1098).
 
 - le schema docs/probe-api-v1.yaml est un document OpenAPI 3.1 valide

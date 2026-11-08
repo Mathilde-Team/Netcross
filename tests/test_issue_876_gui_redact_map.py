@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #876 : table d'anonymisation (--redact-map) dans la GUI, en
 analyse simple et en comparaison, même fichier que la CLI."""
 

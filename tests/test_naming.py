@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_core.naming -- tests de la table des noms (Job 18 / issue #17,
 section 6.15) et de son integration dans les sorties CSV detail et JSON.

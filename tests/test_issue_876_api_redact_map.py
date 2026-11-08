@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #876 : table d'anonymisation (--redact-map) dans l'API, et
 anonymisation partagée baseline/courant des comparaisons."""
 

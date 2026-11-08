@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_gtk4.panel_state -- decisions de visibilite, de sensibilite et de
 selection des panneaux de la GUI (issue #285, troisieme lot).

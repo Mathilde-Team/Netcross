@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Issue #675 : panneau « Recherche forensic » (page Resultats) et case
 « Index de recherche forensic » (Configuration).
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests de netcross_report.comm_map (cartographie des communications,
 issue #15) et du rendu charts.chart_comm_map.

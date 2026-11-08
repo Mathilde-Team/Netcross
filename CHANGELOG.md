@@ -8,12 +8,19 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Journaux de flux au format Zeek `conn.log` (#1115) : `--zeek-conn FICHIER` écrit une ligne par connexion et par point, colonnes Zeek standard (`#fields`/`#types`, lisible par `zeek-cut`) puis colonnes `netcross_*` (segment, latence et pertes par segment avec `--order`) ; `--zeek-format json` pour un objet par ligne. Respecte `--redact`. Voir docs/zeek-export.md.
 - Image de CI préconstruite (#968, étape 1) : `.github/ci-image/Dockerfile` (paquets apt des jobs `quality`, `gtk4` et
   `packaging`) et workflow `ci-image.yml`. L'image est construite sur chaque PR qui la modifie, puis poussée vers
   `ghcr.io/mathilde-team/netcross-ci:26.04` à chaque modification fusionnée dans `dev`, chaque lundi (mises à jour de
   sécurité) et à la demande. `ci.yml` basculera dessus dans une seconde PR, une fois l'image publiée.
 
 ### Modifié
+- Licence (#986) : passage de MIT à **GPL-3.0-or-later** — texte officiel
+  GPLv3 dans `LICENSE`, déclaration `license = "GPL-3.0-or-later"` dans
+  `pyproject.toml`, en-têtes `SPDX-License-Identifier` sur tous les
+  fichiers source (Python, scripts shell, Dockerfile), `debian/copyright`
+  ajouté (format machine-readable), spec RPM et README mis à jour
+  (compatibilité des dépendances documentée).
 - Guide utilisateur (#465) : captures d'écran de l'interface GTK4 à jour (les quatre onglets et la cartographie, plus quatre nouvelles pour les fenêtres Outils de capture, Analyse d'un dossier, Documentation Lua et Historique des runs), prises sur la vraie interface par `tools/captures_ecran_gui.py`, qui les régénère.
 - CI (#966) : un nouveau commit sur une PR annule le run du commit précédent (`concurrency`), dans `ci.yml` et `pr-coverage.yml`. Les runs `push` sur dev et main ne sont jamais annulés.
 - Seuil de couverture bloquant porté à 95 % (#953, règle Mathilde-Team/.github#9) :

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Tests des routes de comparaison baseline/courant de l'API (issue #669).
 
