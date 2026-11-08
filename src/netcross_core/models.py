@@ -216,6 +216,13 @@ class Pkt:
     tcp_checksum_bad: bool | None = None
     udp_checksum: str | None = None
     udp_checksum_bad: bool | None = None
+    # -- Dechiffrement TLS/QUIC (issue #1043) : reportes depuis RawPacket,
+    # agreges par netcross_core.dechiffrement en « k/n sessions dechiffrees »
+    # par point.
+    tls_stream: int | None = None
+    tls_dechiffre: bool = False
+    quic_connexion: int | None = None
+    quic_dechiffre: bool = False
     # -- empreintes JA4/HASSH (FLOW-2, issue #143, parent #141) : calculees
     # par netcross_core.fingerprint.report.compute_pkt_fingerprints depuis
     # RawPacket.payload (les octets ne sont plus disponibles ensuite --
@@ -734,6 +741,13 @@ class Report:
     # point -> {speed_bps, speed_source ("if_speed", "--link-speed" ou
     # None), ts_resolution (s), interfaces}. Vide hors CLI.
     link_speeds: dict[str, dict] = field(default_factory=dict)
+    # -- Couverture du dechiffrement TLS/QUIC (issue #1043) -- dechiffrement
+    # est rempli par analyse() (netcross_core.dechiffrement.compter_sessions) :
+    # point -> {"tls"/"quic": {"sessions", "dechiffrees"}}. points_keylog est
+    # rempli par l'appelant (CLI, API, GUI) : points ayant recu un fichier de
+    # cles, pour signaler aussi une couverture nulle.
+    dechiffrement: dict[str, dict[str, dict[str, int]]] = field(default_factory=dict)
+    points_keylog: list[str] = field(default_factory=list)
     # -- Integrite/qualite de capture (Job 43/issue #163) -- voir
     # netcross_core.forensic.validate_checksums().
     checksum_errors: list[ChecksumError] = field(default_factory=list)
