@@ -25,6 +25,13 @@ celui de durée totale médiane, les autres durées sont gardées dans
 
 ``--mini`` génère un jeu de 2 points x 2 000 paquets (graine 1) dans un
 dossier temporaire : quelques secondes, utilisable en CI.
+
+Non-régression (issue #1019) : :func:`comparer` confronte un résultat à une
+référence versionnée (``benchmarks/reference.json``) et signale toute mesure
+qui dépasse la référence de plus d'un seuil configurable (durée totale, pics
+RSS). ``--reference`` active la comparaison ; le code de sortie vaut alors 3
+en cas de régression. Une référence prise sur un autre environnement (CPU ou
+nombre de cœurs utilisables différents) n'est pas comparée.
 """
 
 from __future__ import annotations
@@ -79,6 +86,15 @@ CLES_ESSAI = (
     "rss_max_enfants_mio",
     "paquets_par_s",
 )
+
+# Non-régression (#1019) : seuils par défaut en pourcentage, mesures
+# comparées et clés d'environnement qui doivent être identiques.
+SEUIL_DUREE_DEFAUT_PCT = 20.0
+SEUIL_MEMOIRE_DEFAUT_PCT = 20.0
+MESURES_DUREE = ("total_s",)
+MESURES_MEMOIRE = ("rss_max_mio", "rss_max_enfants_mio")
+CLES_ENVIRONNEMENT_COMPARABLES = ("cpu", "coeurs_utilisables")
+CODE_REGRESSION = 3
 
 Executeur = Callable[[list[str]], int]
 
@@ -392,6 +408,155 @@ def en_markdown(resultat: dict) -> str:
     return "\n".join(lignes) + "\n"
 
 
+# -- non-régression (#1019) ---------------------------------------------------
+
+
+def _ecart_pct(actuel: float, reference: float) -> float | None:
+    """Écart relatif en pourcentage ; None si la référence est nulle."""
+    logger.debug("_ecart_pct: entrée")
+    if not reference:
+        logger.debug("_ecart_pct: référence nulle -> retour None")
+        return None
+    logger.debug("_ecart_pct: retour")
+    return round((actuel - reference) / reference * 100, 1)
+
+
+def comparer(
+    resultat: dict,
+    reference: dict,
+    seuil_duree_pct: float = SEUIL_DUREE_DEFAUT_PCT,
+    seuil_memoire_pct: float = SEUIL_MEMOIRE_DEFAUT_PCT,
+) -> dict:
+    """Compare chaque essai de la référence à l'essai (jeu, parallèle) du résultat.
+
+    Statut : ``ok``, ``regression`` (une mesure dépasse la référence de plus
+    du seuil), ``environnement_different`` (CPU ou cœurs utilisables
+    différents : rien n'est comparé) ou ``incomparable`` (essai de la
+    référence absent du résultat). Une amélioration n'est jamais une
+    régression.
+    """
+    logger.debug("comparer: entrée (seuils durée {} %, mémoire {} %)", seuil_duree_pct, seuil_memoire_pct)
+    env_ref = reference.get("environnement", {})
+    env_act = resultat.get("environnement", {})
+    differences = [
+        {"cle": cle, "reference": env_ref.get(cle), "actuel": env_act.get(cle)}
+        for cle in CLES_ENVIRONNEMENT_COMPARABLES
+        if env_ref.get(cle) != env_act.get(cle)
+    ]
+    comparaison: dict = {
+        "seuil_duree_pct": seuil_duree_pct,
+        "seuil_memoire_pct": seuil_memoire_pct,
+        "environnement": differences,
+        "manquants": [],
+        "lignes": [],
+    }
+    if differences:
+        comparaison["statut"] = "environnement_different"
+        logger.debug("comparer: environnement différent -> retour sans comparaison")
+        return comparaison
+    actuels = {(e["jeu"], e["parallele"]): e for e in resultat.get("essais", [])}
+    seuils = [(m, seuil_duree_pct) for m in MESURES_DUREE] + [(m, seuil_memoire_pct) for m in MESURES_MEMOIRE]
+    for essai_ref in reference.get("essais", []):
+        cle = (essai_ref["jeu"], essai_ref["parallele"])
+        essai = actuels.get(cle)
+        if essai is None:
+            comparaison["manquants"].append({"jeu": cle[0], "parallele": cle[1]})
+            continue
+        for mesure, seuil in seuils:
+            valeur_ref, valeur = essai_ref.get(mesure), essai.get(mesure)
+            if valeur_ref is None or valeur is None:
+                continue
+            ecart = _ecart_pct(valeur, valeur_ref)
+            comparaison["lignes"].append(
+                {
+                    "jeu": cle[0],
+                    "parallele": cle[1],
+                    "mesure": mesure,
+                    "reference": valeur_ref,
+                    "actuel": valeur,
+                    "ecart_pct": ecart,
+                    "seuil_pct": seuil,
+                    "regression": ecart is not None and ecart > seuil,
+                }
+            )
+    if comparaison["manquants"]:
+        comparaison["statut"] = "incomparable"
+    elif any(ligne["regression"] for ligne in comparaison["lignes"]):
+        comparaison["statut"] = "regression"
+    else:
+        comparaison["statut"] = "ok"
+    logger.debug("comparer: retour statut {}", comparaison["statut"])
+    return comparaison
+
+
+_LIBELLES_STATUT = {
+    "ok": "aucune régression",
+    "regression": "RÉGRESSION",
+    "environnement_different": "référence prise sur un autre environnement, non comparée",
+    "incomparable": "essais de la référence absents du résultat",
+}
+
+
+def comparaison_en_markdown(comparaison: dict) -> str:
+    """Résumé Markdown de :func:`comparer` (pour ``$GITHUB_STEP_SUMMARY``)."""
+    logger.debug("comparaison_en_markdown: entrée")
+    lignes = [
+        f"## Non-régression : {_LIBELLES_STATUT[comparaison['statut']]}",
+        "",
+        f"Seuils : durée +{comparaison['seuil_duree_pct']:g} %, mémoire +{comparaison['seuil_memoire_pct']:g} %.",
+        "",
+    ]
+    lignes += [
+        f"- `{d['cle']}` : référence {d['reference']!r}, actuel {d['actuel']!r}" for d in comparaison["environnement"]
+    ]
+    lignes += [f"- essai absent : {m['jeu']} avec --parallel {m['parallele']}" for m in comparaison["manquants"]]
+    if comparaison["lignes"]:
+        lignes += [
+            "| Jeu | Parallèle | Mesure | Référence | Actuel | Écart (%) | Seuil (%) | Verdict |",
+            "|---|---:|---|---:|---:|---:|---:|---|",
+        ]
+        for ligne in comparaison["lignes"]:
+            verdict = "régression" if ligne["regression"] else "ok"
+            lignes.append(
+                f"| {ligne['jeu']} | {ligne['parallele']} | {ligne['mesure']} | {_cellule(ligne['reference'])} "
+                f"| {_cellule(ligne['actuel'])} | {_cellule(ligne['ecart_pct'], '{:+.1f}')} "
+                f"| {ligne['seuil_pct']:g} | {verdict} |"
+            )
+    logger.debug("comparaison_en_markdown: retour")
+    return "\n".join(lignes) + "\n"
+
+
+def _lire_json(chemin: str) -> dict:
+    """Résultat ou référence JSON conforme au schéma ; BancError sinon."""
+    logger.debug("_lire_json: entrée ({})", chemin)
+    try:
+        donnees = json.loads(Path(chemin).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.debug("_lire_json: lecture impossible -> levée")
+        raise BancError(f"{chemin} illisible : {exc}") from exc
+    erreurs = valider(donnees) if isinstance(donnees, dict) else ["objet JSON attendu"]
+    if erreurs:
+        logger.debug("_lire_json: schéma non conforme -> levée")
+        raise BancError(f"{chemin} non conforme : {', '.join(erreurs)}")
+    logger.debug("_lire_json: retour")
+    return donnees
+
+
+def _pourcentage(texte: str) -> float:
+    """Seuil en pourcentage, positif ou nul (argparse)."""
+    logger.debug("_pourcentage: entrée")
+    try:
+        valeur = float(texte)
+    except ValueError as exc:
+        logger.debug("_pourcentage: valeur non numérique -> levée")
+        raise argparse.ArgumentTypeError(f"pourcentage attendu : {texte}") from exc
+    if valeur < 0:
+        logger.debug("_pourcentage: valeur négative -> levée")
+        raise argparse.ArgumentTypeError(f"pourcentage positif attendu : {texte}")
+    logger.debug("_pourcentage: retour")
+    return valeur
+
+
 # -- ligne de commande --------------------------------------------------------
 
 
@@ -420,6 +585,7 @@ def construire_parseur() -> argparse.ArgumentParser:
     source = p.add_mutually_exclusive_group(required=True)
     source.add_argument("--jeux", help="jeu (dossier avec verite.json) ou dossier de jeux (sortie --matrice)")
     source.add_argument("--mini", action="store_true", help="mini-jeu 2 points x 2 000 paquets, généré à la volée")
+    source.add_argument("--resultat", help="résultat JSON déjà mesuré, à comparer à --reference sans relancer le banc")
     p.add_argument(
         "--parallel",
         type=_liste_paralleles,
@@ -429,31 +595,41 @@ def construire_parseur() -> argparse.ArgumentParser:
     p.add_argument("--repetitions", type=int, default=1, help="essais par mesure, médiane retenue (défaut 1)")
     p.add_argument("--json", dest="sortie_json", help="écrit le résultat JSON dans ce fichier")
     p.add_argument("--markdown", dest="sortie_markdown", help="écrit le tableau Markdown dans ce fichier")
+    p.add_argument("--reference", help="référence JSON (ex. benchmarks/reference.json) : active la non-régression")
+    p.add_argument(
+        "--seuil-duree",
+        type=_pourcentage,
+        default=SEUIL_DUREE_DEFAUT_PCT,
+        help=f"hausse de durée tolérée en %% (défaut {SEUIL_DUREE_DEFAUT_PCT:g})",
+    )
+    p.add_argument(
+        "--seuil-memoire",
+        type=_pourcentage,
+        default=SEUIL_MEMOIRE_DEFAUT_PCT,
+        help=f"hausse de pic RSS tolérée en %% (défaut {SEUIL_MEMOIRE_DEFAUT_PCT:g})",
+    )
+    p.add_argument(
+        "--resume", help="ajoute le tableau et la comparaison en Markdown à ce fichier ($GITHUB_STEP_SUMMARY)"
+    )
     logger.debug("construire_parseur: retour")
     return p
 
 
 def main(argv: list[str] | None = None, executeur: Executeur = executer) -> int:
-    """Point d'entrée ; 0 si le banc est complet, 2 sur jeu ou analyse en échec."""
+    """Point d'entrée ; 0 si le banc est complet (et sans régression), 2 sur
+    jeu, analyse ou fichier en échec, 3 sur régression (avec --reference)."""
     logger.debug("main: entrée")
     parseur = construire_parseur()
     args = parseur.parse_args(argv)
     if args.repetitions < 1:
         logger.debug("main: --repetitions < 1 -> levée SystemExit")
         parseur.error("--repetitions doit valoir au moins 1")
+    if args.resultat and not args.reference:
+        logger.debug("main: --resultat sans --reference -> levée SystemExit")
+        parseur.error("--resultat exige --reference")
     try:
-        with tempfile.TemporaryDirectory(prefix="netcross-mini-") as tmp:
-            if args.mini:
-                from netcross_core.testing.synth import Configuration, generer
-
-                generer(Configuration(points=MINI_POINTS, paquets=MINI_PAQUETS, graine=MINI_GRAINE), tmp)
-                jeux = [Path(tmp)]
-            else:
-                jeux = trouver_jeux(args.jeux)
-            resultat = lancer(jeux, args.parallel, args.repetitions, executeur)
-            if args.mini:
-                for essai in resultat["essais"]:
-                    essai["jeu"] = "mini"
+        reference = _lire_json(args.reference) if args.reference else None
+        resultat = _lire_json(args.resultat) if args.resultat else _mesurer_depuis_arguments(args, executeur)
     except BancError as exc:
         logger.warning("banc interrompu : {}", exc)
         print(f"erreur : {exc}", file=sys.stderr)
@@ -464,6 +640,38 @@ def main(argv: list[str] | None = None, executeur: Executeur = executer) -> int:
         Path(args.sortie_json).write_text(json.dumps(resultat, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     if args.sortie_markdown:
         Path(args.sortie_markdown).write_text(texte, encoding="utf-8")
+    code = 0
+    if reference is not None:
+        comparaison = comparer(resultat, reference, args.seuil_duree, args.seuil_memoire)
+        texte += "\n" + comparaison_en_markdown(comparaison)
+        if comparaison["statut"] == "regression":
+            code = CODE_REGRESSION
+        elif comparaison["statut"] == "incomparable":
+            code = 2
+        elif comparaison["statut"] == "environnement_different":
+            logger.warning("référence prise sur un autre environnement : comparaison ignorée")
+    if args.resume:
+        with Path(args.resume).open("a", encoding="utf-8") as resume:
+            resume.write(texte)
     print(texte, end="")
-    logger.debug("main: retour 0")
-    return 0
+    logger.debug("main: retour {}", code)
+    return code
+
+
+def _mesurer_depuis_arguments(args: argparse.Namespace, executeur: Executeur) -> dict:
+    """Lance le banc sur ``--mini`` ou ``--jeux`` ; BancError en cas d'échec."""
+    logger.debug("_mesurer_depuis_arguments: entrée")
+    with tempfile.TemporaryDirectory(prefix="netcross-mini-") as tmp:
+        if args.mini:
+            from netcross_core.testing.synth import Configuration, generer
+
+            generer(Configuration(points=MINI_POINTS, paquets=MINI_PAQUETS, graine=MINI_GRAINE), tmp)
+            jeux = [Path(tmp)]
+        else:
+            jeux = trouver_jeux(args.jeux)
+        resultat = lancer(jeux, args.parallel, args.repetitions, executeur)
+        if args.mini:
+            for essai in resultat["essais"]:
+                essai["jeu"] = "mini"
+    logger.debug("_mesurer_depuis_arguments: retour")
+    return resultat
