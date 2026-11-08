@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-223 modules · 326 classes · 820 fonctions publiques de module.
+224 modules · 327 classes · 821 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -569,6 +569,7 @@ classDiagram
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
+| `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
 | `netcross_core.streaming` | correlation des points en flux, par fenetre glissante (issue #1022, sous-issue 3/6 du chantier #995). |
 | `netcross_core.tls_diagnostics` | extrait l'etat des handshakes TLS (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de capture et localise le segment ou un handshake qui reussissait en amont se met a echouer. |
@@ -1797,6 +1798,7 @@ classDiagram
         +dict~tuple~str, str~, list~str~~ encap_change_examples
         +dict~tuple~str, str~, int~ encap_frag_correlated
         +list~dict~ rtp_streams
+        +list~dict~ rtp_matches
         +list~dict~ voip_calls
         +dict~str, int~ voip_quality_distribution
         +dict~str, list~float~~ server_think_time
@@ -2067,6 +2069,30 @@ classDiagram
         +archiver_incident(rapport, decoupeur) ManifesteIncident
         +verifier_manifeste(manifeste) list~str~
         +appliquer_quota(archives_dir, quota_octets, conserver) tuple~str, ...~
+    }
+
+    %% ===== netcross_core.rtp_match =====
+    class _Leg {
+        <<dataclass>>
+        +str point
+        +str src
+        +int? sport
+        +str dst
+        +int? dport
+        +int? ssrc
+        +float first_ts
+        +float last_ts
+        +int packets
+        +list~tuple~int, int~~ pairs
+        +list~float~ arrivals
+        +sample() set~tuple~int, int~~
+        +around(ts, window) list~tuple~int, int~~
+        +endpoint() tuple
+        +to_dict(seq_offset, ts_offset) dict
+    }
+    class mod_netcross_core_rtp_match["netcross_core.rtp_match"] {
+        <<module>>
+        +match_rtp_streams(all_packets, points, window_seconds) list~dict~
     }
 
     %% ===== netcross_core.stats =====
