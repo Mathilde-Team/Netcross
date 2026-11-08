@@ -29,6 +29,7 @@ from netcross_core.clock_sync import (
 )
 from netcross_core.content import extract_http_objects
 from netcross_core.correlate import TOPN_DIMENSIONS, compute_throughput, compute_topn_series
+from netcross_core.dechiffrement import compter_sessions
 from netcross_core.extract.carver import detect_extracted_files
 from netcross_core.forensic import detect_sequence_gaps, validate_checksums
 from netcross_core.logging_config import get_logger, summarize
@@ -144,6 +145,8 @@ def analyse(
     r.packet_comments = [
         f"{pkt.point} — trame {pkt.frame_number} : {pkt.comment}" for pkt in all_packets if pkt.comment
     ]
+    # Couverture du dechiffrement TLS/QUIC par point (issue #1043).
+    r.dechiffrement = compter_sessions(all_packets)
     with _phase("compute_throughput"):
         r.throughput = compute_throughput(all_packets, bucket_seconds)
     r.topn_timeseries = {dim: compute_topn_series(all_packets, bucket_seconds, dim, topn) for dim in TOPN_DIMENSIONS}

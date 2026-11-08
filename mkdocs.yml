@@ -75,6 +75,7 @@ nav:
       - Rapport de sécurité: security-report.md
       - Export SIEM (CEF, LEEF, STIX): siem-export.md
       - Journaux Zeek conn.log: zeek-export.md
+      - Couverture du déchiffrement TLS/QUIC: couverture-dechiffrement.md
       - Notifications: notifications.md
       - Plugins: plugins.md
       - Empreintes JA4/HASSH: fingerprints-ja4-hassh.md
@@ -89,6 +90,7 @@ nav:
       - Diagramme de classes: class-diagram.md
       - Internationalisation: i18n.md
       - Journalisation et mode debug: journalisation.md
+      - Non-fuite des secrets de déchiffrement: non-fuite-secrets.md
       - Empreinte de paquet: empreinte-paquet.md
       - Décisions d'architecture: adr/netflow-sflow-architecture.md
       - Qualité: quality/anonymization-plan.md

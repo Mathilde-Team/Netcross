@@ -19,6 +19,7 @@ meme triage pour un meme Report.
 import datetime
 import json
 
+from netcross_core.dechiffrement import document_json
 from netcross_core.logging_config import get_logger, summarize
 from netcross_report.synthesis import build_findings
 from netcross_report.triage import health_label, health_score, rank_segments
@@ -367,6 +368,11 @@ def build_json_report_document(
         "flow_anomalies": list(getattr(r, "flow_anomalies", [])),
         "lateral_movement_events": list(getattr(r, "lateral_movement_events", [])),
     }
+    # Issue #1043 : couverture du dechiffrement TLS/QUIC par point -- cle
+    # absente si aucun point n'a de cle ni de session dechiffree.
+    decryption = document_json(r)
+    if decryption:
+        doc["decryption"] = {"by_point": decryption}
     if getattr(r, "duplicate_count", None):
         # Job 41/issue #161 : cle absente si la detection n'a rien trouve
         # (meme convention que voip_calls ci-dessous).
