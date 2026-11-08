@@ -48,6 +48,7 @@ def lire_seuil(chemin: str = PYPROJECT) -> float | None:
     Lecture par expression reguliere plutot que tomllib : le script tourne
     avec le python3 systeme du runner et reste compatible 3.9 (cible ruff).
     """
+    logger.debug("lire_seuil: entrée")
     try:
         with open(chemin, encoding="utf-8") as f:
             texte = f.read()
@@ -65,6 +66,7 @@ def lire_seuil(chemin: str = PYPROJECT) -> float | None:
 
 def _lire_totaux(chemin: str) -> dict:
     """Extrait les totaux d'un rapport JSON de coverage.py."""
+    logger.debug("_lire_totaux: entrée")
     with open(chemin, encoding="utf-8") as f:
         logger.debug("_lire_totaux: retour json.load(f)['totals']")
         return json.load(f)["totals"]
@@ -83,6 +85,7 @@ def _delta(pr: float, base: float) -> str:
 
 
 def _ligne_seuil(pourcentage_pr: float, seuil: float | None) -> str:
+    logger.debug("_ligne_seuil: entrée")
     if seuil is None:
         logger.debug("_ligne_seuil: si seuil is None -> retour 'Aucun seuil bloquant configuré (`fail_…")
         return "Aucun seuil bloquant configuré (`fail_under` absent de pyproject.toml)."
@@ -95,6 +98,7 @@ def _ligne_seuil(pourcentage_pr: float, seuil: float | None) -> str:
 
 def _construire_commentaire(totaux_pr: dict, totaux_base: dict, seuil: float | None = None) -> str:
     """Construit le corps du commentaire de couverture (Markdown)."""
+    logger.debug("_construire_commentaire: entrée")
     lignes = [
         MARQUEUR,
         "## Couverture de tests (delta vs `dev`)",
@@ -122,6 +126,7 @@ def _construire_commentaire(totaux_pr: dict, totaux_base: dict, seuil: float | N
 
 def _appel_api(chemin: str, token: str, methode: str = "GET", corps: str | None = None) -> dict:
     """Appel REST GitHub minimal (urllib, pas de dependance tierce)."""
+    logger.debug("_appel_api: entrée")
     requete = urllib.request.Request(
         f"{API}{chemin}",
         data=corps.encode() if corps else None,
@@ -140,6 +145,7 @@ def _appel_api(chemin: str, token: str, methode: str = "GET", corps: str | None 
 
 def _publier(repo: str, pr: int, corps: str, token: str) -> str:
     """Met a jour le commentaire existant (marqueur) ou en cree un."""
+    logger.debug("_publier: entrée")
     commentaires = _appel_api(f"/repos/{repo}/issues/{pr}/comments?per_page=100", token)
     for c in commentaires:
         if MARQUEUR in c.get("body", ""):
@@ -162,6 +168,7 @@ def _publier(repo: str, pr: int, corps: str, token: str) -> str:
 
 
 def main(argv: list[str]) -> int:
+    logger.debug("main: entrée")
     parseur = argparse.ArgumentParser(description=__doc__)
     parseur.add_argument("--pr-json", required=True, help="rapport coverage.py de la PR")
     parseur.add_argument("--base-json", required=True, help="rapport coverage.py de la base")

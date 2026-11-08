@@ -74,6 +74,7 @@ _ADMONITIONS = {"NOTE": "Note", "TIP": "Tip", "IMPORTANT": "Important", "WARNING
 
 def clean_inline(text: str) -> str:
     """Convertit le balisage inline AsciiDoc en texte lisible."""
+    logger.debug("clean_inline: entrée")
     text = _XREF_RE.sub(r"\1", text)
     text = _BARE_XREF_RE.sub(r"\1", text)
     text = _LINK_RE.sub(lambda m: f"{m.group(2)} ({m.group(1)})" if m.group(2) else m.group(1), text)
@@ -88,6 +89,7 @@ def clean_inline(text: str) -> str:
 
 def _macro(m: re.Match[str]) -> str:
     """menu:Tools[Lua > Reload] -> 'Tools > Lua > Reload' ; kbd:[Ctrl+L] -> 'Ctrl+L'."""
+    logger.debug("_macro: entrée")
     cible, contenu = m.group(2).strip(), m.group(3).strip()
     if m.group(1) == "menu":
         logger.debug("_macro: si m.group(1) == 'menu' -> retour ' > '.join(…)")
@@ -114,10 +116,12 @@ def render_blocks(lines: list[str]) -> str:
     preformatees (tableaux, blocs ``----``) commencent par deux espaces.
     Les encadres ``[NOTE]`` / ``[WARNING]``... deviennent ``Note: ...``.
     """
+    logger.debug("render_blocks: entrée")
     paragraphes: list[str] = []
     courant: list[str] = []  # lignes logiques du paragraphe en cours
 
     def flush() -> None:
+        logger.debug("flush: entrée")
         if courant:
             paragraphes.append("\n".join(clean_inline(c) for c in courant))
             courant.clear()
@@ -201,6 +205,7 @@ def split_description(lines: list[str]) -> tuple[str, list[str]]:
     Retourne ``(description, exemples)``. Les titres "Example" qui
     precedent un bloc de code sont retires de la description.
     """
+    logger.debug("split_description: entrée")
     texte: list[str] = []
     exemples: list[str] = []
     i = 0
@@ -251,6 +256,7 @@ def paragraphs(lines: list[str]) -> list[str]:
 
 def extract_version(text: str) -> str:
     """Version Wireshark d'introduction mentionnee dans un texte, ou ''."""
+    logger.debug("extract_version: entrée")
     m = _VERSION_RE.search(text)
     logger.debug("extract_version: retour m.group(1) if m else ''")
     return m.group(1) if m else ""
@@ -263,6 +269,7 @@ def extract_version(text: str) -> str:
 
 def _split_name(signature: str) -> tuple[str, str]:
     """``bytearray:len()`` -> (``len``, ``methode``) ; ``ByteArray.new()`` -> (``new``, ``constructeur``)."""
+    logger.debug("_split_name: entrée")
     ident = signature.split("(", 1)[0].strip()
     if ":" in ident:
         nom = ident.rsplit(":", 1)[1]
@@ -277,6 +284,7 @@ def _split_name(signature: str) -> tuple[str, str]:
 
 def parse_function(anchor: str, block: list[str]) -> dict[str, Any]:
     """Parse un bloc ``[#lua_fn_*]`` jusqu'a ``// function_footer:`` (exclu)."""
+    logger.debug("parse_function: entrée")
     signature = block[0].lstrip("=").strip() if block else ""
     nom, genre = _split_name(signature)
     desc_lines: list[str] = []
@@ -334,6 +342,7 @@ def parse_function(anchor: str, block: list[str]) -> dict[str, Any]:
 
 def parse_attribute(anchor: str, block: list[str]) -> dict[str, Any]:
     """Parse un bloc ``[#lua_class_attrib_*]`` jusqu'a ``// End ...`` (exclu)."""
+    logger.debug("parse_attribute: entrée")
     nom_complet = block[0].lstrip("=").strip() if block else anchor
     description, exemples = split_description(block[1:])
     mode = ""
@@ -363,6 +372,7 @@ def parse_adoc(text: str, classes: dict[str, dict[str, Any]] | None = None) -> d
 
     Accumule dans ``classes`` (nom de classe -> fiche) et le retourne.
     """
+    logger.debug("parse_adoc: entrée")
     classes = {} if classes is None else classes
     lines = text.splitlines()
     module = ""
@@ -370,6 +380,7 @@ def parse_adoc(text: str, classes: dict[str, dict[str, Any]] | None = None) -> d
     class_desc: list[str] | None = None
 
     def fermer_description() -> None:
+        logger.debug("fermer_description: entrée")
         nonlocal class_desc
         if classe is not None and class_desc is not None:
             desc, ex = split_description(class_desc)
@@ -432,6 +443,7 @@ def parse_adoc(text: str, classes: dict[str, dict[str, Any]] | None = None) -> d
 
 def wireshark_version(src: Path) -> str:
     """Lit ``PROJECT_{MAJOR,MINOR,PATCH}_VERSION`` dans le CMakeLists.txt racine."""
+    logger.debug("wireshark_version: entrée")
     text = (src / "CMakeLists.txt").read_text(encoding="utf-8")
     parts = [re.search(rf"set\(PROJECT_{k}_VERSION\s+(\d+)\)", text) for k in ("MAJOR", "MINOR", "PATCH")]
     if not all(parts):
@@ -443,6 +455,7 @@ def wireshark_version(src: Path) -> str:
 
 def wslua_modules(src: Path) -> list[Path]:
     """Liste ``WSLUA_MODULES`` de ``epan/wslua/CMakeLists.txt`` (meme liste que le build Wireshark)."""
+    logger.debug("wslua_modules: entrée")
     cmake = (src / "epan" / "wslua" / "CMakeLists.txt").read_text(encoding="utf-8")
     m = re.search(r"set\(WSLUA_MODULES(.*?)\)", cmake, re.DOTALL)
     if not m:
@@ -455,6 +468,7 @@ def wslua_modules(src: Path) -> list[Path]:
 
 def generate_adoc(src: Path, out_dir: Path) -> list[Path]:
     """Lance ``tools/make-wsluarm.py`` du checkout Wireshark ; retourne les .adoc produits."""
+    logger.debug("generate_adoc: entrée")
     script = src / "tools" / "make-wsluarm.py"
     if not script.exists():
         logger.debug("generate_adoc: si not script.exists() -> levée FileNotFoundError")
@@ -468,6 +482,7 @@ def generate_adoc(src: Path, out_dir: Path) -> list[Path]:
 
 def clone_tag(tag: str, dest: Path) -> tuple[Path, str]:
     """Clone partiel (epan/wslua + tools) d'un tag Wireshark ; retourne (chemin, commit)."""
+    logger.debug("clone_tag: entrée")
     git = ["git", "-c", "advice.detachedHead=false"]
     subprocess.run(  # noqa: S603
         [
@@ -500,6 +515,7 @@ def clone_tag(tag: str, dest: Path) -> tuple[Path, str]:
 
 def build_api(adoc_files: list[Path], version: str, source: str) -> dict[str, Any]:
     """Parse les .adoc et assemble le JSON final (classes triees)."""
+    logger.debug("build_api: entrée")
     classes: dict[str, dict[str, Any]] = {}
     for f in sorted(adoc_files):
         parse_adoc(f.read_text(encoding="utf-8"), classes)

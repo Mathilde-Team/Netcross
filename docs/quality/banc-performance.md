@@ -87,3 +87,52 @@ Sur ce mini-jeu, `--parallel 2` est plus lent que la lecture séquentielle :
 le lancement des processus coûte plus que ce qu'ils font gagner sur
 2 000 paquets. Les vrais chiffres, sur la matrice et sur plusieurs
 machines, relèvent de #1018 (`docs/performance.md`).
+
+## Non-régression
+
+Issue #1019. Le workflow `.github/workflows/bench.yml` mesure chaque lundi,
+et à la demande (onglet Actions, « Banc de performance »), le jeu moyen :
+3 points × 100 000 paquets émis (graine 1), en lecture séquentielle et avec
+`--parallel 2`, 3 essais par mesure. Il ne se déclenche jamais sur une PR.
+
+Le résultat est comparé à la référence versionnée `benchmarks/reference.json` :
+
+```bash
+python3 scripts/bench_datasets.py --sortie /tmp/jeux/p3-n100000-g1 --points 3 --paquets 100000
+python3 scripts/bench.py --jeux /tmp/jeux --parallel 1,2 --repetitions 3 --json banc.json \
+    --reference benchmarks/reference.json --seuil-duree 20 --seuil-memoire 20
+
+# comparer un résultat déjà mesuré, sans relancer le banc
+python3 scripts/bench.py --resultat banc.json --reference benchmarks/reference.json
+```
+
+Pour chaque essai de la référence (même jeu, même parallélisme), le
+comparateur vérifie la durée totale (`total_s`) et les deux pics RSS
+(`rss_max_mio`, `rss_max_enfants_mio`). Une mesure en régression dépasse la
+référence de plus du seuil : `--seuil-duree` et `--seuil-memoire`, 20 % par
+défaut, réglables à la demande dans le workflow. Une amélioration n'est
+jamais une régression.
+
+| Statut | Code de sortie | Cas |
+| --- | --- | --- |
+| `ok` | 0 | toutes les mesures restent sous le seuil |
+| `regression` | 3 | au moins une mesure dépasse le seuil |
+| `environnement_different` | 0 (avertissement) | CPU ou cœurs utilisables différents de la référence : rien n'est comparé |
+| `incomparable` | 2 | un essai de la référence manque dans le résultat |
+
+Le workflow publie `banc.json` et `banc.md` en artefact `banc-performance`
+(90 jours) et ajoute le tableau et la comparaison au résumé du job.
+
+### Mettre à jour la référence
+
+La référence n'a de sens que sur la machine qui la mesure. Le workflow tourne
+sur le runner maison (`NETCROSS_RUNS_ON_BENCH`, sinon `NETCROSS_RUNS_ON`).
+La référence initiale vient d'un poste de développement (2 cœurs Xeon) :
+tant qu'elle n'a pas été remplacée, le workflow rend le statut
+`environnement_different`. Pour la remplacer, après un changement de runner
+ou une amélioration voulue :
+
+1. lancer le workflow à la demande sur `dev` ;
+2. télécharger l'artefact `banc-performance` ;
+3. copier `banc.json` dans `benchmarks/reference.json` dans une PR qui
+   explique le changement.

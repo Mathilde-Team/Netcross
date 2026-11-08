@@ -92,6 +92,7 @@ class CaptureSource:
 
 def is_source_url(text: str) -> bool:
     """Vrai si ``text`` commence par un schema de source connu (``rpcap://``...)."""
+    logger.debug("is_source_url: entrée")
     scheme, sep, _rest = text.partition("://")
     logger.debug("is_source_url: retour bool(sep) and scheme.lower() in REMOTE_SCHEMES")
     return bool(sep) and scheme.lower() in REMOTE_SCHEMES
@@ -105,6 +106,7 @@ def split_live_target(text: str) -> tuple[str, str | None]:
     crochets) ne comptent pas : le separateur est le premier ``:`` situe
     apres le debut du chemin (``/interface``).
     """
+    logger.debug("split_live_target: entrée")
     if not is_source_url(text):
         iface, sep, bpf = text.partition(":")
         logger.debug("split_live_target: si not is_source_url(text) -> retour tuple de 2")
@@ -336,6 +338,7 @@ def parse_source(text: str, env: Mapping[str, str] | None = None) -> CaptureSour
 
 def source_display(text: str) -> str:
     """Forme lisible et sans secret de ``text`` (ou ``text`` si invalide)."""
+    logger.debug("source_display: entrée")
     try:
         logger.debug("source_display: retour parse_source(text, env=()).display")
         return parse_source(text, env={}).display

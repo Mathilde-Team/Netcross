@@ -174,6 +174,7 @@ class ForensicIndex:
         nat_window_ms: int = 200,
     ):
         # Index paquet → flow_key : (point, frame_number) -> flow_key
+        logger.debug("__init__: entrée")
         self._packet_to_key: dict[tuple[str, int], tuple] = {}
         for pk in all_packets:
             if pk.frame_number is not None:
@@ -268,6 +269,7 @@ class ForensicIndex:
         """Retourne les paquets qui justifient un ExpertEvent : d'abord
         ceux references dans evidence/packet_evidence, puis les paquets
         des flows lies (complement)."""
+        logger.debug("event_to_packets: entrée")
         pkts: list[PacketEvidence] = []
         seen: set[tuple[str, int]] = set()
 
@@ -306,6 +308,7 @@ class ForensicIndex:
     def packet_to_flow(self, point: str, frame_number: int) -> Flow | None:
         """Retourne le flow auquel appartient un paquet (point + numero
         de trame), ou None si le paquet n'est pas indexe."""
+        logger.debug("packet_to_flow: entrée")
         pk_key = (point, frame_number)
         fk = self._packet_to_key.get(pk_key)
         if fk is None:
@@ -319,6 +322,7 @@ class ForensicIndex:
     def flow_to_events(self, flow: Flow) -> list[ExpertEvent]:
         """Retourne les evenements lies a un flow : d'abord par flow_keys
         direct (tshark), puis par segment (les points du flow)."""
+        logger.debug("flow_to_events: entrée")
         events: list[ExpertEvent] = []
         seen: set[int] = set()
 
@@ -345,6 +349,7 @@ class ForensicIndex:
     def flow_to_packets(self, flow: Flow) -> list[Pkt]:
         """Retourne tous les paquets d'un flow, tous points confondus,
         dans l'ordre de point puis d'arrivee."""
+        logger.debug("flow_to_packets: entrée")
         per_point = self._packets_by_key.get(flow.key, {})
         result: list[Pkt] = []
         for point in flow.points:

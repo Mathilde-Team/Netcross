@@ -98,6 +98,7 @@ def _emit(lignes: list[str]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     parser = build_parser()
     add_debug_argument(parser)
     args = parser.parse_args(argv)
@@ -140,6 +141,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def _run_dissectors(args: argparse.Namespace, terme: str) -> int:
     """``--dissectors`` / ``--domains`` (issue #917) : n'a pas besoin du JSON de l'API."""
+    logger.debug("_run_dissectors: entrée")
     args.db.parent.mkdir(parents=True, exist_ok=True)
     conn = lua_doc.connect(args.db)
     try:

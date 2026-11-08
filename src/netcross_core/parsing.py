@@ -420,6 +420,7 @@ def parse_live_multi(interfaces, stop_event=None, *, bpf_filter=None):
 
 
 def parse_rtp(payload: bytes):
+    logger.debug("parse_rtp: entrée")
     from pcap_parser.protocols import _parse_rtp_heuristic
 
     logger.debug("parse_rtp: retour _parse_rtp_heuristic(…)")
@@ -427,6 +428,7 @@ def parse_rtp(payload: bytes):
 
 
 def parse_sip(payload: bytes):
+    logger.debug("parse_sip: entrée")
     from pcap_parser.protocols import _parse_sip_heuristic
 
     logger.debug("parse_sip: retour _parse_sip_heuristic(…)")

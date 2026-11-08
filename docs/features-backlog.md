@@ -21,6 +21,15 @@ toute divergence avec le README reflète l'état effectif du code.
 
 ### Outillage qualité (lint / format / architecture)
 
+Journalisation (#954, 08/11/2026) : 183 traces d'entrée supplémentaires,
+sans arguments ni données réseau ; référence des entrées abaissée de 193
+à 9, référence des sorties maintenue à 0. Les neuf entrées restantes
+appartiennent à l'amorçage du journaliseur, conservé intact pour éviter
+des messages DEBUG prématurés sur stderr. Elles restent mesurées par le
+contrôle AST, qui n'a reçu aucune exclusion. Huit cas de test vérifient
+la reconnaissance des entrées DEBUG synchrones/asynchrones et le refus
+d'une trace INFO ou tardive. Détail : session 74.
+
 Introduit en Session 7 via `pyproject.toml` (`[tool.ruff]` /
 `[tool.importlinter]`) et `.pre-commit-config.yaml`, tous deux à la racine.
 

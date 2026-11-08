@@ -38,6 +38,7 @@ def _parse(address: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None
 
 def is_test_net(address: str) -> bool:
     """Vrai pour une adresse dans une plage TEST-NET (RFC 5737)."""
+    logger.debug("is_test_net: entrée")
     addr = _parse(address)
     logger.debug("is_test_net: retour addr is not None and any((addr in net for net in …")
     return addr is not None and any(addr in net for net in TEST_NET_RANGES)
