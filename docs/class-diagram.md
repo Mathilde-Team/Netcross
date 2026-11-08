@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-221 modules · 317 classes · 812 fonctions publiques de module.
+222 modules · 321 classes · 812 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -46,7 +46,7 @@ flowchart TD
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"48 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"24 imports"| pcap_parser
+    netcross_core -->|"25 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -95,10 +95,12 @@ flowchart LR
     OsGuess["netcross_core.discovery.os_detect.OsGuess"]
     PacketAnnotation["netcross_core.models.PacketAnnotation"]
     Pkt["netcross_core.models.Pkt"]
+    PointDeGel["netcross_core.retro_capture.PointDeGel"]
     RadioInfo["pcap_parser.radio.RadioInfo"]
     RawPacket["pcap_parser.packet.RawPacket"]
     ReportContext["netcross_gtk4.report_exports.ReportContext"]
     Report["netcross_core.models.Report"]
+    RingFile["pcap_parser.capture.RingFile"]
     SegmentScore["netcross_report.triage.SegmentScore"]
     StreamQuality["netcross_core.extract.media.StreamQuality"]
     _Detector["netcross_core.exploit_signatures._Detector"]
@@ -129,6 +131,7 @@ flowchart LR
     LoadedPlugins -->|exporters| Exporter
     ModelPack -->|baseline| Baseline
     Pkt -->|radio| RadioInfo
+    PointDeGel -->|inventory| RingFile
     RawPacket -->|radio| RadioInfo
     Report -->|clock_offset_estimate| EstimationHorloge
     Report -->|clock_offset_samples| EchantillonHorloge
@@ -564,6 +567,7 @@ classDiagram
 | `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial v1 et v2 (RFC 9000/9001/9369), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP… |
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
+| `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
 | `netcross_core.tls_diagnostics` | extrait l'etat des handshakes TLS (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de capture et localise le segment ou un handshake qui reussissait en amont se met a echouer. |
 | `netcross_core.tls_keylog` | Fichiers de clés TLS (SSLKEYLOGFILE) par point de capture (issue #1040, chantier #997). |
@@ -601,12 +605,14 @@ classDiagram
         +str state
         +float timestamp
         +str message
+        +str severity
     }
     class _SegmentState {
         <<dataclass>>
         +list~tuple~float, bool~~ samples
         +float? active_since
         +bool alarmed
+        +str last_severity
     }
     class AlarmEngine {
         +events() list~AlarmEvent~
@@ -2003,6 +2009,33 @@ classDiagram
         +load_capture_annotations(captures) dict~str, list~PacketAnnotation~~
         +print_capture_annotations(by_point) None
         +write_detail_csv(path, flows, points, names)
+    }
+
+    %% ===== netcross_core.retro_capture =====
+    class GelConfig {
+        <<dataclass, frozen>>
+        +float seconds_before
+        +float seconds_after
+        +str min_severity
+        +float min_delay_between_gels
+    }
+    class PointDeGel {
+        <<dataclass, frozen>>
+        +Callable~(), Sequence~RingFile~~ inventory
+        +float offset_vers_point
+    }
+    class GelReport {
+        <<dataclass, frozen>>
+        +str rule_id
+        +str segment
+        +float start
+        +float end
+        +Mapping~str, Sequence~str~~ files
+        +str message
+        +str? ignored_reason
+    }
+    class GelManager {
+        +on_alarm(event) GelReport?
     }
 
     %% ===== netcross_core.stats =====
