@@ -72,6 +72,7 @@ import ipaddress
 import re
 
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.pseudonyms import NamePseudonymizer, PseudonymTable
 
 logger = get_logger(__name__)
 
@@ -151,20 +152,30 @@ class AddressRedactor:
     pseudonymes deja attribues pour toute adresse deja rencontree."""
 
     def __init__(self) -> None:
-        self._map: dict[str, tuple[str, str]] = {}  # adresse reelle -> (pseudonyme, type)
-        self._counters = {"ipv4": 0, "ipv6": 0, "mac": 0}
+        # Issue #1151 : table commune (netcross_core.pseudonyms), adresse
+        # reelle -> (pseudonyme, type). Non idempotente : une adresse
+        # reelle situee dans la plage des pseudonymes recoit son propre
+        # pseudonyme (voir PseudonymTable).
+        logger.debug("AddressRedactor.__init__: debut")
+        self._table = PseudonymTable(_GENERATORS, idempotent=False)
+        # Table des NOMS (host-N[.domain-M].example.invalid), partagee par
+        # tous les champs nommes et exportee avec --redact-map ; appliquee
+        # aux champs types DNS/HTTP/TLS/SIP par #1153.
+        self.names = NamePseudonymizer()
         logger.debug("AddressRedactor.__init__: fin")
 
     def _pseudonym(self, addr: str, kind: str) -> str:
-        entry = self._map.get(addr)
-        if entry is not None:
-            logger.debug("AddressRedactor._pseudonym: si entry is not None -> retour entry[0]")
-            return entry[0]
-        idx = self._counters[kind]
-        self._counters[kind] += 1
-        pseudo = _GENERATORS[kind](idx)
-        self._map[addr] = (pseudo, kind)
+        logger.debug("AddressRedactor._pseudonym: kind={}", kind)
+        pseudo = self._table.pseudonym(addr, kind)
         logger.debug("AddressRedactor._pseudonym: retour pseudo={}", summarize(pseudo, "pseudo"))
+        return pseudo
+
+    def pseudonymize_name(self, name: str) -> str:
+        """Pseudonyme stable d'un nom d'hote/DNS (voir NamePseudonymizer) :
+        meme table pour tous les points et tous les champs du run."""
+        logger.debug("AddressRedactor.pseudonymize_name: debut")
+        pseudo = self.names.pseudonym(name)
+        logger.debug("AddressRedactor.pseudonymize_name: retour {}", summarize(pseudo, "pseudo"))
         return pseudo
 
     def redact(self, packets) -> None:
@@ -207,25 +218,28 @@ class AddressRedactor:
         logger.debug("AddressRedactor._redact_one: fin")
 
     def entries(self):
-        """Tuples (adresse_reelle, pseudonyme, type), tries par type puis
-        par pseudonyme -- ordre stable pour un export reproductible
-        (--redact-map, tests)."""
+        """Tuples (valeur_reelle, pseudonyme, type) : adresses triees par
+        type puis par pseudonyme -- ordre stable pour un export
+        reproductible (--redact-map, tests) --, puis table des noms
+        (types "nom" et "domaine", issue #1151), absente si aucun nom n'a
+        ete pseudonymise."""
         logger.debug("AddressRedactor.entries()")
-        return sorted(
-            ((addr, pseudo, kind) for addr, (pseudo, kind) in self._map.items()),
-            key=lambda t: (t[2], t[1]),
-        )
+        addresses = sorted(self._table.entries(), key=lambda t: (t[2], t[1]))
+        logger.debug("AddressRedactor.entries: retour {} adresse(s) + noms", len(addresses))
+        return addresses + self.names.entries()
 
     def __len__(self) -> int:
+        """Nombre d'ADRESSES pseudonymisees (messages « N adresse(s)
+        anonymisee(s) ») ; les noms se comptent avec len(self.names)."""
         logger.debug("AddressRedactor.__len__: retour len(…)")
-        return len(self._map)
+        return len(self._table)
 
     @property
     def mapping(self) -> dict[str, str]:
         """Vue simplifiee adresse_reelle -> pseudonyme (sans le type),
         pour un usage programmatique simple (tests notamment)."""
         logger.debug("AddressRedactor.mapping: retour dictionnaire")
-        return {addr: pseudo for addr, (pseudo, _kind) in self._map.items()}
+        return {addr: pseudo for addr, pseudo, _kind in self._table.entries()}
 
 
 def redact_packets(packets) -> AddressRedactor:
@@ -261,7 +275,9 @@ def write_redaction_map_csv(redactor: AddressRedactor, path: str) -> None:
     l'operateur, jamais transmis avec la capture/le rapport reidiges :
     permet de retrouver plus tard a quelle adresse reelle correspond un
     pseudonyme mentionne par un tiers (ex: un support vendeur qui cite
-    192.0.2.4 dans sa reponse)."""
+    192.0.2.4 dans sa reponse). Issue #1151 : la table des noms y figure
+    aussi (types "nom" et "domaine") ; elle n'est jamais jointe a un
+    rapport ni a un ticket de support."""
     logger.debug(
         "write_redaction_map_csv: redactor={} path={}",
         summarize(redactor, "redactor"),
