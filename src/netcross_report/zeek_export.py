@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 netcross_report.zeek_export -- journaux de flux au format Zeek ``conn.log``
 (issue #1115, chantier #1003).

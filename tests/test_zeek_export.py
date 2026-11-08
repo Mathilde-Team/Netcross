@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Tests de l'export Zeek conn.log (issue #1115, chantier #1003).
 
 Relecture facon ``zeek-cut`` : un analyseur TSV qui suit les en-tetes
