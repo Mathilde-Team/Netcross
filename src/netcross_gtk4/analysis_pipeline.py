@@ -384,6 +384,8 @@ def _run_pipeline(
 
         report.capture_comments = read_capture_comments(captures)
         report.capture_infos = read_capture_infos(captures)
+        if advanced.tls_keylog:
+            report.points_keylog = sorted({label for label, _ in captures})
 
     # 8. Rapport texte
     _log("Mise en forme du rapport...")
@@ -477,7 +479,11 @@ def _run_pipeline(
         else:
             quic_events = []
             for label, path in captures:
-                quic_events.extend(parse_quic_capture(label, path))
+                quic_events.extend(
+                    parse_quic_capture(
+                        label, path, **({"tls_keylog": advanced.tls_keylog} if advanced.tls_keylog else {})
+                    )
+                )
             quic_findings = diagnose_quic(quic_events, report.points)
             with contextlib.redirect_stdout(buf):
                 print("\n" + "=" * 70)
@@ -499,6 +505,7 @@ def _run_pipeline(
             test_net_external=advanced.test_net_external,
             cve_db=advanced.cve_db,
             plugins=options.plugins,
+            tls_keylog=advanced.tls_keylog,
         )
         if options.notify is not None and options.notify.active:
             # Avant l'impression : la section « Notifications » du rapport
@@ -639,6 +646,7 @@ def run_security_analysis(
     test_net_external: bool = False,
     cve_db: str | None = None,
     plugins: Any = None,
+    tls_keylog: str | None = None,
 ):
     """Analyse de securite de la GUI (issue #357), alignee sur
     --security-report : signatures d'exploits relues sur les fichiers,
@@ -657,7 +665,11 @@ def run_security_analysis(
     logger.debug("run_security_analysis: {} capture(s), {} paquet(s)", len(captures), len(all_packets))
     detections = []
     for label, path in captures:
-        found = scan_capture_exploits(label, path)
+        found = (
+            scan_capture_exploits(label, path, tls_keylog=tls_keylog)
+            if tls_keylog
+            else scan_capture_exploits(label, path)
+        )
         log(f"  [{label}] {len(found)} signature(s) d'exploit")
         detections.extend(found)
     cve_conn = None

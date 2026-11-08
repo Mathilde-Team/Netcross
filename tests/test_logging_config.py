@@ -72,6 +72,97 @@ def test_defaut_info_sans_debug():
     assert "tracing debug actif" not in r.stderr
 
 
+_IMPORT_AMORCAGE_SEUL = f"""
+import importlib.util
+# __init__ de netcross_core appelle déjà get_logger et configure le journal.
+# Charger le vrai module seul pour observer son état avant cette première configuration.
+spec = importlib.util.spec_from_file_location(
+    "netcross_core.logging_config", {str(SRC / "netcross_core/logging_config.py")!r}
+)
+lc = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(lc)
+assert lc._CONFIGURED is False
+"""
+
+
+@pytest.mark.parametrize("env", [{}, {"NETCROSS_DEBUG": "1"}])
+def test_amorcage_silencieux_avant_configuration(env):
+    """Les helpers préalables ne passent jamais par le handler DEBUG de loguru."""
+    r = _run(
+        _IMPORT_AMORCAGE_SEUL
+        + textwrap.dedent("""
+        import argparse
+        lc.level_from_env()
+        lc.is_debug_level("INFO")
+        parser = argparse.ArgumentParser()
+        lc.add_debug_argument(parser)
+        lc.apply_debug_argument(parser.parse_args([]))
+        lc.summarize("valeur", "password")
+        """),
+        env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert r.stderr == ""
+
+
+def test_import_amorcage_ne_desactive_pas_le_logger_de_lappelant():
+    r = _run(
+        textwrap.dedent("""
+        import sys
+        from loguru import logger
+        logger.remove()
+        logger.add(sys.stderr, format="APPELANT|{message}", level="INFO")
+        """)
+        + _IMPORT_AMORCAGE_SEUL
+        + '\nlogger.info("temoin-appelant")\n'
+    )
+    assert r.returncode == 0, r.stderr
+    assert r.stderr == "APPELANT|temoin-appelant\n"
+
+
+_APPELS_AMORCAGE = (
+    _IMPORT_AMORCAGE_SEUL
+    + """
+import argparse
+lc.configure_logging()
+lc.configure_logging()
+lc.level_from_env()
+lc.is_debug_level("INFO")
+lc.enable_debug(lc.current_level())
+lc.current_level()
+lc.is_debug_enabled()
+parser = argparse.ArgumentParser()
+lc.add_debug_argument(parser)
+lc.apply_debug_argument(parser.parse_args([]))
+lc.get_logger("essai")
+"""
+)
+
+
+def test_neuf_entrees_silencieuses_au_niveau_normal():
+    r = _run(_APPELS_AMORCAGE)
+    assert r.returncode == 0, r.stderr
+    assert r.stderr == ""
+
+
+@pytest.mark.parametrize("niveau", ["DEBUG", "TRACE"])
+def test_neuf_entrees_visibles_apres_configuration_debug(niveau):
+    r = _run(_APPELS_AMORCAGE, {"NETCROSS_LOG_LEVEL": niveau})
+    assert r.returncode == 0, r.stderr
+    for fonction in (
+        "level_from_env",
+        "is_debug_level",
+        "configure_logging",
+        "enable_debug",
+        "current_level",
+        "is_debug_enabled",
+        "add_debug_argument",
+        "apply_debug_argument",
+        "get_logger",
+    ):
+        assert f"{fonction}: entrée" in r.stderr
+
+
 def test_netcross_debug_active_le_tracing_avec_le_thread():
     r = _run(_EMIT, {"NETCROSS_DEBUG": "1"})
     assert r.stdout.split() == ["DEBUG", "True"]

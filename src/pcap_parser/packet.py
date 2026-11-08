@@ -34,6 +34,7 @@ from pcap_parser.ek_fields import (
     layer,
 )
 from pcap_parser.protocols import (
+    extract_dechiffrement,
     extract_dhcp,
     extract_dns,
     extract_http,
@@ -331,6 +332,18 @@ class RawPacket:
     tcp_checksum_bad: bool | None = None
     udp_checksum: str | None = None
     udp_checksum_bad: bool | None = None
+    # -- Dechiffrement TLS/QUIC (issue #1043, voir protocols.
+    # extract_dechiffrement) : identifiant de session dans la capture
+    # (tls.stream, quic.connection.number) et preuve que tshark a dechiffre
+    # ce paquet (keylog ou DSB). None/False hors TLS/QUIC.
+    tls_stream: int | None = None
+    tls_dechiffre: bool = False
+    quic_connexion: int | None = None
+    quic_dechiffre: bool = False
+    # Issue #1045 : paquet a en-tete court (1-RTT), dechiffre ou non, et
+    # trame CONNECTION_CLOSE lisible (« applicatif 0x42 (raison) »).
+    quic_court: bool = False
+    quic_fermeture: str | None = None
 
 
 # Cles de couches EK dont le "_ws_expert" est collecte en plus des couches
@@ -789,6 +802,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
     )
 
     key_id = seq if proto == "TCP" else ip_id
+    dechiffrement = extract_dechiffrement(layers) or {}
     phash = hashlib.md5(payload).hexdigest() if payload else None
     # Issue #351 : entropie de Shannon sur les octets du payload
     pentropy = _byte_entropy(payload) if payload else 0.0
@@ -888,4 +902,10 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
         tcp_checksum_bad=tcp_checksum_bad,
         udp_checksum=udp_checksum,
         udp_checksum_bad=udp_checksum_bad,
+        tls_stream=dechiffrement.get("tls_stream"),
+        tls_dechiffre=dechiffrement.get("tls_dechiffre", False),
+        quic_connexion=dechiffrement.get("quic_connexion"),
+        quic_dechiffre=dechiffrement.get("quic_dechiffre", False),
+        quic_court=dechiffrement.get("quic_court", False),
+        quic_fermeture=dechiffrement.get("quic_fermeture"),
     )
