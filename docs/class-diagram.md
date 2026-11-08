@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-204 modules · 295 classes · 725 fonctions publiques de module.
+206 modules · 299 classes · 731 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -44,7 +44,7 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"54 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"41 imports"| netcross_core
+    netcross_report -->|"42 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"19 imports"| pcap_parser
 ```
@@ -75,6 +75,8 @@ flowchart LR
     DemandeSauvegarde["netcross_gtk4.bpf_panel.DemandeSauvegarde"]
     Detector["netcross_core.plugins.api.Detector"]
     DiffFinding["netcross_core.baseline_diff.DiffFinding"]
+    EchantillonHorloge["netcross_core.clock_sync.EchantillonHorloge"]
+    EstimationHorloge["netcross_core.clock_sync.EstimationHorloge"]
     EvidenceLink["netcross_core.expert_model.EvidenceLink"]
     ExpertEvent["netcross_core.expert_model.ExpertEvent"]
     ExpertiseExports["netcross_gtk4.expertise_view.ExpertiseExports"]
@@ -124,6 +126,8 @@ flowchart LR
     LoadedPlugins -->|detectors| Detector
     LoadedPlugins -->|exporters| Exporter
     ModelPack -->|baseline| Baseline
+    Report -->|clock_offset_estimate| EstimationHorloge
+    Report -->|clock_offset_samples| EchantillonHorloge
     SegmentScore -->|findings| Finding
     _Detector -->|run| netcross_core_security_expert_correlation__FlowState
 ```
@@ -471,6 +475,7 @@ classDiagram
 | `netcross_core.capture_tools` | manipulation de fichiers de capture partagee par la CLI, la GUI et l'API (issues #868, #869, #870, #886, #887). |
 | `netcross_core.causality` | moteur de correlation causale (Session 3 de la section 13.3 de FEATURES.md, Job 4/issue #4). |
 | `netcross_core.client_diff` | comparaison "client vs client" : meme capture, memes points, seule la source (l'IP du poste) change. |
+| `netcross_core.clock_sync` | estimation robuste du decalage et de la derive d'horloge entre deux points de capture (issue #996). |
 | `netcross_core.compliance` | evaluateur de conformite, huitieme et neuvieme objets de contrat de la Session 0 (FEATURES.md section 13.3) : `ReferenceProfile`/`ComplianceResult` (netcross_core.expert_model). |
 | `netcross_core.config` | chargement de configuration depuis .netcross.toml (issue #170). |
 | `netcross_core.content` | Extraction des objets applicatifs HTTP/1.x sans conservation du corps. |
@@ -548,7 +553,7 @@ classDiagram
     %% ===== netcross_core.analysis =====
     class mod_netcross_core_analysis["netcross_core.analysis"] {
         <<module>>
-        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts)
+        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets)
     }
 
     %% ===== netcross_core.annotations =====
@@ -727,6 +732,33 @@ classDiagram
         +compare_clients(all_packets, client_group, reference, points_order, bucket_seconds, nat_tolerant, nat_window_ms, rtp_clock_rate, loss_min_pp, latency_min_ms)
         +print_client_comparison(result) None
         +write_client_diff_csv(result, path) None
+    }
+
+    %% ===== netcross_core.clock_sync =====
+    class EchantillonHorloge {
+        <<dataclass, frozen>>
+        +float t
+        +float decalage_ms
+        +float delai_ms
+    }
+    class EstimationHorloge {
+        <<dataclass>>
+        +float decalage_ms
+        +float t0
+        +float derive_ppm
+        +float ic_decalage_ms
+        +float ic_derive_ppm
+        +int n_echantillons
+        +int n_conserves
+        +str methode
+        +bool manuel
+        +decalage_a(t) float
+    }
+    class mod_netcross_core_clock_sync["netcross_core.clock_sync"] {
+        <<module>>
+        +estimer_decalage(echantillons) EstimationHorloge?
+        +estimation_manuelle(decalage_ms, t0) EstimationHorloge
+        +analyser_decalages_manuels(specifications) dict~tuple~str, str~, float~
     }
 
     %% ===== netcross_core.compliance =====
@@ -1518,6 +1550,7 @@ classDiagram
         +float bucket_seconds
         +int rtp_clock_rate
         +dict~str, int~ seen_count
+        +dict~str, int~ packet_count
         +dict~str, int~ loss_count
         +dict~str, int~ off_path_count
         +dict~tuple~str, str~, list~float~~ latency
@@ -1585,8 +1618,8 @@ classDiagram
         +list~dict~ expert_malformed_flows
         +dict~str, dict~str, int~~ exploit_suspicion
         +list~dict~ exploit_suspicion_flows
-        +dict~tuple~str, str~, list~float~~ clock_offset_samples
-        +dict~tuple~str, str~, tuple~float, float, int~~ clock_offset_estimate
+        +dict~tuple~str, str~, list~EchantillonHorloge~~ clock_offset_samples
+        +dict~tuple~str, str~, EstimationHorloge~ clock_offset_estimate
         +dict~str, set~int~~ vlan_seen
         +dict~tuple~str, str~, int~ vlan_change
         +dict~tuple~str, str~, dict~str, int~~ vlan_tag_flip
@@ -1702,6 +1735,52 @@ classDiagram
         +apply_packet_limits(all_packets, max_packets, sample_n)
     }
 
+    %% ===== relations =====
+    DiffFinding --> EvidenceLink : evidence
+    CaptureGroup --> CaptureInventory : members
+    CaptureGroup --> PairEvaluation : evaluations
+    IsolatedCapture --> CaptureInventory : capture
+    BatchPlan --> CaptureGroup : groups
+    BatchPlan --> CaptureInventory : failures
+    BatchPlan --> IsolatedCapture : isolated
+    ClientReport --> ClientSignature : signature
+    ClientReport --> Report : report
+    ClientComparisonResult --> ClientReport : clients
+    NetcrossConfig --> AnalysisConfig : analysis
+    NetcrossConfig --> NotifyConfig : notify
+    NetcrossConfig --> OutputConfig : output
+    NetcrossConfig --> ParallelConfig : parallel
+    NetcrossConfig --> SecurityConfig : security
+    EvidenceLink --> PacketEvidence : packet
+    ExpertEvent --> EvidenceLink : evidence
+    ExpertEvent --> PacketEvidence : packet_evidence
+    Diagnosis --> ExpertEvent : events
+    ComplianceResult --> ReferenceProfile : reference
+    _Detector --> netcross_core_exploit_signatures__FlowState : run
+    FlowTimeline --> PacketTiming : packet_timings
+    FlowTimeline --> ThroughputWindow : throughput_windows
+    FlowView --> ExpertEvent : events
+    FlowView --> Flow : flow
+    FlowView --> TcpSummary : tcp
+    FlowView --> Transaction : transactions
+    LiveDiffState --> Pkt : packets_in_window
+    LiveAggregator --> _Point : points
+    Methode --> Parametre : parametres
+    FicheClasse --> Attribut : attributs
+    FicheClasse --> Methode : methodes
+    Pkt --> Banner : service_banners
+    Report --> ChecksumError : checksum_errors
+    Report --> EchantillonHorloge : clock_offset_samples
+    Report --> EstimationHorloge : clock_offset_estimate
+    Report --> SequenceGap : sequence_gaps
+```
+
+### Diagramme (2/2)
+
+```mermaid
+classDiagram
+    direction LR
+
     %% ===== netcross_core.parsing =====
     class mod_netcross_core_parsing["netcross_core.parsing"] {
         <<module>>
@@ -1738,50 +1817,6 @@ classDiagram
         +diagnose_quic(events, points_order)
         +print_quic_diagnostics(findings) None
     }
-
-    %% ===== relations =====
-    DiffFinding --> EvidenceLink : evidence
-    CaptureGroup --> CaptureInventory : members
-    CaptureGroup --> PairEvaluation : evaluations
-    IsolatedCapture --> CaptureInventory : capture
-    BatchPlan --> CaptureGroup : groups
-    BatchPlan --> CaptureInventory : failures
-    BatchPlan --> IsolatedCapture : isolated
-    ClientReport --> ClientSignature : signature
-    ClientReport --> Report : report
-    ClientComparisonResult --> ClientReport : clients
-    NetcrossConfig --> AnalysisConfig : analysis
-    NetcrossConfig --> NotifyConfig : notify
-    NetcrossConfig --> OutputConfig : output
-    NetcrossConfig --> ParallelConfig : parallel
-    NetcrossConfig --> SecurityConfig : security
-    EvidenceLink --> PacketEvidence : packet
-    ExpertEvent --> EvidenceLink : evidence
-    ExpertEvent --> PacketEvidence : packet_evidence
-    Diagnosis --> ExpertEvent : events
-    ComplianceResult --> ReferenceProfile : reference
-    _Detector --> netcross_core_exploit_signatures__FlowState : run
-    FlowTimeline --> PacketTiming : packet_timings
-    FlowTimeline --> ThroughputWindow : throughput_windows
-    FlowView --> ExpertEvent : events
-    FlowView --> Flow : flow
-    FlowView --> TcpSummary : tcp
-    FlowView --> Transaction : transactions
-    LiveDiffState --> Pkt : packets_in_window
-    LiveAggregator --> _Point : points
-    Methode --> Parametre : parametres
-    FicheClasse --> Attribut : attributs
-    FicheClasse --> Methode : methodes
-    Pkt --> Banner : service_banners
-    Report --> ChecksumError : checksum_errors
-    Report --> SequenceGap : sequence_gaps
-```
-
-### Diagramme (2/2)
-
-```mermaid
-classDiagram
-    direction LR
 
     %% ===== netcross_core.redact =====
     class AddressRedactor {
@@ -3528,6 +3563,7 @@ classDiagram
 | `netcross_report.lua_doc_text` | rendu texte de la documentation Lua Wireshark (``netcross-lua-doc``, issue #388), partage avec la fenetre « Documentation Lua » de la GUI (issue #873). |
 | `netcross_report.markdown_report` | generation d'un rapport au format Markdown (issue #761). |
 | `netcross_report.metric_charts` | API generique de graphiques : tout module d'analyse peut produire un graphique a partir d'une MetricSeries sans reimplementer son propre code matplotlib. |
+| `netcross_report.metrics_export` | catalogue des metriques Prometheus / OpenMetrics de Netcross et production des series depuis un rapport (issue #1110, sous-issue 1/5 du chantier #1003). |
 | `netcross_report.path_metrics` | metriques de qualite par segment du chemin observe (Job 16/issue #12, FEATURES.md section 6.7). |
 | `netcross_report.pdf` | assemble le rapport PDF final (synthese, graphiques, tableaux de detail) a partir d'un Report netcross_core, avec reportlab. |
 | `netcross_report.rule_engine` | premier PILOTE du moteur d'EXECUTION evoque comme premier chantier ouvert par CLAUDE.md/`Prochaine feature` depuis la Session 54 (bibliotheque de regles §6.2 complete, 41 regles) : faire evaluer une… |
@@ -3750,6 +3786,29 @@ classDiagram
         +render_metric_chart(series, path, kind) str?
     }
 
+    %% ===== netcross_report.metrics_export =====
+    class MetricSpec {
+        <<dataclass, frozen>>
+        +str name
+        +str type
+        +str unit
+        +str help
+        +tuple~str, ...~ labels
+    }
+    class Sample {
+        <<dataclass, frozen>>
+        +str name
+        +tuple~tuple~str, str~, ...~ labels
+        +float value
+        +label(key) str?
+    }
+    class mod_netcross_report_metrics_export["netcross_report.metrics_export"] {
+        <<module>>
+        +series_upper_bound(n_points, n_segments) int
+        +segment_label(a, b) str
+        +collect_samples(r, run, findings, max_points, max_segments) list~Sample~
+    }
+
     %% ===== netcross_report.path_metrics =====
     class SegmentMetrics {
         <<dataclass>>
@@ -3764,6 +3823,11 @@ classDiagram
         +int loss_count
         +float? loss_pct
         +float? throughput_bps
+        +float? clock_offset_ms
+        +float? clock_drift_ppm
+        +float? clock_ci_ms
+        +int? clock_samples
+        +str? clock_method
         +int dscp_changes
         +int frag_new
         +int pmtud_blackhole
