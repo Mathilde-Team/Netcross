@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from netcross_core.clock_sync import EchantillonHorloge, EstimationHorloge
 from netcross_core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -291,6 +292,9 @@ class Report:
     bucket_seconds: float = 1.0
     rtp_clock_rate: int = 8000
     seen_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    # issue #1110 : paquets vus a chaque point (seen_count compte des FLUX) --
+    # alimente netcross_point_packets_total (netcross_report.metrics_export)
+    packet_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     loss_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     # issue #352 : paquets vus en amont dont le couple d'hotes n'echange
     # jamais rien a ce point (ni aller ni retour) -- trafic hors chemin
@@ -504,9 +508,13 @@ class Report:
     # confirmer, jamais un diagnostic definitif -- voir la docstring du module.
     exploit_suspicion: dict[str, dict[str, int]] = field(default_factory=lambda: defaultdict(lambda: defaultdict(int)))
     exploit_suspicion_flows: list[dict] = field(default_factory=list)
-    # -- decalage d'horloge (via handshakes TCP, hypothese de chemin symetrique) --
-    clock_offset_samples: dict[tuple[str, str], list[float]] = field(default_factory=lambda: defaultdict(list))
-    clock_offset_estimate: dict[tuple[str, str], tuple[float, float, int]] = field(default_factory=dict)
+    # -- decalage d'horloge (issue #996 : filtre au delai minimal +
+    # Theil-Sen, echantillons handshakes TCP et couples DNS ; voir
+    # clock_sync.py) --
+    clock_offset_samples: dict[tuple[str, str], list[EchantillonHorloge]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    clock_offset_estimate: dict[tuple[str, str], EstimationHorloge] = field(default_factory=dict)
     # -- VLAN 802.1Q --
     vlan_seen: dict[str, set[int]] = field(default_factory=lambda: defaultdict(set))
     vlan_change: dict[tuple[str, str], int] = field(default_factory=lambda: defaultdict(int))
