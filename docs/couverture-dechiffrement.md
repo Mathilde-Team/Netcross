@@ -17,7 +17,7 @@ rapport indique, pour chaque point concerné, combien de sessions ont réellemen
   un de ses enregistrements l'a été (tshark n'ajoute `tls.record.sequence_number` qu'aux enregistrements
   déchiffrés, TLS 1.2 comme 1.3).
 - **Session QUIC** : un `quic.connection.number`. Elle est comptée déchiffrée si au moins un paquet 1-RTT
-  (en-tête court) a été déchiffré. Les paquets Initial, toujours déchiffrables, ne comptent pas.
+  (en-tête court) a été déchiffré, c'est-à-dire dont tshark a disséqué les trames. Les paquets Initial, toujours déchiffrables, ne comptent pas.
 - Un paquet sans identifiant de session est rattaché à sa conversation (adresses et ports, sans le sens).
 
 ## Points affichés
@@ -38,6 +38,8 @@ La clé `decryption` est absente quand rien n'est à signaler.
 
 ## Limites
 
-- Le compteur QUIC est testé sur des couches EK synthétiques : aucune capture QUIC avec ses secrets n'est
-  produite par la suite de tests (pas de pile QUIC disponible dans la CI).
+- Le compteur QUIC est testé sur une vraie connexion QUIC v1 versionnée (`tests/data/quic-1rtt.pcap` et son
+  fichier de clés, produits une fois par `scripts/generer_capture_quic.py` avec aioquic, qui n'est pas une
+  dépendance du projet). Sans clé, tshark ne signale pas d'échec sur un paquet 1-RTT : seule la présence de
+  trames disséquées prouve le déchiffrement.
 - Une session dont la capture ne contient que la fin (ni poignée de main ni clé) est comptée non déchiffrée.

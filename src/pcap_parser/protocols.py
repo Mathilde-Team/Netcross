@@ -644,8 +644,11 @@ def extract_dechiffrement(layers: dict) -> dict | None:
     - QUIC : ``quic.connection.number`` identifie la connexion. Les paquets
       Initial sont toujours dechiffrables (cles derivees du DCID) et ne
       prouvent donc rien : seul un paquet 1-RTT (en-tete court,
-      ``quic.short``) sans ``quic.decryption_failed`` atteste que les
-      secrets de session etaient disponibles.
+      ``quic.short``) dont tshark a dissequé les trames (``quic.frame_type``)
+      atteste que les secrets de session etaient disponibles. Sans cle,
+      tshark ne signale PAS d'echec : il n'expose que
+      ``quic.remaining_payload`` (verifie avec tshark 4.6.4 sur
+      tests/data/quic-1rtt.pcap).
 
     Renvoie None si le paquet ne porte ni couche tls ni couche quic.
     """
@@ -661,7 +664,7 @@ def extract_dechiffrement(layers: dict) -> dict | None:
     for quic in quics:
         if quic_connexion is None:
             quic_connexion = hex_or_dec_to_int(_premier(g(quic, "quic_quic_connection_number")))
-        if "quic_quic_short" in quic and "quic_quic_decryption_failed" not in quic:
+        if _quic_1rtt_dechiffre(quic):
             quic_dechiffre = True
     logger.debug("extract_dechiffrement: retour (tls {}, quic {})", tls_dechiffre, quic_dechiffre)
     return {
@@ -670,6 +673,19 @@ def extract_dechiffrement(layers: dict) -> dict | None:
         "quic_connexion": quic_connexion,
         "quic_dechiffre": quic_dechiffre,
     }
+
+
+def _quic_1rtt_dechiffre(quic: dict) -> bool:
+    """Paquet QUIC 1-RTT dont tshark a dechiffre et dissequé les trames."""
+    logger.debug("_quic_1rtt_dechiffre: entrée")
+    resultat = (
+        isinstance(quic, dict)
+        and "quic_quic_short" in quic
+        and "quic_quic_frame_type" in quic
+        and "quic_quic_decryption_failed" not in quic
+    )
+    logger.debug("_quic_1rtt_dechiffre: retour {}", resultat)
+    return resultat
 
 
 def _premier(valeur):

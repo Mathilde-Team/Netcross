@@ -60,8 +60,18 @@ def test_extraction_tls_chiffre():
     ("quic", "attendu"),
     [
         ({"quic_quic_connection_number": "1", "quic_quic_long_packet_type": "0"}, False),
-        ({"quic_quic_connection_number": "1", "quic_quic_short": "1"}, True),
-        ({"quic_quic_connection_number": "1", "quic_quic_short": "1", "quic_quic_decryption_failed": "x"}, False),
+        ({"quic_quic_connection_number": "1", "quic_quic_short": None, "quic_quic_frame_type": "11"}, True),
+        # sans cle, tshark n'expose que la charge restante, sans signaler d'echec
+        ({"quic_quic_connection_number": "1", "quic_quic_short": None, "quic_quic_remaining_payload": "e2:be"}, False),
+        (
+            {
+                "quic_quic_connection_number": "1",
+                "quic_quic_short": None,
+                "quic_quic_frame_type": "1",
+                "quic_quic_decryption_failed": "x",
+            },
+            False,
+        ),
     ],
 )
 def test_extraction_quic(quic, attendu):
@@ -73,7 +83,7 @@ def test_extraction_quic(quic, attendu):
 
 def test_extraction_quic_coalesce():
     # deux paquets QUIC coalescés dans un datagramme : Initial puis 1-RTT
-    layers = {"quic": [{"quic_quic_connection_number": "2"}, {"quic_quic_short": "1"}]}
+    layers = {"quic": [{"quic_quic_connection_number": "2"}, {"quic_quic_short": None, "quic_quic_frame_type": "29"}]}
     resultat = extract_dechiffrement(layers)
     assert resultat["quic_connexion"] == 2
     assert resultat["quic_dechiffre"] is True
@@ -245,3 +255,18 @@ def test_compteur_keylog_complet_et_absent(deux_sessions, tmp_path):
     assert compter_sessions(avec) == {"CLIENT": {"tls": {"sessions": 2, "dechiffrees": 2}}}
     sans = parse_capture("CLIENT", str(capture))
     assert compter_sessions(sans) == {"CLIENT": {"tls": {"sessions": 2, "dechiffrees": 0}}}
+
+
+# --- QUIC réel : tests/data/quic-1rtt.pcap (scripts/generer_capture_quic.py) ------
+
+DONNEES = Path(__file__).parent / "data"
+
+
+@avec_tshark
+@pytest.mark.parametrize(("avec_cle", "attendu"), [(True, 1), (False, 0)])
+def test_compteur_quic_reel(avec_cle, attendu):
+    from netcross_core.parsing import parse_capture
+
+    options = {"tls_keylog": str(DONNEES / "quic-1rtt-keys.txt")} if avec_cle else {}
+    paquets = parse_capture("CLIENT", str(DONNEES / "quic-1rtt.pcap"), **options)
+    assert compter_sessions(paquets) == {"CLIENT": {"quic": {"sessions": 1, "dechiffrees": attendu}}}
