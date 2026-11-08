@@ -36,6 +36,7 @@ from netcross_core.fingerprint.report import compute_pkt_fingerprints
 from netcross_core.logging_config import get_logger
 from netcross_core.models import Pkt
 from pcap_parser.capinfos_source import read_capture_comment
+from pcap_parser.capture import keylog_task_args
 from pcap_parser.ek_source import CaptureAccessError, TsharkError, TsharkNotFoundError
 from pcap_parser.packet import RawPacket
 from pcap_parser.protocols import compute_mos
@@ -155,14 +156,19 @@ def _to_pkt(label: str, raw: RawPacket) -> Pkt:
     )
 
 
-def parse_capture(label, path, raise_on_error=False) -> list[Pkt]:
+def parse_capture(label, path, raise_on_error=False, *, tls_keylog: str | None = None) -> list[Pkt]:
     """Meme signature/comportement que l'ancienne version de ce module : lit
     `path` via pcap_parser (tshark -T ek), etiquette chaque paquet avec
     `label`. raise_on_error=True laisse remonter l'exception au lieu de
-    l'avaler (utilise par parse_captures_parallel)."""
+    l'avaler (utilise par parse_captures_parallel). tls_keylog (issue #1040) :
+    fichier de cles TLS transmis a tshark, None = comportement inchange."""
     logger.debug("parse_capture: point {} <- {}", label, path)
     try:
-        raw_packets = pcap_parser.parse_capture(path, raise_on_error=True)
+        raw_packets = (
+            pcap_parser.parse_capture(path, raise_on_error=True, tls_keylog=tls_keylog)
+            if tls_keylog
+            else pcap_parser.parse_capture(path, raise_on_error=True)
+        )
     except (TsharkNotFoundError, TsharkError) as e:
         if isinstance(e, CaptureAccessError):
             # erreur utilisateur (droits, chemin) : message clair, sans trace (#468)
@@ -194,29 +200,36 @@ def parse_capture(label, path, raise_on_error=False) -> list[Pkt]:
     return pkts
 
 
-def _parse_capture_timed(label, path):
+def _parse_capture_timed(label, path, tls_keylog=None):
     """Wrapper picklable pour ProcessPoolExecutor, cf. l'ancienne version."""
     import time
 
     t0 = time.time()
-    pkts = parse_capture(label, path, raise_on_error=True)
+    pkts = (
+        parse_capture(label, path, raise_on_error=True, tls_keylog=tls_keylog)
+        if tls_keylog
+        else parse_capture(label, path, raise_on_error=True)
+    )
     logger.debug("_parse_capture_timed: retour tuple de 2")
     return pkts, time.time() - t0
 
 
-def parse_captures_parallel(captures, max_workers=None) -> tuple[list[Pkt], list[dict]]:
+def parse_captures_parallel(captures, max_workers=None, *, tls_keylogs=None) -> tuple[list[Pkt], list[dict]]:
     """Identique a l'ancienne version : un processus tshark par fichier
     en parallele. Renvoie (all_packets, per_file_stats), meme format
-    (voir docstring de l'ancienne implementation pour le detail des cles)."""
+    (voir docstring de l'ancienne implementation pour le detail des cles).
+    tls_keylogs (issue #1040) : fichier de cles TLS par label."""
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
     all_packets: list[Pkt] = []
     per_file_stats: list[dict] = []
 
     logger.debug("parse_captures_parallel: {} capture(s), max_workers={}", len(captures), max_workers)
+    keylogs = dict(tls_keylogs or {})
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         future_to_capture = {
-            executor.submit(_parse_capture_timed, label, path): (label, path) for label, path in captures
+            executor.submit(_parse_capture_timed, label, path, *keylog_task_args(keylogs, label)): (label, path)
+            for label, path in captures
         }
         for future in as_completed(future_to_capture):
             label, path = future_to_capture[future]

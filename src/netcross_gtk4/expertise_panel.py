@@ -17,7 +17,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gio, Gtk  # noqa: E402
 
-from netcross_core.logging_config import get_logger  # noqa: E402
+from netcross_core.logging_config import get_logger, summarize  # noqa: E402
 from netcross_gtk4.expertise_view import timeline_summary, tshark_stats_summary, write_json  # noqa: E402
 
 logger = get_logger(__name__)
@@ -25,6 +25,7 @@ logger = get_logger(__name__)
 
 class ExpertisePanel(Gtk.Box):
     def __init__(self):
+        logger.debug("ExpertisePanel.__init__: entrée")
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         logger.debug("ExpertisePanel: construction du panneau")
         for side in ("top", "bottom", "start", "end"):
@@ -45,6 +46,7 @@ class ExpertisePanel(Gtk.Box):
         for widget in (self.timeline_label, self.stats_label, buttons, self.status_label):
             self.append(widget)
         self._sync()
+        logger.debug("ExpertisePanel.__init__: fin")
 
     def set_exports(self, exports) -> None:
         """Documents de la derniere analyse (ExpertiseExports ou None)."""
@@ -54,6 +56,7 @@ class ExpertisePanel(Gtk.Box):
         logger.debug("ExpertisePanel.set_exports: {}", exports is not None)
 
     def _document(self, key: str):
+        logger.debug("ExpertisePanel._document: retour getattr(self.exports, key, None) if self.exports …")
         return getattr(self.exports, key, None) if self.exports is not None else None
 
     def _sync(self) -> None:
@@ -63,13 +66,16 @@ class ExpertisePanel(Gtk.Box):
         self.stats_label.set_text(tshark_stats_summary(stats))
         self.timeline_btn.set_sensitive(timelines is not None)
         self.stats_btn.set_sensitive(stats is not None)
+        logger.debug("ExpertisePanel._sync: fin")
 
     def export_to(self, key: str, path) -> str:
         document = self._document(key)
         if document is None:
+            logger.debug("ExpertisePanel.export_to: si document is None -> levée ValueError")
             raise ValueError("rien a exporter : relancez l'analyse avec la case correspondante")
         written = write_json(path, document)
         self.status_label.set_text(f"Ecrit dans {written}")
+        logger.debug("ExpertisePanel.export_to: retour written={}", summarize(written, "written"))
         return written
 
     def _choose(self, key: str, initial_name: str) -> None:
@@ -77,6 +83,7 @@ class ExpertisePanel(Gtk.Box):
         dialog.set_initial_name(initial_name)
         root = self.get_root()
         dialog.save(root if isinstance(root, Gtk.Window) else None, None, lambda d, res: self._on_chosen(d, res, key))
+        logger.debug("ExpertisePanel._choose: fin")
 
     def _on_chosen(self, dialog, result, key: str) -> None:
         try:
@@ -93,3 +100,4 @@ class ExpertisePanel(Gtk.Box):
         except (OSError, ValueError) as exc:
             logger.warning("ExpertisePanel: export impossible ({})", exc)
             self.status_label.set_text(f"Export impossible : {exc}")
+        logger.debug("ExpertisePanel._on_chosen: fin")
