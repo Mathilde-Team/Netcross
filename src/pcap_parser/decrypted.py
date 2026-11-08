@@ -39,7 +39,7 @@ from collections.abc import Iterable
 
 from loguru import logger as _loguru_logger
 
-from pcap_parser.ek_source import TsharkError, _tshark_path, tls_keylog_prefs
+from pcap_parser.ek_source import TsharkError, TsharkNotFoundError, _tshark_path, tls_keylog_prefs
 
 # pcap_parser reste independant de netcross_core (contrat import-linter).
 logger = _loguru_logger.bind(name=__name__)
@@ -101,12 +101,19 @@ def read_decrypted_tls(path: str, tls_keylog: str) -> dict[int, bytes]:
     continue sur le seul contenu chiffré).
     """
     logger.debug("read_decrypted_tls: entrée ({})", path)
-    args = _arguments(tls_keylog)
+    # La capture est ouverte AVANT de chercher tshark : une capture absente
+    # est signalée comme telle, que tshark soit installé ou non.
     try:
         capture = open(path, "rb")  # noqa: SIM115 -- fermé par le with ci-dessous
     except OSError as exc:
         logger.debug("read_decrypted_tls: capture illisible -> levée TsharkError")
         raise TsharkError(f"capture illisible : {path} ({exc.strerror})") from exc
+    try:
+        args = _arguments(tls_keylog)
+    except TsharkNotFoundError:
+        capture.close()
+        logger.debug("read_decrypted_tls: tshark introuvable -> capture fermée, levée propagée")
+        raise
     # stderr dans un fichier temporaire : un tube non lu pendant la lecture
     # de stdout pourrait se remplir et bloquer tshark.
     with capture, tempfile.TemporaryFile(mode="w+", errors="replace") as journal:

@@ -139,6 +139,31 @@ def test_read_decrypted_tls_capture_absente(tmp_path):
         read_decrypted_tls(str(tmp_path / "absente.pcap"), str(tmp_path / "k.txt"))
 
 
+def test_read_decrypted_tls_sans_tshark(tmp_path, monkeypatch):
+    """Sans tshark, l'erreur dédiée remonte et la capture déjà ouverte est fermée."""
+    from pcap_parser.ek_source import TsharkNotFoundError
+
+    capture = tmp_path / "c.pcap"
+    capture.write_bytes(b"x")
+    ouverts = []
+    vrai_open = open
+
+    def open_espion(*a, **k):
+        f = vrai_open(*a, **k)
+        ouverts.append(f)
+        return f
+
+    def sans_tshark():
+        raise TsharkNotFoundError("tshark introuvable")
+
+    monkeypatch.setattr(module_dechiffre, "_tshark_path", sans_tshark)
+    monkeypatch.setattr("builtins.open", open_espion)
+    with pytest.raises(TsharkNotFoundError):
+        read_decrypted_tls(str(capture), str(tmp_path / "k.txt"))
+    monkeypatch.undo()
+    assert ouverts and all(f.closed for f in ouverts)
+
+
 @avec_tshark
 def test_read_decrypted_tls_echec_tshark(tmp_path):
     pas_une_capture = tmp_path / "faux.pcap"
