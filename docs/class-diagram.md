@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-225 modules · 327 classes · 824 fonctions publiques de module.
+226 modules · 330 classes · 827 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -563,6 +563,7 @@ classDiagram
 | `netcross_core.lua_dissectors` | catalogue des dissecteurs Wireshark écrits en Lua, dans la banque Lua (issue #917). |
 | `netcross_core.lua_doc` | banque SQLite locale de l'API Lua Wireshark (issue #387, rattachee a #331). |
 | `netcross_core.models` | structures de donnees partagees : un paquet normalise (Pkt) et le resultat d'analyse consolide (Report). |
+| `netcross_core.multiscale` | Debit crete multi-echelle en fenetre glissante (issue #1133). |
 | `netcross_core.naming` | table locale de correspondance adresse/MAC -> nom logique, type, contexte (Job 18 / issue #16-bis, section 6.15 de FEATURES.md). |
 | `netcross_core.packet_limits` | ``--max-packets`` et ``--sample`` (issue #283), partages par la CLI et la GUI (issue #672). |
 | `netcross_core.parsing` | adaptateur entre pcap_parser (decodage via tshark -T ek) et le modele Pkt de netcross_core. |
@@ -1885,6 +1886,24 @@ classDiagram
         +str name
         +str expression
         +str description
+    }
+
+    %% ===== netcross_core.multiscale =====
+    class ScaleTooFineError {
+        <<ValueError>>
+    }
+    class SlidingWindowPeak {
+        +update(ts_ns, length) None
+    }
+    class MultiScaleRates {
+        +update(ts, length) None
+        +results() list~dict~
+    }
+    class mod_netcross_core_multiscale["netcross_core.multiscale"] {
+        <<module>>
+        +format_scale(seconds) str
+        +check_scale(scale, ts_resolution, point) None
+        +multiscale_peaks(packets_by_point, link_speeds, scales) dict~str, dict~
     }
 
     %% ===== netcross_core.naming =====
