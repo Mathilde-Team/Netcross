@@ -8,6 +8,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Couverture du déchiffrement TLS/QUIC (#1043) : le rapport texte, le PDF et le JSON (`decryption.by_point`)
+  indiquent par point « 42/50 sessions TLS déchiffrées au point CLIENT » (et de même pour QUIC) dès qu'un fichier de
+  clés ou des blocs DSB sont fournis. Voir docs/couverture-dechiffrement.md.
 - Garde-fous de non-fuite des secrets (#1047) : un test de bout en bout cherche les secrets d'un fichier de clés et
   d'un bloc DSB (hexadécimal, octets bruts, base64) dans toutes les sorties d'un run : rapports texte, JSON,
   Markdown, PDF et HTML, journaux loguru, export SIEM, Zeek, base d'historique, ticket de support, contenus extraits
