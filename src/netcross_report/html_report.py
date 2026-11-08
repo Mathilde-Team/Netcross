@@ -332,7 +332,7 @@ def _labels() -> dict:
         "state": _("Etat"),
         # Separateur decimal des valeurs affichees (« . » en anglais).
         "decimal": _(","),
-        "segment_fields": [{**champ, "libelle": _(champ["libelle"])} for champ in _SEGMENT_FIELDS],
+        "segment_fields": [{**champ, "libelle": _(str(champ["libelle"]))} for champ in _SEGMENT_FIELDS],
         "severities": {k: _(v) for k, v in _SEVERITY_LABELS.items()},
         "health": {k: _(v) for k, v in _HEALTH_LABELS.items()},
         "severity_order": list(_SEVERITY_ORDER),
