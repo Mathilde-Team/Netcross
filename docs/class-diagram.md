@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-213 modules · 309 classes · 758 fonctions publiques de module.
+214 modules · 311 classes · 759 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -541,6 +541,7 @@ classDiagram
 | `netcross_core.packet_limits` | ``--max-packets`` et ``--sample`` (issue #283), partages par la CLI et la GUI (issue #672). |
 | `netcross_core.parsing` | adaptateur entre pcap_parser (decodage via tshark -T ek) et le modele Pkt de netcross_core. |
 | `netcross_core.profiling` | Mesure par étape du pipeline d'analyse (issue #1016, banc #994). |
+| `netcross_core.pseudonyms` | Module commun de pseudonymisation : adresses et noms (issue #1151). |
 | `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial v1 et v2 (RFC 9000/9001/9369), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP… |
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
@@ -1882,6 +1883,21 @@ classDiagram
         +marquer(mesures, nom) None
     }
 
+    %% ===== netcross_core.pseudonyms =====
+    class PseudonymTable {
+        +pseudonym(real, kind) str
+        +mark_own(value) None
+        +entries() list~tuple~str, str, str~~
+    }
+    class NamePseudonymizer {
+        +pseudonym(name) str
+        +entries() list~tuple~str, str, str~~
+    }
+    class mod_netcross_core_pseudonyms["netcross_core.pseudonyms"] {
+        <<module>>
+        +host_pseudonym(index) str
+    }
+
     %% ===== netcross_core.quic_diagnostics =====
     class QuicVersion {
         <<dataclass, frozen>>
@@ -1917,6 +1933,7 @@ classDiagram
 
     %% ===== netcross_core.redact =====
     class AddressRedactor {
+        +pseudonymize_name(name) str
         +redact(packets) None
         +entries()
         +mapping() dict~str, str~
