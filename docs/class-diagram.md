@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-217 modules · 312 classes · 774 fonctions publiques de module.
+218 modules · 313 classes · 790 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -3364,6 +3364,7 @@ classDiagram
 | Module | Rôle |
 |---|---|
 | `netcross_core.testing` | Outils de test réutilisables (jeux synthétiques du banc #994). |
+| `netcross_core.testing.bench` | Banc de performance reproductible de Netcross (issue #1017, chantier #994). |
 | `netcross_core.testing.synth` | Jeux synthétiques multi-points déterministes (issue #1015, banc #994). |
 
 ### Diagramme
@@ -3371,6 +3372,30 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_core.testing.bench =====
+    class BancError {
+        <<RuntimeError>>
+    }
+    class mod_netcross_core_testing_bench["netcross_core.testing.bench"] {
+        <<module>>
+        +modele_cpu(cpuinfo) str
+        +ram_mio(meminfo) int?
+        +coeurs_utilisables(affinite) int
+        +version_tshark(tshark) str?
+        +version_netcross() str
+        +environnement() dict
+        +trouver_jeux(chemin) list~Path~
+        +lire_verite(dossier) dict
+        +commande_analyse(dossier, verite, parallele, mesures, python)
+        +executer(cmd) int
+        +mesurer(dossier, parallele, repetitions, executeur, horloge) dict
+        +lancer(jeux, paralleles, repetitions, executeur, env) dict
+        +valider(resultat) list~str~
+        +en_markdown(resultat) str
+        +construire_parseur() argparse.ArgumentParser
+        +main(argv, executeur) int
+    }
 
     %% ===== netcross_core.testing.synth =====
     class Configuration {
