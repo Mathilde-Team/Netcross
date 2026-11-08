@@ -13,6 +13,11 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   Le calcul est exact, incrémental (paquet par paquet, compatible avec `--streaming`) et à mémoire bornée par la
   fenêtre. Une échelle plus fine que la résolution d'horodatage du point (`if_tsresol`) ou que 1 µs est refusée
   explicitement, avec la raison. Voir docs/fenetres-multi-echelles.md.
+- Échelle SIP multi-points (#1125) : pour chaque appel, une ligne par message SIP et une colonne par point de capture,
+  dans le PDF, le rapport HTML (avec ou sans JavaScript) et le JSON (`sip_ladders`). Un message perdu entre deux
+  points (« ABSENT »), retransmis ou réécrit (SDP, premier Via, Contact modifiés par un ALG ou un SBC) est mis en
+  évidence ; les `100 Trying`, produits à chaque saut, ne sont jamais déclarés perdus. Les en-têtes Via et Contact
+  sont désormais extraits, et `--redact` anonymise leurs adresses. Voir docs/echelle-sip.md.
 - Appariement des flux RTP entre points (#1121) : le même flux est reconnu à plusieurs points malgré un NAT ou un SBC
   (ports, adresses, SSRC, séquence et horodatage RTP réécrits), par SSRC puis par couples (séquence, horodatage RTP)
   avec décalage constant. Clé `rtp_matches` de `--json-report` : jambes par point, méthode, `nat_rewritten`, pertes

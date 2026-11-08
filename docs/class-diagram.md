@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-225 modules · 330 classes · 823 fonctions publiques de module.
+226 modules · 330 classes · 826 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -434,6 +434,8 @@ classDiagram
         +int? tcp_len
         +tuple~str, ...~ dns_answers
         +tuple~tuple~str, int~, ...~ sip_sdp_media
+        +str? sip_via
+        +str? sip_contact
         +RadioInfo? radio
         +str? comment
         +str? ip_checksum
@@ -461,6 +463,7 @@ classDiagram
         +extract_dhcp(layers) dict?
         +extract_sip(layers, payload) dict?
         +extract_sdp_media(payload) tuple~tuple~str, int~, ...~
+        +extract_sip_route_headers(payload) tuple~str?, str?~
         +extract_dns(layers) dict?
         +extract_http(layers) dict?
         +extract_tls_certificate(layers) dict?
@@ -571,6 +574,7 @@ classDiagram
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
+| `netcross_core.sip_ladder` | diagramme d'echelle SIP multi-points (issue #1125, sous-issue 4/6 du chantier VoIP #1004). |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
 | `netcross_core.streaming` | correlation des points en flux, par fenetre glissante (issue #1022, sous-issue 3/6 du chantier #995). |
 | `netcross_core.tls_diagnostics` | extrait l'etat des handshakes TLS (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de capture et localise le segment ou un handshake qui reussissait en amont se met a echouer. |
@@ -1672,6 +1676,8 @@ classDiagram
         +int? tcp_len
         +tuple~str, ...~ dns_answers
         +tuple~tuple~str, int~, ...~ sip_sdp_media
+        +str? sip_via
+        +str? sip_contact
         +RadioInfo? radio
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -1813,6 +1819,7 @@ classDiagram
         +dict~tuple~str, str~, list~str~~ sip_missing
         +list~float~ sip_setup_duration_ms
         +list~str~ sip_failed_calls
+        +list~dict~ sip_ladders
         +dict~str, int~ dns_query_count
         +dict~str, int~ dns_response_count
         +dict~str, int~ dns_nxdomain_count
@@ -2109,6 +2116,12 @@ classDiagram
     class mod_netcross_core_rtp_match["netcross_core.rtp_match"] {
         <<module>>
         +match_rtp_streams(all_packets, points, window_seconds) list~dict~
+    }
+
+    %% ===== netcross_core.sip_ladder =====
+    class mod_netcross_core_sip_ladder["netcross_core.sip_ladder"] {
+        <<module>>
+        +build_sip_ladders(all_packets, points, max_calls) list~dict~
     }
 
     %% ===== netcross_core.stats =====
@@ -4343,6 +4356,7 @@ classDiagram
     class mod_netcross_report_pdf["netcross_report.pdf"] {
         <<module>>
         +path_section_story(metrics, styles, chart_path)
+        +sip_ladder_section_story(ladders, styles)
         +sequence_section_story(views, styles, chart_paths)
         +expert_section_story(session_objects, styles, top_n)
         +security_section_story(security_report, styles)
