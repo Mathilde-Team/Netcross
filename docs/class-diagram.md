@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-206 modules · 299 classes · 737 fonctions publiques de module.
+207 modules · 300 classes · 740 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -483,6 +483,7 @@ classDiagram
 | `netcross_core.content` | Extraction des objets applicatifs HTTP/1.x sans conservation du corps. |
 | `netcross_core.correlate` | correlation des paquets entre points de capture (par 5-tuple strict ou par hash de payload en mode NAT-tolerant) et calcul du debit par fenetre temporelle. |
 | `netcross_core.dashboard` | contexte d'analyse partage pour le dashboard analytique interactif (issue #18, section 6.17). |
+| `netcross_core.detector_inventory` | Inventaire des détecteurs et de leur besoin de vue globale (issue #1020, chantier #995). |
 | `netcross_core.expert_model` | objets de contrat partages entre netcross_core et netcross_report ("Session 0" de FEATURES.md section 13.3 : stabiliser les objets communs avant de batir le moteur d'expertise vise par la comparaison… |
 | `netcross_core.expert_rules` | bibliotheque de regles d'expertise reseau DECLARATIVE (FEATURES.md section 6.2), dernier chantier de la Session 2 de la section 13.3 ("moteur d'evenements d'expertise") apres la cloture cote… |
 | `netcross_core.exploit_signatures` | detection PASSIVE de signatures d'exploits CVE connus (Log4Shell, Shellshock, Heartbleed, EternalBlue, compression TLS/CRIME) dans la charge utile brute des paquets. |
@@ -890,6 +891,24 @@ classDiagram
         +select_event(selection, event_id, events) DashboardSelection
         +build_dashboard_snapshot(report, flows, findings, tls_findings, quic_findings, wireshark_expert_events, selection) DashboardSnapshot
         +dashboard_document(report, flows, findings, tls_findings, quic_findings, wireshark_expert_events, segment, host, protocol) dict
+    }
+
+    %% ===== netcross_core.detector_inventory =====
+    class Detecteur {
+        <<dataclass, frozen>>
+        +str nom
+        +str provenance
+        +str classe
+        +str etat
+        +str fenetre
+        +tuple~str, ...~ champs
+        +str note
+    }
+    class mod_netcross_core_detector_inventory["netcross_core.detector_inventory"] {
+        <<module>>
+        +par_nom() dict~str, Detecteur~
+        +classe_de(nom) str
+        +tableau_markdown() str
     }
 
     %% ===== netcross_core.expert_model =====
