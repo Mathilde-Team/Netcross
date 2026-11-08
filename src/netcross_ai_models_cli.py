@@ -196,6 +196,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     parser = build_parser()
     add_debug_argument(parser)
     args = parser.parse_args(argv)

@@ -1056,6 +1056,7 @@ def load_capture_annotations(captures) -> dict[str, list[PacketAnnotation]]:
     regroupees par point (issue #910). Un point sans sidecar n'apparait pas ;
     un sidecar illisible est signale dans le journal et ignore -- une
     annotation reste facultative, elle n'interrompt jamais le rapport."""
+    logger.debug("load_capture_annotations: entrée")
     from netcross_core.forensic import read_annotations
 
     by_point: dict[str, list[PacketAnnotation]] = {}
@@ -1074,6 +1075,7 @@ def load_capture_annotations(captures) -> dict[str, list[PacketAnnotation]]:
 def print_capture_annotations(by_point: dict[str, list[PacketAnnotation]]) -> None:
     """Section annotations du rapport texte de la CLI (issue #910), un bloc
     par point annote ; rien n'est affiche s'il n'y a aucune annotation."""
+    logger.debug("print_capture_annotations: entrée")
     if not by_point:
         logger.debug("print_capture_annotations: aucune annotation -> retour")
         return

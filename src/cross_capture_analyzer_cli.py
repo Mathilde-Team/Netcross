@@ -199,6 +199,7 @@ def _parse_live_spec(spec):
     reste intact, seuls les 2 premiers ':' sont significatifs. INTERFACE
     peut etre une source distante (issue #166) : les ':' de son hote/port
     ne comptent pas -- voir pcap_parser.remote.split_live_target."""
+    logger.debug("_parse_live_spec: entrée")
     label, sep, rest = spec.partition(":")
     iface, bpf = split_live_target(rest) if sep else ("", None)
     if not label or not iface:
@@ -223,6 +224,7 @@ def _parse_ring_buffer_spec(spec):
 
     Retourne (None, None) si spec est vide ; leve SystemExit sur format invalide.
     """
+    logger.debug("_parse_ring_buffer_spec: entrée")
     if not spec:
         logger.debug("_parse_ring_buffer_spec: si not spec -> retour tuple de 2")
         return None, None
@@ -253,6 +255,7 @@ def _load_bpf_from_library(name):
     Retourne l'expression BPF (str) ou None si le nom est vide.
     Leve SystemExit si le filtre n'est pas trouve.
     """
+    logger.debug("_load_bpf_from_library: entrée")
     if not name:
         logger.debug("_load_bpf_from_library: si not name -> retour None")
         return None
@@ -362,6 +365,7 @@ def _collect_tshark_stats(captures) -> dict:
     """Statistiques tshark -z par fichier (issue #361) : document commun a
     l'API et a la GUI (``collect_capture_stats``, issue #673) ; une capture
     en echec porte une cle `error` et un message stderr."""
+    logger.debug("_collect_tshark_stats: entrée")
     from netcross_core.tshark_stats import collect_capture_stats
 
     def _report(label, path, exc):
@@ -410,6 +414,7 @@ def _run_netflow(args) -> int:
     """Mode --netflow (issue #362) : resume d'exports NetFlow v5, sans analyse
     multi-points. Code de retour : 0, ou 1 (options incompatibles, fichier
     illisible ou tronque)."""
+    logger.debug("_run_netflow: entrée")
     import json
 
     from netcross_core.netflow import (
@@ -530,6 +535,7 @@ def _expand_split_interfaces(captures):
     segments d'une meme interface portent le meme label et sont concatenes
     comme d'habitude. Un fichier illisible est laisse tel quel : la lecture
     normale le signalera en ECHEC, comme sans l'option."""
+    logger.debug("_expand_split_interfaces: entrée")
     workdir = tempfile.mkdtemp(prefix="netcross-split-interfaces-")
     atexit.register(shutil.rmtree, workdir, True)
     expanded = []
@@ -560,6 +566,7 @@ def _run_merge(capture_specs, output_path, dedup):
     sortie et la deduplication). Les NOM= des specs ne servent a rien ici
     -- une capture fusionnee perd la notion de point de capture, c'est
     pourquoi aucune analyse n'est lancee ensuite (l'appelant retourne)."""
+    logger.debug("_run_merge: entrée")
     paths = []
     for spec in capture_specs:
         _label, spec_paths = _parse_capture_spec(spec, "--capture")
@@ -586,6 +593,7 @@ def _run_convert(capture_specs, output_path, fmt):
     """--convert : convertit UN fichier de capture vers un autre format
     (pcap, pcapng, erf) ou exporte en CSV/JSON structure, puis s'arrete
     sans lancer d'analyse. Comme --merge/--split, ne lance aucune analyse."""
+    logger.debug("_run_convert: entrée")
     if not capture_specs:
         print("--convert necessite --capture (fichier source).", file=sys.stderr)
         sys.exit(1)
@@ -621,6 +629,7 @@ def _run_export(capture_specs, output_path, bpf_filter, time_start, time_end, en
     """--export-pcap : exporte un sous-ensemble filtre de la premiere
     capture vers un nouveau fichier. Comme --merge/--split, ne lance aucune
     analyse ensuite."""
+    logger.debug("_run_export: entrée")
     if not capture_specs:
         print("--export-pcap necessite --capture (fichier source).", file=sys.stderr)
         sys.exit(1)
@@ -665,6 +674,7 @@ _SPLIT_DEFAULT_DIR = "captures_split"
 
 def _parse_size(text):
     """Voir netcross_core.capture_tools.parse_size (partage GUI/API, #869)."""
+    logger.debug("_parse_size: entrée")
     from netcross_core.capture_tools import parse_size
 
     logger.debug("_parse_size: retour parse_size(…)")
@@ -674,6 +684,7 @@ def _parse_size(text):
 def _parse_split_spec(spec):
     """MODE:VALEUR -> (mode, valeur) : netcross_core.capture_tools.parse_split_spec
     (partage avec la GUI et l'API, issue #869) ; message d'erreur puis sortie 1."""
+    logger.debug("_parse_split_spec: entrée")
     from netcross_core.capture_tools import parse_split_spec
 
     try:
@@ -692,6 +703,7 @@ def _run_split(capture_specs, split_spec, output_dir):
     echec est rapporte explicitement puis les suivants sont traites quand
     meme (meme choix que --parallel : rien ne passe sous silence, mais un
     fichier illisible n'empeche pas de decouper les autres)."""
+    logger.debug("_run_split: entrée")
     mode, value = _parse_split_spec(split_spec)
     status = 0
     for spec in capture_specs:
@@ -729,6 +741,7 @@ def _run_adjust_time(capture_specs, output_path, offset, normalize, align_to):
     """--adjust-time : ajuste les timestamps d'une capture (decalage fixe,
     normalisation ou alignement sur une autre capture). Comme --merge/--split,
     ne lance aucune analyse ensuite."""
+    logger.debug("_run_adjust_time: entrée")
     if not capture_specs:
         print("--adjust-time necessite --capture (fichier source).", file=sys.stderr)
         sys.exit(1)
@@ -772,6 +785,7 @@ def _run_replay(capture_specs, interface, speed, loop):
     fichiers a la fois n'a pas de sens pour tcpreplay (un seul flux emis,
     un seul ordre de paquets possible) -- fusionner d'abord avec --merge
     si plusieurs segments doivent etre rejoues comme un seul flux continu."""
+    logger.debug("_run_replay: entrée")
     paths = []
     for spec in capture_specs:
         _label, spec_paths = _parse_capture_spec(spec, "--capture")
@@ -801,6 +815,7 @@ def _start_ring_recorders(points, ring_buffer):
     """Issue #676 : lance un enregistreur en ring buffer par point si
     ``ring_buffer`` vaut (N, SECONDES). Renvoie {label: (processus, repertoire)}.
     Quitte avec un message si une source ne le permet pas (pipe://)."""
+    logger.debug("_start_ring_recorders: entrée")
     if not ring_buffer or ring_buffer[0] is None:
         logger.debug("_start_ring_recorders: pas de ring buffer -> retour dict vide")
         return {}
@@ -832,6 +847,7 @@ def _start_ring_recorders(points, ring_buffer):
 
 def _stop_ring_recorders(recorders):
     """Arrete les enregistreurs et affiche les fichiers conserves par point."""
+    logger.debug("_stop_ring_recorders: entrée")
     if not recorders:
         logger.debug("_stop_ring_recorders: si not recorders -> retour")
         return
@@ -858,6 +874,7 @@ def _run_live_captures(live_specs, duration, reporter=None, ring_buffer=None):
 
     ``reporter`` (issue #274, --live-report) : LiveReporter alimente paquet
     par paquet et publie a intervalle regulier pendant la capture."""
+    logger.debug("_run_live_captures: entrée")
     points = [_parse_live_spec(s) for s in live_specs]
     _check_single_stdin(points)
     stop_event = threading.Event()
@@ -1062,6 +1079,7 @@ def _available_memory_bytes() -> int | None:
     visee par install.sh. Aucune exception ne remonte : une plateforme sans
     /proc/meminfo (autre qu'Linux) degrade simplement vers "indeterminable",
     l'avertissement est alors omis plutot que de bloquer l'analyse."""
+    logger.debug("_available_memory_bytes: entrée")
     try:
         with open("/proc/meminfo") as f:
             for line in f:
@@ -1270,6 +1288,7 @@ def _parse_plugin_exports(specs: list[str], authorized: list[str]) -> list[tuple
 
 def _check_extraction_args(args) -> tuple[str, ...]:
     """Validations de l'issue #278 ; renvoie les types a extraire."""
+    logger.debug("_check_extraction_args: entrée")
     from netcross_core.extract.contents import parse_kinds
 
     if args.extract_kinds and not args.extract_contents:
@@ -1312,6 +1331,7 @@ def _check_extraction_args(args) -> tuple[str, ...]:
 
 def _run_content_extraction(captures, out_dir, kinds) -> None:
     """Analyse qualitative / extraction des contenus (issue #278)."""
+    logger.debug("_run_content_extraction: entrée")
     from netcross_core.extract.contents import USAGE_REMINDER, format_extraction, run_extraction
 
     print("\n" + "=" * 70)
@@ -1328,6 +1348,7 @@ def _run_content_extraction(captures, out_dir, kinds) -> None:
 
 def _check_dashboard_args(args) -> None:
     """Validations de l'issue #911."""
+    logger.debug("_check_dashboard_args: entrée")
     if (args.dashboard_segment or args.dashboard_host or args.dashboard_protocol) and not args.dashboard:
         print("--dashboard-segment/--dashboard-host/--dashboard-protocol necessitent --dashboard.", file=sys.stderr)
         sys.exit(1)
@@ -1336,6 +1357,7 @@ def _check_dashboard_args(args) -> None:
 
 def _check_stats_args(args) -> None:
     """Validations de l'issue #912."""
+    logger.debug("_check_stats_args: entrée")
     modifies = (
         args.stats_group_by != "endpoint"
         or args.stats_sort != "bytes"
@@ -1353,6 +1375,7 @@ def _check_stats_args(args) -> None:
 
 def comm_map_protocols(values) -> list[str] | None:
     """Protocoles de --comm-map-protocol (repetable, virgules acceptees)."""
+    logger.debug("comm_map_protocols: entrée")
     protos = [p.strip() for v in values or [] for p in v.split(",") if p.strip()]
     logger.debug("comm_map_protocols: retour protos or None")
     return protos or None
@@ -1360,6 +1383,7 @@ def comm_map_protocols(values) -> list[str] | None:
 
 def _check_comm_map_args(args) -> None:
     """Validations de l'issue #909."""
+    logger.debug("_check_comm_map_args: entrée")
     filtres = args.comm_map_protocol or args.comm_map_top_n is not None or args.comm_map_anomalies_only
     if filtres and not args.comm_map:
         print("--comm-map-protocol/--comm-map-top-n/--comm-map-anomalies-only necessitent --comm-map.", file=sys.stderr)
@@ -1396,6 +1420,7 @@ def _check_live_report_args(args) -> None:
 
 def _start_live_report(args):
     """(LiveReporter | None, serveur HTTP | None) pour --live-report."""
+    logger.debug("_start_live_report: entrée")
     if not args.live_report:
         logger.debug("_start_live_report: si not args.live_report -> retour tuple de 2")
         return None, None
@@ -1432,6 +1457,7 @@ def _start_live_report(args):
 def _check_ai_args(args):
     """Validations de l'issue #146, AVANT l'analyse (echec immediat plutot
     qu'apres de longues minutes de lecture de capture)."""
+    logger.debug("_check_ai_args: entrée")
     requested = (
         args.ai_baseline_save or args.ai_anomalies or args.ai_training_export or args.ai_classify or args.ai_summary
     )
@@ -1482,6 +1508,7 @@ def _check_ai_args(args):
 
 
 def _run_ai(args, ai_options, report, all_packets) -> None:
+    logger.debug("_run_ai: entrée")
     import json
 
     from netcross_ai.pipeline import format_ai, run_ai
@@ -1507,6 +1534,7 @@ def _run_ai(args, ai_options, report, all_packets) -> None:
 
 def main():
     # `netcross lua-doc ...` : documentation hors ligne de l'API Lua Wireshark (issue #388)
+    logger.debug("main: entrée")
     if sys.argv[1:2] == ["lua-doc"]:
         from netcross_lua_doc_cli import main as lua_doc_main
 

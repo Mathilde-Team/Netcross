@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 
 class LuaDocWindow(Gtk.Window):
     def __init__(self, parent: Gtk.Window | None = None, browser: LuaDocBrowser | None = None):
+        logger.debug("__init__: entrée")
         super().__init__(title="Documentation de l'API Lua Wireshark", default_width=1000, default_height=700)
         if parent is not None:
             self.set_transient_for(parent)

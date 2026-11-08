@@ -33,6 +33,7 @@ def _touche_gtk(node: ast.AST) -> bool:
 
 
 def inventaire(source: str) -> dict:
+    logger.debug("inventaire: entrée")
     arbre = ast.parse(source)
     gtk: list[tuple[int, str]] = []
     sans_gtk: list[tuple[int, str]] = []

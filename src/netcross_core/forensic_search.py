@@ -323,6 +323,7 @@ class ForensicSearchIndex:
         tls_events: list | None = None,
         quic_events: list | None = None,
     ) -> None:
+        logger.debug("__init__: entrée")
         self._docs: list[_SearchDoc] = [_doc_from_packet(pk) for pk in all_packets]
 
         if flows:

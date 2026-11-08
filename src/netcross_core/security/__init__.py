@@ -134,6 +134,7 @@ def correlate_versions(conn, banners) -> dict[str, list[CveMatch]]:
     directement le nombre de services vulnérables plutôt que le nombre
     de bannières testées.
     """
+    logger.debug("correlate_versions: entrée")
     result: dict[str, list[CveMatch]] = {}
     for banner in banners:
         matches = correlate_banner(conn, banner)

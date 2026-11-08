@@ -9,6 +9,7 @@ GET  /comparisons/{id}/csv  — CSV des écarts
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 import pytest
@@ -92,10 +93,14 @@ def test_create_comparison_success():
 
 
 def test_create_comparison_accepted_pending():
-    """POST /comparisons sans wait doit retourner 202."""
+    """POST sans wait renvoie 202 ; son worker termine avant de restaurer les doublures (#1215)."""
     with (
-        patch("netcross_api.app.parse_capture", side_effect=_mock_parse_capture),
+        patch("netcross_api.app.parse_capture", side_effect=_mock_parse_capture) as parse,
         patch("netcross_api.app.scan_capture_exploits", return_value=[]),
+        # L'ordre des contextes est important : shutdown(wait=True) s'exécute
+        # AVANT la restauration des deux doublures, même si la requête échoue.
+        ThreadPoolExecutor(max_workers=1) as executor,
+        patch("netcross_api.app._get_executor", return_value=executor),
     ):
         response = client.post(
             "/comparisons",
@@ -108,6 +113,8 @@ def test_create_comparison_accepted_pending():
     assert response.status_code == 202
     assert "analysis_id" in response.json()
     assert response.json()["status"] == "pending"
+    assert parse.call_count == 2
+    assert _comparisons[response.json()["analysis_id"]]["status"] == "completed"
 
 
 def test_create_comparison_missing_files():

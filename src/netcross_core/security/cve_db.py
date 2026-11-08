@@ -187,6 +187,7 @@ def upsert_cve(conn: sqlite3.Connection, entry: CveEntry) -> None:
 
 def get_cve(conn: sqlite3.Connection, cve_id: str) -> CveEntry | None:
     """Recupere une CVE par identifiant, avec tous ses produits affectes (sans filtre)."""
+    logger.debug("get_cve: entrée")
     row = conn.execute(
         "SELECT cve_id, description, cvss_score, cvss_severity, published FROM cves WHERE cve_id = ?",
         (cve_id,),

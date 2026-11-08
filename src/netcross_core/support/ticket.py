@@ -376,6 +376,7 @@ def install_crash_handler(
     le journal -- plutot que d'installer un hook qui echouerait au pire
     moment (pendant un crash).
     """
+    logger.debug("install_crash_handler: entrée")
     if not consent.granted:
         logger.info("gestionnaire de crash non installe : consentement non accorde")
         logger.debug("install_crash_handler: si not consent.granted -> retour")
