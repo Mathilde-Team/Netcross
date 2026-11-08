@@ -354,6 +354,10 @@ Options utiles :
   microbursts).
 - `--rtp-clock-rate` : cadence d'horloge RTP (8000Hz voix par défaut, 90000
   pour de la vidéo).
+- `--link-speed POINT=VITESSE` (répétable, ex. `A=1G`, `B=2.5G`) : vitesse
+  du lien d'un point, utilisée seulement si le pcapng ne porte pas l'option
+  `if_speed` ; la section « Vitesse des liens » du rapport indique la source
+  retenue et la résolution d'horodatage (`if_tsresol`) de chaque point.
 - `--idle-timeout-seconds` : seuil (en secondes) au-delà duquel un silence
   entre deux paquets consécutifs d'une connexion TCP déjà établie est
   signalé comme un timeout d'inactivité / coupure NAT-FW silencieuse
@@ -1274,9 +1278,12 @@ avant un déploiement en production.
   l'état du handshake par segment (ClientHello/ServerHello/Alert) — pas de
   réassemblage TCP inter-segments, pas de TLS en tunnel, pas de chaîne de
   certificats.
-- **Analyse RF WiFi** (retries, RSSI, roaming 802.11) : hors périmètre,
-  nécessiterait des captures en mode moniteur distinctes du scénario filaire
-  multi-points de cet outil.
+- **Analyse RF WiFi** (retries, RSSI, roaming 802.11) : en cours (#1006).
+  Une capture en mode moniteur avec radiotap (linktype 127) est acceptée
+  comme point, et chaque trame porte RSSI, MCS, débit, retry et canal
+  (`Pkt.radio`, issue #1142) ; une capture 802.11 sans radiotap
+  (linktype 105) est lue avec un avertissement explicite (retry seul).
+  Pas encore de constats radio ni de section de rapport dédiée.
 - **Protocoles propriétaires non standard** (ex : signalisation Alcatel NOE
   historique, non-SIP) : non couverts, faute de spécification publique
   fiable.

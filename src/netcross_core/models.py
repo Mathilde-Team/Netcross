@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from netcross_core.clock_sync import EchantillonHorloge, EstimationHorloge
 from netcross_core.logging_config import get_logger
+from pcap_parser.radio import RadioInfo
 
 logger = get_logger(__name__)
 
@@ -194,6 +195,9 @@ class Pkt:
     # Adresses A/AAAA d'une reponse DNS (issue #344, fast flux), reportees
     # depuis RawPacket.dns_answers ; tuple vide hors reponse DNS.
     dns_answers: tuple[str, ...] = ()
+    # Metadonnees radio 802.11 par trame (issue #1142), reportees depuis
+    # RawPacket.radio ; None hors capture 802.11.
+    radio: RadioInfo | None = None
     # -- Checksums IP/TCP/UDP (Job 43/issue #163) : valeurs brutes (chaine
     # hex) et verdicts tri-etats (True=invalide, False=valide, None=non
     # determine) reportes tels quels depuis RawPacket. Pas encore consommes
@@ -719,6 +723,12 @@ class Report:
     # print_report(). Vide si capinfos est absent ou si la capture ne
     # porte aucune metadonnee (cas le plus frequent).
     capture_infos: list[dict] = field(default_factory=list)
+    # -- Vitesse de lien et resolution d'horodatage par point (issue
+    # #1132) -- remplie par l'appelant via
+    # netcross_core.link_speed.resolve_link_speeds(captures, overrides) :
+    # point -> {speed_bps, speed_source ("if_speed", "--link-speed" ou
+    # None), ts_resolution (s), interfaces}. Vide hors CLI.
+    link_speeds: dict[str, dict] = field(default_factory=dict)
     # -- Integrite/qualite de capture (Job 43/issue #163) -- voir
     # netcross_core.forensic.validate_checksums().
     checksum_errors: list[ChecksumError] = field(default_factory=list)
