@@ -6,6 +6,7 @@ tableaux de detail) a partir d'un Report netcross_core, avec reportlab.
 
 import datetime
 import tempfile
+from xml.sax.saxutils import escape as _xml_escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -583,6 +584,97 @@ def _sequence_table(view, styles):
     )
 
 
+_SIP_FIELD_NAMES = {"sdp": "SDP", "via": "Via", "contact": "Contact"}
+_SIP_LOST_BG = colors.HexColor("#fee2e2")
+_SIP_REWRITTEN_BG = colors.HexColor("#ffedd5")
+_SIP_RETRANS_BG = colors.HexColor("#fef9c3")
+
+
+def _sip_cell_text(message, point) -> tuple[str, object]:
+    """Texte et fond de la cellule (message, point) de l'echelle SIP
+    (issue #1125). Le constat est toujours ecrit : la couleur ne fait que
+    le doubler."""
+    logger.debug("_sip_cell_text: point={}", summarize(point, "point"))
+    cell = message["cells"].get(point)
+    if cell is None:
+        if point in message["lost_at"]:
+            logger.debug("_sip_cell_text: si message perdu -> retour 'ABSENT'")
+            return "ABSENT", _SIP_LOST_BG
+        logger.debug("_sip_cell_text: si saut par saut -> retour tiret")
+        return "\u2014 (saut par saut)", None
+    parts = [f"{cell['rel_ms']:.1f} ms"]
+    fond = None
+    if cell["count"] > 1:
+        parts.append(f"x{cell['count']} (retransmis)")
+        fond = _SIP_RETRANS_BG
+    if cell["rewritten"]:
+        parts.append("reecrit : " + ", ".join(_SIP_FIELD_NAMES.get(f, f) for f in cell["rewritten"]))
+        fond = _SIP_REWRITTEN_BG
+    logger.debug("_sip_cell_text: retour texte de cellule")
+    return " ; ".join(parts), fond
+
+
+def _sip_ladder_table(ladder, styles):
+    """Une ligne par message SIP, une colonne par point de capture."""
+    logger.debug("_sip_ladder_table: ladder={}", summarize(ladder, "ladder"))
+    points = ladder["points"]
+    largeur_point = (17.0 - 3.6) / max(len(points), 1)
+    data = [["Message", *points]]
+    fonds = []
+    for i, message in enumerate(ladder["messages"], start=1):
+        ligne = [Paragraph(f"{_xml_escape(message['message'])}<br/>{_xml_escape(message['cseq'])}", styles["Cell"])]
+        for j, point in enumerate(points, start=1):
+            texte, fond = _sip_cell_text(message, point)
+            ligne.append(Paragraph(texte, styles["Cell"]))
+            if fond is not None:
+                fonds.append(("BACKGROUND", (j, i), (j, i), fond))
+        data.append(ligne)
+    table = _grid_table(data, [3.6 * cm, *([largeur_point * cm] * len(points))])
+    if fonds:
+        table.setStyle(TableStyle(fonds))
+    logger.debug("_sip_ladder_table: retour table")
+    return table
+
+
+def sip_ladder_section_story(ladders, styles):
+    """Flowables de la section "Echelle SIP multi-points" (issue #1125) :
+    par appel, un tableau message x point de capture. Liste vide => aucune
+    section."""
+    logger.debug("sip_ladder_section_story: ladders={}", summarize(ladders, "ladders"))
+    ladders = [lad for lad in (ladders or []) if lad.get("messages")]
+    if not ladders:
+        logger.debug("sip_ladder_section_story: si aucune echelle -> retour liste vide")
+        return []
+    story = [
+        Paragraph("Echelle SIP multi-points", styles["H1b"]),
+        Paragraph(
+            "Chaque message SIP d'un appel (methode ou statut, et CSeq), point de capture par point. "
+            "Une cellule donne la date du message en ms depuis le debut de l'appel. ABSENT : vu a un "
+            "autre point mais pas a celui-ci (perte entre les deux). Retransmis : vu plusieurs fois "
+            "au meme point. Reecrit : SDP, premier Via ou Contact differents de ceux du premier point "
+            "ou le message a ete vu (ALG, SBC ; un proxy ajoute aussi son propre Via). Les reponses "
+            "100 Trying sont produites a chaque saut et ne sont jamais declarees perdues.",
+            styles["Normal"],
+        ),
+        Spacer(1, 0.3 * cm),
+    ]
+    for ladder in ladders:
+        story.append(Paragraph(f"Call-ID {_xml_escape(ladder['call_id'])}", styles["H2b"]))
+        story.append(
+            Paragraph(
+                f"{ladder['total_messages']} message(s) : {ladder['lost']} perdu(s), "
+                f"{ladder['retransmitted']} retransmis, {ladder['rewritten']} reecrit(s)"
+                + (f" -- {ladder['truncated']} non represente(s)." if ladder["truncated"] else "."),
+                styles["Normal"],
+            )
+        )
+        story.append(Spacer(1, 0.15 * cm))
+        story.append(_sip_ladder_table(ladder, styles))
+        story.append(Spacer(1, 0.4 * cm))
+    logger.debug("sip_ladder_section_story: retour story={}", summarize(story, "story"))
+    return story
+
+
 def sequence_section_story(views, styles, chart_paths=None):
     """Flowables de la section "Sequence des echanges" (Job 14/issue #11,
     FEATURES.md 6.5) : un diagramme + une table de references par flux.
@@ -1114,6 +1206,13 @@ def generate_pdf(
                 chart_sequence_diagram(v, f"{tmpdir}/chart_sequence_{i}.png") for i, v in enumerate(seq_views)
             ]
             story.extend(sequence_section_story(seq_views, styles, seq_charts))
+            story.append(PageBreak())
+
+        # -- echelle SIP multi-points (issue #1125) : apres la sequence d'un
+        # flux, la meme lecture message par message pour la signalisation.
+        sip_story = sip_ladder_section_story(getattr(r, "sip_ladders", None), styles)
+        if sip_story:
+            story.extend(sip_story)
             story.append(PageBreak())
 
         # -- graphiques temporels top-N (protocole/port/IP/DSCP) --

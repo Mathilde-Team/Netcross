@@ -40,7 +40,13 @@ Socle du futur ``--html-report FICHIER.html`` (branchement CLI, API, GUI et
    couleur) et ses valeurs « non mesure » : une valeur inconnue ne
    s'affiche jamais comme un zero.
 
-6. **Accessibilite de base et i18n.** ``lang`` du document, titres
+6. **Echelle SIP multi-points (issue #1125).** Cle ``sip_ladders`` du
+   JSON : par appel, un tableau message x point de capture. Un message
+   perdu (« ABSENT »), retransmis ou reecrit (SDP, Via, Contact) est ecrit
+   en toutes lettres dans sa cellule, la couleur ne faisant que doubler le
+   texte. Section absente sans SIP.
+
+7. **Accessibilite de base et i18n.** ``lang`` du document, titres
    hierarchises, tableaux avec ``<caption>`` et ``scope``, region
    ``aria-live`` pour la synthese, severite toujours ecrite en texte (pas
    seulement en couleur). Libelles en francais par defaut, traduits via
@@ -132,6 +138,10 @@ th { background: #f9fafb; font-weight: 600; color: #374151; }
 .detail-segment h3 { font-size: 1rem; margin: 0 0 .5rem; }
 .detail-segment dl { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1.25rem; margin: 0; }
 .detail-segment dt { color: #4b5563; } .detail-segment dd { margin: 0; font-variant-numeric: tabular-nums; }
+.sip-perdu { background: #fee2e2; color: #7f1d1d; font-weight: 600; }
+.sip-reecrit { background: #ffedd5; color: #7c2d12; }
+.sip-retransmis { background: #fef9c3; color: #713f12; }
+.sip-resume { color: #374151; font-size: .875rem; margin: .25rem 0 .5rem; }
 @media print { body { padding: 0; } th { position: static; } }
 """
 
@@ -277,6 +287,48 @@ _JS = """
   }
   racine.appendChild(chemin);
 
+  // -- Echelle SIP multi-points (issue #1125) --
+  var CHAMPS_SIP = {"sdp": "SDP", "via": "Via", "contact": "Contact"};
+  function celluleSip(m, p) {
+    var c = (m.cells || {})[p];
+    if (!c) {
+      if ((m.lost_at || []).indexOf(p) >= 0) { return [L.sip_absent, "sip-perdu"]; }
+      return ["\u2014 (" + L.sip_hop + ")", ""];
+    }
+    var parts = [fixe(c.rel_ms, 1) + " ms"];
+    var classe = "";
+    if (c.count > 1) { parts.push("x" + c.count + " (" + L.sip_retransmitted + ")"); classe = "sip-retransmis"; }
+    if ((c.rewritten || []).length) {
+      parts.push(L.sip_rewritten + " : " + c.rewritten.map(function (f) { return CHAMPS_SIP[f] || f; }).join(", "));
+      classe = "sip-reecrit";
+    }
+    return [parts.join(" ; "), classe];
+  }
+  var echelles = doc.sip_ladders || [];
+  if (echelles.length) {
+    var sip = el("section", {"aria-labelledby": "titre-sip", "id": "echelle-sip"});
+    sip.appendChild(el("h2", {"id": "titre-sip"}, L.sip));
+    sip.appendChild(el("p", {"class": "sous-titre"}, L.sip_help));
+    echelles.forEach(function (e) {
+      sip.appendChild(el("h3", null, "Call-ID " + e.call_id));
+      sip.appendChild(el("p", {"class": "sip-resume"}, L.sip_summary
+        .replace("{total}", e.total_messages).replace("{lost}", e.lost)
+        .replace("{retransmitted}", e.retransmitted).replace("{rewritten}", e.rewritten)
+        + (e.truncated ? " " + L.sip_truncated.replace("{n}", e.truncated) : "")));
+      var lignes = (e.messages || []).map(function (m) {
+        return [m.message + " (" + m.cseq + ")"].concat(e.points.map(function (p) {
+          var r = celluleSip(m, p);
+          var span = el("span", r[1] ? {"class": r[1]} : null, r[0]);
+          return span;
+        }));
+      });
+      var t = tableau(L.sip_caption, [L.message].concat(e.points), lignes, L.no_sip);
+      t.setAttribute("data-call-id", e.call_id);
+      sip.appendChild(t);
+    });
+    racine.appendChild(sip);
+  }
+
   var triage = el("section", {"aria-labelledby": "titre-triage"});
   triage.appendChild(el("h2", {"id": "titre-triage"}, L.triage));
   triage.appendChild(tableau(L.triage_caption, [L.segment, L.score, L.categories, L.findings_count],
@@ -330,6 +382,22 @@ def _labels() -> dict:
         "not_measured": _("non mesure"),
         "losses": _("pertes"),
         "state": _("Etat"),
+        "sip": _("Echelle SIP multi-points"),
+        "sip_help": _(
+            "Chaque message SIP de l'appel, point de capture par point (date en ms depuis le debut de l'appel). "
+            "ABSENT : vu a un autre point mais pas a celui-ci. Retransmis : vu plusieurs fois au meme point. "
+            "Reecrit : SDP, premier Via ou Contact differents du premier point ou le message a ete vu "
+            "(ALG, SBC ; un proxy ajoute aussi son propre Via). Les 100 Trying, produits a chaque saut, "
+            "ne sont jamais declares perdus."
+        ),
+        "sip_caption": _("Messages SIP de l'appel, une colonne par point de capture"),
+        "sip_summary": _("{total} message(s) : {lost} perdu(s), {retransmitted} retransmis, {rewritten} reecrit(s)."),
+        "sip_truncated": _("{n} message(s) non represente(s)."),
+        "sip_absent": _("ABSENT"),
+        "sip_hop": _("saut par saut"),
+        "sip_retransmitted": _("retransmis"),
+        "sip_rewritten": _("reecrit"),
+        "no_sip": _("Aucun message SIP pour cet appel."),
         # Separateur decimal des valeurs affichees (« . » en anglais).
         "decimal": _(","),
         "segment_fields": [{**champ, "libelle": _(str(champ["libelle"]))} for champ in _SEGMENT_FIELDS],
@@ -417,6 +485,61 @@ def _static_path(doc: dict, labels: dict) -> str:
     return f"<h2>{_e(labels['path'])}</h2>{tableau}"
 
 
+_SIP_FIELD_NAMES = {"sdp": "SDP", "via": "Via", "contact": "Contact"}
+
+
+def _sip_cell(message: dict, point: str, labels: dict) -> tuple[str, str]:
+    """Texte et classe CSS d'une cellule de l'echelle SIP (meme rendu que le JS)."""
+    logger.debug("_sip_cell: entrée ({})", point)
+    cell = (message.get("cells") or {}).get(point)
+    if cell is None:
+        if point in (message.get("lost_at") or []):
+            logger.debug("_sip_cell: si message perdu -> retour absent")
+            return labels["sip_absent"], "sip-perdu"
+        logger.debug("_sip_cell: si saut par saut -> retour tiret")
+        return f"\u2014 ({labels['sip_hop']})", ""
+    parts = [f"{cell['rel_ms']:.1f}".replace(".", labels["decimal"]) + " ms"]
+    classe = ""
+    if cell.get("count", 1) > 1:
+        parts.append(f"x{cell['count']} ({labels['sip_retransmitted']})")
+        classe = "sip-retransmis"
+    if cell.get("rewritten"):
+        noms = ", ".join(_SIP_FIELD_NAMES.get(f, f) for f in cell["rewritten"])
+        parts.append(f"{labels['sip_rewritten']} : {noms}")
+        classe = "sip-reecrit"
+    logger.debug("_sip_cell: retour texte de cellule")
+    return " ; ".join(parts), classe
+
+
+def _static_sip(doc: dict, labels: dict) -> str:
+    """Echelle SIP sans JavaScript ; chaine vide sans SIP."""
+    logger.debug("_static_sip: entrée")
+    echelles = doc.get("sip_ladders") or []
+    if not echelles:
+        logger.debug("_static_sip: si aucune echelle -> retour chaine vide")
+        return ""
+    blocs = [f"<h2>{_e(labels['sip'])}</h2><p>{_e(labels['sip_help'])}</p>"]
+    for e in echelles:
+        resume = labels["sip_summary"].format(
+            total=e["total_messages"], lost=e["lost"], retransmitted=e["retransmitted"], rewritten=e["rewritten"]
+        )
+        if e.get("truncated"):
+            resume += " " + labels["sip_truncated"].format(n=e["truncated"])
+        lignes = []
+        for m in e.get("messages") or []:
+            cellules = [_e(f"{m['message']} ({m['cseq']})")]
+            for p in e["points"]:
+                texte, classe = _sip_cell(m, p, labels)
+                cellules.append(f'<span class="{classe}">{_e(texte)}</span>' if classe else _e(texte))
+            lignes.append(cellules)
+        blocs.append(
+            f"<h3>Call-ID {_e(e['call_id'])}</h3><p>{_e(resume)}</p>"
+            + _static_table(labels["sip_caption"], [labels["message"], *e["points"]], lignes, labels["no_sip"])
+        )
+    logger.debug("_static_sip: retour ({} appel(s))", len(echelles))
+    return "".join(blocs)
+
+
 def _static_body(doc: dict, labels: dict) -> str:
     """Rendu sans JavaScript (``<noscript>``) : synthese, score, triage, constats."""
     logger.debug("_static_body: entrée")
@@ -459,6 +582,7 @@ def _static_body(doc: dict, labels: dict) -> str:
         f"<p>{_e(labels['points'])} : {_e(' -> '.join(doc.get('points') or []))}</p>"
         f"<p>{_e(labels['findings_count'])} : {len(findings)} ({_e(resume)})</p>"
         f"{_static_path(doc, labels)}"
+        f"{_static_sip(doc, labels)}"
         f"<h2>{_e(labels['triage'])}</h2>{triage}"
         f"<h2>{_e(labels['findings'])}</h2>{constats}"
     )
