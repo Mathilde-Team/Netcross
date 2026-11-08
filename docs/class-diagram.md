@@ -2050,6 +2050,7 @@ classDiagram
         +float seconds_after
         +str min_severity
         +float min_delay_between_gels
+        +int? max_octets_archives
     }
     class PointDeGel {
         <<dataclass, frozen>>
@@ -2067,6 +2068,7 @@ classDiagram
         +Mapping~str, tuple~float, float~~ fenetres
         +str dossier
         +float? horodatage_alarme
+        +tuple~str, ...~ quota_supprimes
         +str? ignored_reason
     }
     class GelManager {
@@ -2093,6 +2095,7 @@ classDiagram
         +empreinte_sha256(chemin) str
         +archiver_incident(rapport, decoupeur) ManifesteIncident
         +verifier_manifeste(manifeste) list~str~
+        +appliquer_quota(archives_dir, quota_octets, conserver) tuple~str, ...~
     }
 
     %% ===== netcross_core.rtp_match =====

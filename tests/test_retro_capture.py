@@ -12,6 +12,7 @@ fichier.
 
 import hashlib
 import os
+from pathlib import Path
 
 import pytest
 from test_live_diff import _pkt, _stub_analyse_et_correlate
@@ -25,6 +26,7 @@ from netcross_core.retro_capture import (
     GelReport,
     ManifesteIncident,
     PointDeGel,
+    appliquer_quota,
     archiver_incident,
     empreinte_sha256,
     verifier_manifeste,
@@ -459,3 +461,93 @@ def test_archiver_incident_sans_dossier_refuse():
     )
     with pytest.raises(ValueError, match="dossier"):
         archiver_incident(rapport, decoupeur=lambda *a: None)
+
+
+# -- Quota disque des archives (issue #1093) -----------------------------------
+
+
+def _archive_gel(archives: Path, numero: int, taille: int) -> str:
+    """Fabrique une archive gel-<N> contenant un fichier de `taille` octets."""
+    dossier = archives / f"gel-{numero}"
+    dossier.mkdir(parents=True)
+    (dossier / "LAN").mkdir()
+    (dossier / "LAN" / "capture.pcapng").write_bytes(b"x" * taille)
+    return str(dossier)
+
+
+def test_appliquer_quota_evicte_les_plus_anciennes(tmp_path):
+    """Critère d'acceptation de l'issue #1093 : quota atteint ⇒
+    suppression des archives les plus ANCIENNES, mentionnée dans le
+    journal (valeur de retour + logger.warning)."""
+    archives = tmp_path / "archives"
+    gel_1 = _archive_gel(archives, 1, 1000)
+    gel_2 = _archive_gel(archives, 2, 1000)
+    gel_3 = _archive_gel(archives, 3, 1000)
+
+    # Total 3000, quota 2500 : gel-1 (la plus ancienne) évincée -> 2000.
+    supprimes = appliquer_quota(str(archives), 2500)
+
+    assert supprimes == (gel_1,)
+    assert not os.path.exists(gel_1)
+    assert os.path.exists(gel_2)
+    assert os.path.exists(gel_3)
+
+
+def test_quota_ne_supprime_jamais_l_archive_courante(tmp_path):
+    """L'archive du gel COURANT n'est jamais évincée, même seule et trop
+    grosse : on préfère avertir (quota toujours dépassé) que détruire
+    l'incident qui vient d'être gélée."""
+    archives = tmp_path / "archives"
+    gel_1 = _archive_gel(archives, 1, 1000)
+    gel_3 = _archive_gel(archives, 3, 1000)
+
+    supprimes = appliquer_quota(str(archives), 100, conserver=gel_3)
+
+    # gel-1 évincée, gel-3 (courante) conservée malgré le dépassement.
+    assert supprimes == (gel_1,)
+    assert not os.path.exists(gel_1)
+    assert os.path.exists(gel_3)
+
+
+def test_gel_applique_le_quota(tmp_path):
+    """Le câblage GelManager : chaque gel applique le quota configuré —
+    le rapport porte les archives supprimées, la plus récente reste."""
+    tampon = _FauxTampon(tmp_path)
+    tampon.ajouter("capture_00001_20260101115900.pcapng", 950.0, 990.0, contenu=b"a" * 1000)
+    tampon.ajouter("capture_00002_20260101120500.pcapng", 1950.0, 1990.0, contenu=b"b" * 1000)
+
+    config = GelConfig(min_delay_between_gels=0.0, max_octets_archives=1200)
+    gel = GelManager(config, str(tmp_path / "archives"), {"LAN": PointDeGel(inventory=tampon.inventaire)})
+
+    rapport_1 = gel.on_alarm(_alarme(timestamp=1000.0))
+    assert rapport_1 is not None
+    assert rapport_1.quota_supprimes == ()  # une seule archive : rien à évincer
+
+    rapport_2 = gel.on_alarm(_alarme(timestamp=2000.0))
+    assert rapport_2 is not None
+    # Total 2000 > quota 1200 : la première archive (la plus ancienne)
+    # est supprimée et mentionnée dans le rapport.
+    assert len(rapport_2.quota_supprimes) == 1
+    assert "gel-1" in rapport_2.quota_supprimes[0]
+    assert not os.path.exists(rapport_2.quota_supprimes[0])
+    assert os.path.exists(rapport_2.dossier)  # l'archive courante survit
+
+
+def test_sans_quota_rien_n_est_supprime(tmp_path):
+    """Contrôle négatif : sans quota (défaut), les archives s'accumulent
+    sans suppression — comportement inchangé."""
+    tampon = _FauxTampon(tmp_path)
+    tampon.ajouter("capture_00001_20260101115900.pcapng", 950.0, 990.0, contenu=b"a" * 1000)
+    tampon.ajouter("capture_00002_20260101120500.pcapng", 1950.0, 1990.0, contenu=b"b" * 1000)
+
+    gel = GelManager(
+        GelConfig(min_delay_between_gels=0.0),
+        str(tmp_path / "archives"),
+        {"LAN": PointDeGel(inventory=tampon.inventaire)},
+    )
+    rapport_1 = gel.on_alarm(_alarme(timestamp=1000.0))
+    rapport_2 = gel.on_alarm(_alarme(timestamp=2000.0))
+    assert rapport_1 is not None and rapport_2 is not None
+    assert rapport_2.quota_supprimes == ()
+    assert os.path.exists(rapport_1.dossier)
+    assert os.path.exists(rapport_2.dossier)
