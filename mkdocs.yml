@@ -72,6 +72,7 @@ nav:
       - API des sondes distribuées: probe-api.md
   - Analyses:
       - Estimation d'horloge: estimation-horloge.md
+      - Débit crête multi-échelle: fenetres-multi-echelles.md
       - Rapport de sécurité: security-report.md
       - Export SIEM (CEF, LEEF, STIX): siem-export.md
       - Journaux Zeek conn.log: zeek-export.md

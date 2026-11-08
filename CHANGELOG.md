@@ -8,6 +8,11 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Débit crête multi-échelle en fenêtre glissante (#1133, chantier microrafales #1005) : `netcross_core.multiscale`
+  cherche, pour chaque point et chaque échelle (100 µs, 1 ms, 10 ms par défaut), la fenêtre la plus chargée en octets.
+  Le calcul est exact, incrémental (paquet par paquet, compatible avec `--streaming`) et à mémoire bornée par la
+  fenêtre. Une échelle plus fine que la résolution d'horodatage du point (`if_tsresol`) ou que 1 µs est refusée
+  explicitement, avec la raison. Voir docs/fenetres-multi-echelles.md.
 - Corrélation en flux (#1022) : `--streaming` fusionne les points en k voies par temps (`heapq.merge`) et ferme
   chaque groupe après `--streaming-window` secondes ; la mémoire suit la fenêtre, pas le nombre de paquets. Paquets
   désordonnés rattachés dans la fenêtre, troncature (paquet arrivé après la fermeture de son groupe) signalée dans
