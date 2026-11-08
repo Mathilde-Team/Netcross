@@ -8,6 +8,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Empreinte de paquet invariante (#1021) : `netcross_core.empreinte` projette la clé de corrélation sur 64 bits
+  stables (BLAKE2b, indépendants de `PYTHONHASHSEED`), avec `apparier()` et `comparer_appariements()` pour vérifier
+  l'équivalence avec `correlate()`. Limites (NAT, fragmentation, réécritures) dans docs/empreinte-paquet.md.
 - Banc de performance (#1017) : `scripts/bench.py` (logique dans `netcross_core.testing.bench`) lance l'analyse complète sur les jeux synthétiques de #1015 et relève, par jeu et par degré de parallélisme (`--parallel 1,2,4,8`), la durée totale et par étape (#1016), le pic RSS du processus et de ses enfants et le débit en paquets/s ; environnement noté (cœurs logiques et utilisables, CPU, RAM, versions de tshark, Python et Netcross) ; sortie JSON au schéma versionné `netcross-bench` v1 et tableau Markdown ; `--repetitions` (médiane) ; `--mini` (2 points × 2 000 paquets) pour la CI. Voir `docs/quality/banc-performance.md`.
 - Journaux de flux au format Zeek `conn.log` (#1115) : `--zeek-conn FICHIER` écrit une ligne par connexion et par point, colonnes Zeek standard (`#fields`/`#types`, lisible par `zeek-cut`) puis colonnes `netcross_*` (segment, latence et pertes par segment avec `--order`) ; `--zeek-format json` pour un objet par ligne. Respecte `--redact`. Voir docs/zeek-export.md.
 - Image de CI préconstruite (#968, étape 1) : `.github/ci-image/Dockerfile` (paquets apt des jobs `quality`, `gtk4` et
