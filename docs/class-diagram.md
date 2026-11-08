@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-218 modules · 313 classes · 790 fonctions publiques de module.
+218 modules · 313 classes · 792 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -3393,6 +3393,8 @@ classDiagram
         +lancer(jeux, paralleles, repetitions, executeur, env) dict
         +valider(resultat) list~str~
         +en_markdown(resultat) str
+        +comparer(resultat, reference, seuil_duree_pct, seuil_memoire_pct) dict
+        +comparaison_en_markdown(comparaison) str
         +construire_parseur() argparse.ArgumentParser
         +main(argv, executeur) int
     }

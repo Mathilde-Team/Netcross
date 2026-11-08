@@ -1,0 +1,63 @@
+{
+  "schema": "netcross-bench",
+  "version": 1,
+  "date": "2026-11-08T11:06:30Z",
+  "environnement": {
+    "coeurs_logiques": 2,
+    "coeurs_utilisables": 2,
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.90GHz",
+    "ram_mio": 7957,
+    "systeme": "Linux 6.1.155 x86_64",
+    "python": "3.14.8",
+    "tshark": "TShark (Wireshark) 4.6.4.",
+    "netcross": "1.0.0"
+  },
+  "essais": [
+    {
+      "jeu": "p3-n100000-g1",
+      "points": 3,
+      "paquets": 300000,
+      "parallele": 1,
+      "repetitions": 3,
+      "total_s": 58.566391,
+      "durees_totales_s": [
+        59.1185,
+        57.857002,
+        58.566391
+      ],
+      "mur_s": 60.277974,
+      "etapes_s": {
+        "lecture": 45.814436,
+        "correlation": 1.38928,
+        "detecteurs": 11.142798,
+        "rapport": 0.219878
+      },
+      "rss_max_mio": 764.1,
+      "rss_max_enfants_mio": 764.1,
+      "paquets_par_s": 5122
+    },
+    {
+      "jeu": "p3-n100000-g1",
+      "points": 3,
+      "paquets": 300000,
+      "parallele": 2,
+      "repetitions": 3,
+      "total_s": 64.877825,
+      "durees_totales_s": [
+        65.271891,
+        64.518666,
+        64.877825
+      ],
+      "mur_s": 66.527279,
+      "etapes_s": {
+        "lecture": 50.877931,
+        "correlation": 1.634764,
+        "detecteurs": 12.152661,
+        "rapport": 0.212468
+      },
+      "rss_max_mio": 1124.1,
+      "rss_max_enfants_mio": 1124.1,
+      "paquets_par_s": 4624
+    }
+  ]
+}

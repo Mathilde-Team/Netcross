@@ -1,0 +1,111 @@
+name: Banc de performance (non-régression)
+
+# Issue #1019 : détecte une régression de durée ou de mémoire sur le jeu
+# moyen (3 points x 100 000 paquets émis, graine 1) en comparant le banc
+# de #1017 à la référence versionnée benchmarks/reference.json.
+#   - chaque lundi et à la demande, jamais sur les PR : une mesure dure
+#     plusieurs minutes et n'a de sens que sur une machine stable ;
+#   - même runner maison que le job Qualité, pour que la référence et la
+#     mesure viennent de la même machine. Si le CPU ou le nombre de cœurs
+#     utilisables diffère de la référence, le comparateur ne compare pas
+#     (succès avec avertissement) : publier alors l'artefact comme nouvelle
+#     référence ;
+#   - le résultat (banc.json, banc.md) est publié en artefact, le tableau et
+#     la comparaison dans le résumé du job.
+# Documentation : docs/quality/banc-performance.md.
+
+"on":
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branche ou commit à mesurer"
+        default: dev
+      seuil_duree:
+        description: "Hausse de durée tolérée (%)"
+        default: "20"
+      seuil_memoire:
+        description: "Hausse de pic RSS tolérée (%)"
+        default: "20"
+
+# Une mesure à la fois : deux bancs simultanés se ralentiraient l'un l'autre.
+concurrency:
+  group: bench
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  bench:
+    name: Banc de performance (jeu moyen)
+    if: github.repository == 'Mathilde-Team/Netcross'
+    runs-on: ${{ fromJSON(vars.NETCROSS_RUNS_ON_BENCH || vars.NETCROSS_RUNS_ON || '{"group":"maison","labels":["self-hosted","linux","docker"]}') }}
+    timeout-minutes: 90
+    container:
+      image: ubuntu:26.04
+
+    steps:
+      - name: Prérequis du conteneur (git, certificats, compilateur)
+        run: |
+          DEBIAN_FRONTEND=noninteractive apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential python3 python3-venv
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Checkout du dépôt
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || 'dev' }}
+
+      - name: Installation de Wireshark CLI (tshark)
+        run: |
+          echo "wireshark-common wireshark-common/install-setuid boolean false" \
+            | debconf-set-selections
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark
+          tshark --version 2>&1 | sed -n 1p
+
+      - name: Installation de uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+
+      - name: Installation de Python
+        run: uv python install 3.14
+
+      - name: Installation des dépendances
+        run: uv sync
+
+      - name: Génération du jeu moyen
+        run: uv run python scripts/bench_datasets.py --sortie "$RUNNER_TEMP/jeux/p3-n100000-g1" --points 3 --paquets 100000
+
+      - name: Mesure et comparaison à la référence
+        env:
+          SEUIL_DUREE: ${{ inputs.seuil_duree || '20' }}
+          SEUIL_MEMOIRE: ${{ inputs.seuil_memoire || '20' }}
+        run: |
+          uv run python scripts/bench.py --jeux "$RUNNER_TEMP/jeux" --parallel 1,2 --repetitions 3 \
+            --json banc.json --markdown banc.md \
+            --reference benchmarks/reference.json \
+            --seuil-duree "$SEUIL_DUREE" --seuil-memoire "$SEUIL_MEMOIRE" \
+            --resume "$GITHUB_STEP_SUMMARY"
+
+      - name: Publication du résultat (artefact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: banc-performance
+          path: |
+            banc.json
+            banc.md
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Restituer le workspace au runner (chown)
+        # Cf. job Qualité de ci.yml : conteneur root, workspace partagé (#919/#936).
+        if: always()
+        run: |
+          chown -R --reference="$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE"
+          chown -R --reference="$RUNNER_TEMP" "$RUNNER_TEMP"
