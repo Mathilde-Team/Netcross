@@ -181,6 +181,18 @@ def redact_args(args: Sequence[str]) -> list:
     return out
 
 
+def tls_keylog_prefs(tls_keylog: str | None) -> tuple[str, ...]:
+    """Preference tshark d'un fichier de cles TLS (SSLKEYLOGFILE, issue #1040) :
+    ``("tls.keylog_file:CHEMIN",)``, ou ``()`` sans fichier. Seul le chemin est
+    transmis (et journalise) ; tshark lit lui-meme les secrets."""
+    logger.debug("tls_keylog_prefs: entrée")
+    if not tls_keylog:
+        logger.debug("tls_keylog_prefs: retour, aucun fichier")
+        return ()
+    logger.debug("tls_keylog_prefs: retour, fichier de cles fourni")
+    return (f"tls.keylog_file:{tls_keylog}",)
+
+
 def _build_args(
     *,
     path: str | None = None,
