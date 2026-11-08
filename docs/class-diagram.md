@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-207 modules · 300 classes · 742 fonctions publiques de module.
+209 modules · 306 classes · 747 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -514,7 +514,7 @@ classDiagram
 | `netcross_core.packet_limits` | ``--max-packets`` et ``--sample`` (issue #283), partages par la CLI et la GUI (issue #672). |
 | `netcross_core.parsing` | adaptateur entre pcap_parser (decodage via tshark -T ek) et le modele Pkt de netcross_core. |
 | `netcross_core.profiling` | Mesure par étape du pipeline d'analyse (issue #1016, banc #994). |
-| `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial (RFC 9000/9001), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP brut. |
+| `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial v1 et v2 (RFC 9000/9001/9369), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP… |
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
@@ -1845,6 +1845,15 @@ classDiagram
     }
 
     %% ===== netcross_core.quic_diagnostics =====
+    class QuicVersion {
+        <<dataclass, frozen>>
+        +int number
+        +str name
+        +str rfc
+        +bytes initial_salt
+        +str label_prefix
+        +int initial_type
+    }
     class QuicEvent {
         <<dataclass>>
         +str point
@@ -1857,11 +1866,12 @@ classDiagram
         +bool decryptable
         +str? sni
         +str? tls_version
+        +str quic_version
     }
     class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
         <<module>>
-        +derive_initial_secrets(dcid) tuple~bytes, bytes~
-        +derive_packet_protection_keys(secret) tuple~bytes, bytes, bytes~
+        +derive_initial_secrets(dcid, version) tuple~bytes, bytes~
+        +derive_packet_protection_keys(secret, version) tuple~bytes, bytes, bytes~
         +parse_quic_capture(label, path) list~QuicEvent~
         +diagnose_quic(events, points_order)
         +print_quic_diagnostics(findings) None
@@ -2064,6 +2074,7 @@ classDiagram
     %% ===== netcross_core.application.http =====
     class mod_netcross_core_application_http["netcross_core.application.http"] {
         <<module>>
+        +http1_transactions(packets) list~HttpTransaction~
         +build_http_transactions(packets, network_signals) list~ApplicationTransaction~
     }
 
@@ -2093,9 +2104,41 @@ classDiagram
         +TransactionClassification classification
         +to_dict() dict
     }
+    class HttpConnection {
+        <<dataclass, frozen, slots>>
+        +str transport
+        +str client
+        +str server
+        +int? client_port
+        +int? server_port
+        +key() FlowKey
+    }
+    class HttpTransaction {
+        <<dataclass, slots>>
+        +str version
+        +str point
+        +HttpConnection connection
+        +int? stream_id
+        +str? method
+        +str? target
+        +str? authority
+        +str? path
+        +int? status
+        +float? request_ts
+        +float? first_byte_ts
+        +float? end_ts
+        +float? server_time_ms
+        +from_target(version, point, connection, target, champs)$
+        +answered() bool
+        +ttfb_ms() float?
+        +total_ms() float?
+        +request_summary() str
+        +to_application_transaction(network_signals)
+    }
 
     %% ===== relations =====
     ApplicationTransaction --> TransactionClassification : classification
+    HttpTransaction --> HttpConnection : connection
 ```
 
 ## `netcross_core.discovery`
@@ -3201,6 +3244,59 @@ classDiagram
 
     %% ===== relations =====
     SupportTicket --> Consent : consent
+```
+
+## `netcross_core.testing`
+
+| Module | Rôle |
+|---|---|
+| `netcross_core.testing` | Outils de test réutilisables (jeux synthétiques du banc #994). |
+| `netcross_core.testing.synth` | Jeux synthétiques multi-points déterministes (issue #1015, banc #994). |
+
+### Diagramme
+
+```mermaid
+classDiagram
+    direction LR
+
+    %% ===== netcross_core.testing.synth =====
+    class Configuration {
+        <<dataclass>>
+        +int points
+        +int paquets
+        +int graine
+        +int debit_pps
+        +float delai_segment_ms
+        +float gigue_ms
+        +dict~str, float~ melange
+        +int? segment_perte
+        +float taux_perte
+        +str sens_perte
+        +int? segment_retard
+        +float retard_ms
+        +list~float~ decalages_ms
+        +valider() None
+    }
+    class _Message {
+        <<dataclass>>
+        +bool aller
+        +int proto
+        +bytes charge_l4
+        +bool perdable
+        +int pause_ns
+    }
+    class _Generateur {
+        +emettre(type_flux, messages, hotes, debut_ns, fenetre) int
+        +vider(jusqu_a_ns) None
+        +fermer() None
+    }
+    class mod_netcross_core_testing_synth["netcross_core.testing.synth"] {
+        <<module>>
+        +entete_pcapng(nom_point) bytes
+        +generer(cfg, dossier) dict
+        +construire_parseur()
+        +main(argv) int
+    }
 ```
 
 ## `netcross_core.tshark_stats`
