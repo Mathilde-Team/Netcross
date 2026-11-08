@@ -8,6 +8,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Garde-fous de non-fuite des secrets (#1047) : un test de bout en bout cherche les secrets d'un fichier de clés et
+  d'un bloc DSB (hexadécimal, octets bruts, base64) dans toutes les sorties d'un run : rapports texte, JSON,
+  Markdown, PDF et HTML, journaux loguru, export SIEM, Zeek, base d'historique, ticket de support, contenus extraits
+  et API. Voir docs/non-fuite-secrets.md.
 - Non-régression de performance (#1019) : `scripts/bench.py --reference benchmarks/reference.json` compare le banc
   à une référence versionnée (durée totale et pics RSS, seuils `--seuil-duree`/`--seuil-memoire`, 20 % par défaut,
   code 3 sur régression ; `--resultat` pour comparer sans relancer, `--resume` pour le résumé du job). Workflow
