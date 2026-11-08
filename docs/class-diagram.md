@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-211 modules · 304 classes · 748 fonctions publiques de module.
+211 modules · 305 classes · 748 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -502,7 +502,7 @@ classDiagram
 | `netcross_core.packet_limits` | ``--max-packets`` et ``--sample`` (issue #283), partages par la CLI et la GUI (issue #672). |
 | `netcross_core.parsing` | adaptateur entre pcap_parser (decodage via tshark -T ek) et le modele Pkt de netcross_core. |
 | `netcross_core.profiling` | Mesure par étape du pipeline d'analyse (issue #1016, banc #994). |
-| `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial (RFC 9000/9001), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP brut. |
+| `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial v1 et v2 (RFC 9000/9001/9369), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP… |
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
@@ -1833,6 +1833,15 @@ classDiagram
     }
 
     %% ===== netcross_core.quic_diagnostics =====
+    class QuicVersion {
+        <<dataclass, frozen>>
+        +int number
+        +str name
+        +str rfc
+        +bytes initial_salt
+        +str label_prefix
+        +int initial_type
+    }
     class QuicEvent {
         <<dataclass>>
         +str point
@@ -1845,11 +1854,12 @@ classDiagram
         +bool decryptable
         +str? sni
         +str? tls_version
+        +str quic_version
     }
     class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
         <<module>>
-        +derive_initial_secrets(dcid) tuple~bytes, bytes~
-        +derive_packet_protection_keys(secret) tuple~bytes, bytes, bytes~
+        +derive_initial_secrets(dcid, version) tuple~bytes, bytes~
+        +derive_packet_protection_keys(secret, version) tuple~bytes, bytes, bytes~
         +parse_quic_capture(label, path) list~QuicEvent~
         +diagnose_quic(events, points_order)
         +print_quic_diagnostics(findings) None
