@@ -16,11 +16,13 @@ JSON et le PDF doivent toujours s'accorder sur les memes constats/le
 meme triage pour un meme Report.
 """
 
+import dataclasses
 import datetime
 import json
 
 from netcross_core.dechiffrement import document_json
 from netcross_core.logging_config import get_logger, summarize
+from netcross_report.path_metrics import build_path_metrics
 from netcross_report.synthesis import build_findings
 from netcross_report.triage import health_label, health_score, rank_segments
 
@@ -214,6 +216,21 @@ def _compliance_dict(result) -> dict:
     }
 
 
+def _path_segment_dict(m) -> dict:
+    """Un ``SegmentMetrics`` (path_metrics) en dict JSON (issue #1075).
+
+    Toutes les metriques du segment, plus ``segment`` (meme libelle que les
+    constats, pour les rapprocher) et ``measured`` : un segment non
+    mesurable reste dans la liste, ses valeurs inconnues a ``None``.
+    """
+    logger.debug("_path_segment_dict: entrée ({})", m.label)
+    d = dataclasses.asdict(m)
+    d["segment"] = m.label
+    d["measured"] = m.measured
+    logger.debug("_path_segment_dict: retour dict")
+    return d
+
+
 def _segment_score_dict(s) -> dict:
     """Le detail des findings du segment n'est pas re-imbrique ici : ils
     sont deja tous presents dans la liste "findings" de premier niveau
@@ -342,6 +359,11 @@ def build_json_report_document(
             }
             for (a, b), est in r.clock_offset_estimate.items()
         ],
+        # Issue #1075 : metriques par segment, dans l'ordre du chemin deduit
+        # (netcross_report.path_metrics, memes chiffres que le PDF) -- lues
+        # par la vue « Chemin » du rapport HTML. Toujours presente (liste
+        # vide sans paire de points).
+        "path_metrics": [_path_segment_dict(m) for m in build_path_metrics(r)],
         "meta": dict(meta) if meta else {},
         "findings": [_finding_dict(f) for f in findings],
         "triage": [_segment_score_dict(s) for s in ranked],
