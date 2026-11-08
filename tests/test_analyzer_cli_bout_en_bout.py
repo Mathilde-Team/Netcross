@@ -226,7 +226,7 @@ def test_tls_quic_et_quic_absent(lance, monkeypatch, capsys):
     assert lance("--tls", "--quic") == 0
     out = capsys.readouterr().out
     assert "[A] 1 evenements TLS trouves dans a.pcap" in out
-    assert "[B] 2 paquets QUIC Initial trouves dans b.pcap" in out
+    assert "[B] 2 paquets QUIC trouves dans b.pcap" in out
     assert "TLS=['tls']" in out and "QUIC=['quic']" in out
 
     monkeypatch.setitem(sys.modules, "netcross_core.quic_diagnostics", None)

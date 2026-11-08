@@ -150,6 +150,8 @@ def _to_pkt(label: str, raw: RawPacket) -> Pkt:
         tls_dechiffre=raw.tls_dechiffre,
         quic_connexion=raw.quic_connexion,
         quic_dechiffre=raw.quic_dechiffre,
+        quic_court=raw.quic_court,
+        quic_fermeture=raw.quic_fermeture,
         tls_cert_issuer=raw.tls_cert_issuer,
         tls_cert_subject=raw.tls_cert_subject,
         tls_cert_sig_hash=raw.tls_cert_sig_hash,

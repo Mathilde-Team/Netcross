@@ -3189,7 +3189,7 @@ def main():
     security_detections = []
     if args.security_report:
         for label, path in captures:
-            detections = security_findings.scan_capture_exploits(label, path)
+            detections = security_findings.scan_capture_exploits(label, path, **options_lecture(tls_keylogs, label))
             print(f"[{label}] {len(detections)} signature(s) d'exploit detectee(s) dans {path}")
             security_detections.extend(detections)
 
@@ -3447,8 +3447,8 @@ def main():
             sys.exit(1)
         quic_events = []
         for label, path in captures:
-            events = parse_quic_capture(label, path)
-            print(f"[{label}] {len(events)} paquets QUIC Initial trouves dans {path}")
+            events = parse_quic_capture(label, path, **options_lecture(tls_keylogs, label))
+            print(f"[{label}] {len(events)} paquets QUIC trouves dans {path}")
             quic_events.extend(events)
         quic_findings = diagnose_quic(quic_events, r.points)
         print_quic_diagnostics(quic_findings)
