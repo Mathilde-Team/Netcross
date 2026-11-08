@@ -88,10 +88,12 @@ nav:
       - Diagramme de classes: class-diagram.md
       - Internationalisation: i18n.md
       - Journalisation et mode debug: journalisation.md
+      - Empreinte de paquet: empreinte-paquet.md
       - Décisions d'architecture: adr/netflow-sflow-architecture.md
       - Qualité: quality/anonymization-plan.md
       - Couverture de la GUI: quality/gui-app-coverage.md
       - Jeux synthétiques multi-points: quality/jeux-synthetiques.md
+      - Banc de performance: quality/banc-performance.md
       - Tests réels (banque de pcap): quality/tests-reels.md
   - Référence:
       - Roadmap: archived/roadmap.md

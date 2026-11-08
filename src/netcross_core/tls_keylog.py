@@ -82,6 +82,7 @@ def resoudre_keylogs(specs: Iterable[str] | None, points: Sequence[str]) -> dict
     ``specs`` : valeurs de ``--tls-keylog`` ; ``points`` : noms des points de capture.
     Lève ``TlsKeylogError`` (message pour l'utilisateur) sur une spécification invalide.
     """
+    logger.debug("resoudre_keylogs: entrée")
     specs = list(specs or ())
     logger.debug("resoudre_keylogs: entrée ({} spécification(s), {} point(s))", len(specs), len(points))
     points = list(dict.fromkeys(points))

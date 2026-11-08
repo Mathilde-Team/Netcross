@@ -144,6 +144,7 @@ def _parse_capture_args(raw_list, flag_name):
 
 
 def _load_packets(scenario_name, captures, parallel, parallel_workers, tls_keylogs=None):
+    logger.debug("_load_packets: entrée")
     tls_keylogs = tls_keylogs or {}
     if parallel:
         cpu_count = os.cpu_count() or 1
@@ -228,6 +229,7 @@ def _parse_live_spec(spec):
     cross_capture_analyzer_cli.py -- chaque CLI reste independante (voir
     docstring du module), pas de module partage pour un helper aussi
     court."""
+    logger.debug("_parse_live_spec: entrée")
     label, sep, rest = spec.partition(":")
     iface, bpf = split_live_target(rest) if sep else ("", None)
     if not label or not iface:
@@ -270,6 +272,7 @@ def _run_live_captures(live_specs, duration):
     cross_capture_analyzer_cli.py -- meme logique (voir ce fichier pour
     le detail : thread par point, arret sur SIGINT ou timer, un point en
     echec ne bloque pas les autres)."""
+    logger.debug("_run_live_captures: entrée")
     points = [_parse_live_spec(s) for s in live_specs]
     _check_single_stdin(points)
     stop_event = threading.Event()
@@ -392,6 +395,7 @@ def _run_scenario(name, captures, points_order, args, redactor=None):
 
 
 def main():
+    logger.debug("main: entrée")
     ap = argparse.ArgumentParser(
         description="Compare deux jeux de captures (avant/apres, site A / site B) et "
         "remonte les regressions/ameliorations"

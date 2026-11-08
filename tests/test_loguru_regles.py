@@ -20,6 +20,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 # Issue #954 : les regles §8 portent sur tout le Python suivi par git,
@@ -94,7 +96,7 @@ def _charger_module(nom: str):
 
 
 def test_audit_debug_sorties_ne_doit_pas_augmenter():
-    """Issue #954 : le total des sorties sans logger.debug ne peut qu'augmenter.
+    """Issue #954 : le total des sorties sans logger.debug ne peut que diminuer.
 
     La référence est scripts/audit_debug_sorties.baseline ; une PR qui
     ajoute une sortie non tracée fait échouer ce test.
@@ -132,6 +134,33 @@ def test_audit_debug_entrees_ne_doit_pas_augmenter():
         f"{manquantes} entrées sans logger.debug (référence : {reference}) — "
         "instrumentez les fonctions que vous ajoutez/modifiez, puis baissez la référence"
     )
+
+
+@pytest.mark.parametrize("definition", ["def", "async def"])
+@pytest.mark.parametrize(
+    ("premiere_instruction", "manquantes"),
+    [
+        ("logger.debug('traiter: entrée')", 0),
+        ("logger.opt(lazy=True).debug('traiter: entrée')", 0),
+        ("logger.info('traiter: entrée')", 1),
+        ("valeur = 1", 1),
+    ],
+)
+def test_audit_entrees_detecte_regression(tmp_path, monkeypatch, definition, premiere_instruction, manquantes):
+    """Le garde-fou reconnaît DEBUG après la docstring, pas INFO ni une trace tardive."""
+    module = _charger_module("audit_debug_entrees")
+    monkeypatch.setattr(module, "BASES", (tmp_path,))
+    monkeypatch.setattr(module, "hot_names", lambda: set())
+    (tmp_path / "exemple.py").write_text(
+        f"{definition} traiter():\n"
+        '    """Une docstring mentionnant logger.debug n\'est pas une trace."""\n'
+        f"    {premiere_instruction}\n"
+        "    valeur = 2\n"
+        "    logger.debug('traiter: sortie')\n"
+        "    return valeur\n",
+        encoding="utf-8",
+    )
+    assert module.audit_entrees() == (1, manquantes)
 
 
 def test_chaque_module_avec_fonctions_a_un_logger():

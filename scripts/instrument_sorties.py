@@ -44,6 +44,7 @@ _SKIP = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
 
 def _short(node: ast.AST, limit: int = MAX_DESC) -> str:
+    logger.debug("_short: entrée")
     text = " ".join(ast.unparse(node).split())
     text = text.replace("{", "(").replace("}", ")")
     logger.debug("_short: retour text if len(text) <= limit else text[:limit - 1] …")
@@ -51,6 +52,7 @@ def _short(node: ast.AST, limit: int = MAX_DESC) -> str:
 
 
 def _exc_name(node: ast.Raise) -> str:
+    logger.debug("_exc_name: entrée")
     exc = node.exc
     if exc is None:
         logger.debug('_exc_name: si exc is None -> retour "relance de l\'exception en cours"')
@@ -76,6 +78,7 @@ class _Exit:
     __slots__ = ("block", "context", "index", "stmt")
 
     def __init__(self, stmt, block, index, context):
+        logger.debug("__init__: entrée")
         self.stmt = stmt
         self.block = block
         self.index = index
@@ -87,6 +90,8 @@ def _walk_blocks(node: ast.AST, context: list[str]):
     """(bloc, contexte) pour chaque bloc d'instructions de la fonction,
     sans descendre dans les fonctions/classes imbriquées."""
 
+    logger.debug("_walk_blocks: entrée")
+
     def sub(stmts, ctx):
         yield stmts, ctx
         for s in stmts:
@@ -96,6 +101,7 @@ def _walk_blocks(node: ast.AST, context: list[str]):
         logger.debug("_walk_blocks.sub: fin")
 
     def _children(s, ctx):
+        logger.debug("_children: entrée")
         if isinstance(s, ast.If):
             yield from sub(s.body, [*ctx, f"si {_short(s.test)}"])
             if s.orelse:
@@ -131,6 +137,7 @@ def _walk_blocks(node: ast.AST, context: list[str]):
 
 
 def _exits(fn):
+    logger.debug("_exits: entrée")
     for block, ctx in _walk_blocks(fn, []):
         for i, s in enumerate(block):
             if isinstance(s, (ast.Return, ast.Raise)):
@@ -139,6 +146,7 @@ def _exits(fn):
 
 
 def _conform(ex: _Exit) -> bool:
+    logger.debug("_conform: entrée")
     prev = ex.block[ex.index - 1] if ex.index > 0 else None
     lvl = _log_level(prev)
     logger.debug("_conform: retour lvl == 'debug' if isinstance(ex.stmt, ast.Return)…")
@@ -146,6 +154,7 @@ def _conform(ex: _Exit) -> bool:
 
 
 def _branch(ctx: list[str]) -> str:
+    logger.debug("_branch: entrée")
     if not ctx:
         logger.debug("_branch: si not ctx -> retour ''")
         return ""
@@ -158,6 +167,7 @@ def _fit(msg: str, col: int, width: int = 120) -> str:
     """Tronque le message pour que la ligne formatée par ruff tienne dans
     ``width`` (chaîne seule sur sa ligne, indentée de col + 4, suivie
     d'une virgule), sans jamais couper le placeholder ``{}`` final."""
+    logger.debug("_fit: entrée")
     budget = width - (col + 4) - 3
     if len(repr(msg)) - 2 <= budget:
         logger.debug("_fit: si len(repr(msg)) - 2 <= budget -> retour msg")
@@ -178,6 +188,7 @@ def _lit(text: str) -> str:
 
 
 def _module_logger(tree: ast.Module) -> str | None:
+    logger.debug("_module_logger: entrée")
     for node in tree.body:
         if (
             isinstance(node, ast.Assign)
@@ -216,6 +227,8 @@ def _has_summarize(tree: ast.Module) -> bool:
 
 
 def _qualfuncs(tree: ast.Module):
+    logger.debug("_qualfuncs: entrée")
+
     def rec(node, prefix, nested, cls):
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -234,6 +247,7 @@ def _qualfuncs(tree: ast.Module):
 
 def _describe(expr: ast.expr) -> str:
     """Description courte d'une expression renvoyée, sans la recopier."""
+    logger.debug("_describe: entrée")
     if isinstance(expr, ast.Call):
         logger.debug("_describe: si isinstance(expr, ast.Call) -> retour chaîne formatée")
         return f"{_short(expr.func, 40)}(…)"
@@ -266,6 +280,7 @@ def _describe(expr: ast.expr) -> str:
 
 
 def _simple_value(expr: ast.expr | None) -> bool:
+    logger.debug("_simple_value: entrée")
     node = expr
     while isinstance(node, ast.Attribute):
         node = node.value
@@ -274,6 +289,7 @@ def _simple_value(expr: ast.expr | None) -> bool:
 
 
 def instrument_text(text: str, hot: set[str], path: str = "") -> tuple[str, int, list[str]]:
+    logger.debug("instrument_text: entrée")
     tree = ast.parse(text)
     log = _module_logger(tree)
     if log is None:
@@ -356,6 +372,7 @@ def instrument_text(text: str, hot: set[str], path: str = "") -> tuple[str, int,
 
 
 def _add_summarize_import(text: str) -> str:
+    logger.debug("_add_summarize_import: entrée")
     tree = ast.parse(text)
     for node in tree.body:
         if isinstance(node, ast.ImportFrom) and node.module == "netcross_core.logging_config":

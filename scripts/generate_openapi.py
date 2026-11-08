@@ -34,6 +34,7 @@ def _render() -> tuple[Path, str]:
     Isole du rendu pour que ``--check`` puisse comparer sans toucher au
     disque -- meme discipline que scripts/generate_class_diagram.py.
     """
+    logger.debug("_render: entrée")
     spec = get_openapi(
         title=app.title,
         version=app.version,
@@ -55,6 +56,7 @@ def _render() -> tuple[Path, str]:
 
 
 def main(argv=None) -> int:
+    logger.debug("main: entrée")
     parser = argparse.ArgumentParser(description="Genere docs/openapi.yaml depuis FastAPI")
     parser.add_argument(
         "--check",

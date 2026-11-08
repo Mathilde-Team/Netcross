@@ -70,6 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _print_list(annotations, as_json: bool) -> None:
+    logger.debug("_print_list: entrée")
     if as_json:
         print(json.dumps([annotation_to_dict(a) for a in annotations], ensure_ascii=False, indent=2))
         logger.debug("_print_list: si as_json -> retour")
@@ -85,6 +86,7 @@ def _print_list(annotations, as_json: bool) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     parser = build_parser()
     add_debug_argument(parser)
     args = parser.parse_args(argv)

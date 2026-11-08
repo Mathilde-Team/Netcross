@@ -216,12 +216,14 @@ class AnalysesStore:
             return dict(entry) if entry else None
 
     def get_status(self, analysis_id: str) -> str | None:
+        logger.debug("get_status: entrée")
         with self._lock:
             entry = self._store.get(analysis_id)
             logger.debug("AnalysesStore.get_status: retour entry['status'] if entry else None")
             return entry["status"] if entry else None
 
     def list_ids(self) -> list[str]:
+        logger.debug("list_ids: entrée")
         with self._lock:
             logger.debug("AnalysesStore.list_ids: retour list(…)")
             return list(self._store.keys())

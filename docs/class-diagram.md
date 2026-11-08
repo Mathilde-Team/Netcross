@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-216 modules · 312 classes · 768 fonctions publiques de module.
+218 modules · 313 classes · 792 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -524,6 +524,7 @@ classDiagram
 | `netcross_core.correlate` | correlation des paquets entre points de capture (par 5-tuple strict ou par hash de payload en mode NAT-tolerant) et calcul du debit par fenetre temporelle. |
 | `netcross_core.dashboard` | contexte d'analyse partage pour le dashboard analytique interactif (issue #18, section 6.17). |
 | `netcross_core.detector_inventory` | Inventaire des détecteurs et de leur besoin de vue globale (issue #1020, chantier #995). |
+| `netcross_core.empreinte` | empreinte compacte et invariante d'un paquet pour l'appariement entre points de capture (issue #1021). |
 | `netcross_core.expert_model` | objets de contrat partages entre netcross_core et netcross_report ("Session 0" de FEATURES.md section 13.3 : stabiliser les objets communs avant de batir le moteur d'expertise vise par la comparaison… |
 | `netcross_core.expert_rules` | bibliotheque de regles d'expertise reseau DECLARATIVE (FEATURES.md section 6.2), dernier chantier de la Session 2 de la section 13.3 ("moteur d'evenements d'expertise") apres la cloture cote… |
 | `netcross_core.exploit_signatures` | detection PASSIVE de signatures d'exploits CVE connus (Log4Shell, Shellshock, Heartbleed, EternalBlue, compression TLS/CRIME) dans la charge utile brute des paquets. |
@@ -951,6 +952,17 @@ classDiagram
         +par_nom() dict~str, Detecteur~
         +classe_de(nom) str
         +tableau_markdown() str
+    }
+
+    %% ===== netcross_core.empreinte =====
+    class mod_netcross_core_empreinte["netcross_core.empreinte"] {
+        <<module>>
+        +empreinte_de_cle(cle) int
+        +empreinte(pk, nat_tolerant, nat_window_ms) int
+        +est_correlable(pk, exclude_duplicates) bool
+        +apparier(all_packets, nat_tolerant, nat_window_ms, exclude_duplicates) dict~int, dict~str, list~Pkt~~~
+        +collisions(cles) list~tuple~int, list~tuple~~~
+        +comparer_appariements(flows_par_cle, groupes_par_empreinte) dict
     }
 
     %% ===== netcross_core.expert_model =====
@@ -1483,6 +1495,45 @@ classDiagram
         +suggest_classes(conn, nom, n) list~str~
     }
 
+    %% ===== relations =====
+    DiffFinding --> EvidenceLink : evidence
+    CaptureGroup --> CaptureInventory : members
+    CaptureGroup --> PairEvaluation : evaluations
+    IsolatedCapture --> CaptureInventory : capture
+    BatchPlan --> CaptureGroup : groups
+    BatchPlan --> CaptureInventory : failures
+    BatchPlan --> IsolatedCapture : isolated
+    ClientReport --> ClientSignature : signature
+    ClientComparisonResult --> ClientReport : clients
+    NetcrossConfig --> AnalysisConfig : analysis
+    NetcrossConfig --> NotifyConfig : notify
+    NetcrossConfig --> OutputConfig : output
+    NetcrossConfig --> ParallelConfig : parallel
+    NetcrossConfig --> SecurityConfig : security
+    EvidenceLink --> PacketEvidence : packet
+    ExpertEvent --> EvidenceLink : evidence
+    ExpertEvent --> PacketEvidence : packet_evidence
+    Diagnosis --> ExpertEvent : events
+    ComplianceResult --> ReferenceProfile : reference
+    _Detector --> netcross_core_exploit_signatures__FlowState : run
+    FlowTimeline --> PacketTiming : packet_timings
+    FlowTimeline --> ThroughputWindow : throughput_windows
+    FlowView --> ExpertEvent : events
+    FlowView --> Flow : flow
+    FlowView --> TcpSummary : tcp
+    FlowView --> Transaction : transactions
+    LiveAggregator --> _Point : points
+    Methode --> Parametre : parametres
+    FicheClasse --> Attribut : attributs
+    FicheClasse --> Methode : methodes
+```
+
+### Diagramme (2/2)
+
+```mermaid
+classDiagram
+    direction LR
+
     %% ===== netcross_core.models =====
     class Banner {
         <<dataclass, frozen, slots>>
@@ -1783,52 +1834,6 @@ classDiagram
         +str description
     }
 
-    %% ===== relations =====
-    DiffFinding --> EvidenceLink : evidence
-    CaptureGroup --> CaptureInventory : members
-    CaptureGroup --> PairEvaluation : evaluations
-    IsolatedCapture --> CaptureInventory : capture
-    BatchPlan --> CaptureGroup : groups
-    BatchPlan --> CaptureInventory : failures
-    BatchPlan --> IsolatedCapture : isolated
-    ClientReport --> ClientSignature : signature
-    ClientReport --> Report : report
-    ClientComparisonResult --> ClientReport : clients
-    NetcrossConfig --> AnalysisConfig : analysis
-    NetcrossConfig --> NotifyConfig : notify
-    NetcrossConfig --> OutputConfig : output
-    NetcrossConfig --> ParallelConfig : parallel
-    NetcrossConfig --> SecurityConfig : security
-    EvidenceLink --> PacketEvidence : packet
-    ExpertEvent --> EvidenceLink : evidence
-    ExpertEvent --> PacketEvidence : packet_evidence
-    Diagnosis --> ExpertEvent : events
-    ComplianceResult --> ReferenceProfile : reference
-    _Detector --> netcross_core_exploit_signatures__FlowState : run
-    FlowTimeline --> PacketTiming : packet_timings
-    FlowTimeline --> ThroughputWindow : throughput_windows
-    FlowView --> ExpertEvent : events
-    FlowView --> Flow : flow
-    FlowView --> TcpSummary : tcp
-    FlowView --> Transaction : transactions
-    LiveDiffState --> Pkt : packets_in_window
-    LiveAggregator --> _Point : points
-    Methode --> Parametre : parametres
-    FicheClasse --> Attribut : attributs
-    FicheClasse --> Methode : methodes
-    Pkt --> Banner : service_banners
-    Report --> ChecksumError : checksum_errors
-    Report --> EchantillonHorloge : clock_offset_samples
-    Report --> EstimationHorloge : clock_offset_estimate
-    Report --> SequenceGap : sequence_gaps
-```
-
-### Diagramme (2/2)
-
-```mermaid
-classDiagram
-    direction LR
-
     %% ===== netcross_core.naming =====
     class NameEntry {
         <<dataclass, frozen>>
@@ -2085,6 +2090,11 @@ classDiagram
         <<module>>
         +build_wireshark_expert_events(all_packets) list~ExpertEvent~
     }
+
+    %% ===== relations =====
+    Pkt --> Banner : service_banners
+    Report --> ChecksumError : checksum_errors
+    Report --> SequenceGap : sequence_gaps
 ```
 
 ## `netcross_core.active`
@@ -3354,6 +3364,7 @@ classDiagram
 | Module | Rôle |
 |---|---|
 | `netcross_core.testing` | Outils de test réutilisables (jeux synthétiques du banc #994). |
+| `netcross_core.testing.bench` | Banc de performance reproductible de Netcross (issue #1017, chantier #994). |
 | `netcross_core.testing.synth` | Jeux synthétiques multi-points déterministes (issue #1015, banc #994). |
 
 ### Diagramme
@@ -3361,6 +3372,32 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_core.testing.bench =====
+    class BancError {
+        <<RuntimeError>>
+    }
+    class mod_netcross_core_testing_bench["netcross_core.testing.bench"] {
+        <<module>>
+        +modele_cpu(cpuinfo) str
+        +ram_mio(meminfo) int?
+        +coeurs_utilisables(affinite) int
+        +version_tshark(tshark) str?
+        +version_netcross() str
+        +environnement() dict
+        +trouver_jeux(chemin) list~Path~
+        +lire_verite(dossier) dict
+        +commande_analyse(dossier, verite, parallele, mesures, python)
+        +executer(cmd) int
+        +mesurer(dossier, parallele, repetitions, executeur, horloge) dict
+        +lancer(jeux, paralleles, repetitions, executeur, env) dict
+        +valider(resultat) list~str~
+        +en_markdown(resultat) str
+        +comparer(resultat, reference, seuil_duree_pct, seuil_memoire_pct) dict
+        +comparaison_en_markdown(comparaison) str
+        +construire_parseur() argparse.ArgumentParser
+        +main(argv, executeur) int
+    }
 
     %% ===== netcross_core.testing.synth =====
     class Configuration {
