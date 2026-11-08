@@ -11,7 +11,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk  # noqa: E402
 
-from netcross_core.logging_config import get_logger  # noqa: E402
+from netcross_core.logging_config import get_logger, summarize  # noqa: E402
 from netcross_gtk4.file_option import FileOption  # noqa: E402
 from netcross_gtk4.report_exports import history_text  # noqa: E402
 
@@ -23,6 +23,7 @@ RUN_TYPE_VALUES = (None, "analyse", "diff")
 
 class HistoryWindow(Gtk.Window):
     def __init__(self, parent: Gtk.Window | None = None, db_path: str | None = None, label: str | None = None):
+        logger.debug("HistoryWindow.__init__: entrée")
         super().__init__(title="Historique des runs", default_width=820, default_height=480)
         if parent is not None:
             self.set_transient_for(parent)
@@ -57,8 +58,10 @@ class HistoryWindow(Gtk.Window):
         scroll.set_child(self.view)
         box.append(scroll)
         self.set_child(box)
+        logger.debug("HistoryWindow.__init__: fin")
 
     def selected_run_type(self) -> str | None:
+        logger.debug("HistoryWindow.selected_run_type: retour RUN_TYPE_VALUES[self.run_type_dropdown.get_select…")
         return RUN_TYPE_VALUES[self.run_type_dropdown.get_selected()]
 
     def show_history(self) -> str:
@@ -79,4 +82,5 @@ class HistoryWindow(Gtk.Window):
                 logger.warning("HistoryWindow: historique illisible ({})", exc)
                 text = str(exc)
         self.view.get_buffer().set_text(text)
+        logger.debug("HistoryWindow.show_history: retour text={}", summarize(text, "text"))
         return text
