@@ -163,6 +163,7 @@ from netcross_core.stats import EXPORT_FORMATS as STATS_EXPORT_FORMATS
 from netcross_core.stats import GROUP_BY as STATS_GROUP_BY
 from netcross_core.stats import SORT_BY as STATS_SORT_BY
 from netcross_core.stats import explore_stats, render_stats, stats_format_for
+from netcross_core.streaming import DEFAULT_WINDOW_SECONDS, correlate_streaming, sources_by_point
 from netcross_core.support import (
     SCOPES as SUPPORT_SCOPES,
 )
@@ -1336,6 +1337,23 @@ def _check_extraction_args(args) -> tuple[str, ...]:
     return kinds
 
 
+def _run_streaming(args, all_packets, points_order, r) -> None:
+    """--streaming (issue #1022) : correlation en flux, affichee et posee
+    sur ``r.streaming`` pour --json-report."""
+    logger.debug("_run_streaming: entrée")
+    resultat = correlate_streaming(
+        sources_by_point(all_packets),
+        points_order,
+        window_seconds=args.streaming_window,
+        nat_tolerant=args.nat_tolerant,
+        nat_window_ms=args.nat_window_ms,
+        exclude_duplicates=args.exclude_duplicates,
+    )
+    print("\n" + "\n".join(resultat.summary_lines()))
+    r.streaming = resultat.to_dict()
+    logger.debug("_run_streaming: retour None")
+
+
 def _write_metrics_files(args, r, findings, redactor) -> None:
     """--prom-file / --openmetrics-file (issue #1112) : series du catalogue
     (#1110), etiquettes anonymisees avec --redact."""
@@ -1829,6 +1847,22 @@ def main():
         default=200,
         help="Largeur de la fenetre temporelle (ms) pour le mode --nat-tolerant "
         "(defaut: 200ms, a elargir si la latence WAN est plus grande)",
+    )
+    ap.add_argument(
+        "--streaming",
+        action="store_true",
+        help="Correle aussi les points en flux (issue #1022) : fusion k voies des points tries par temps, "
+        "fenetre glissante, memoire proportionnelle a la fenetre. Compteurs dans le rapport texte et la cle "
+        "`streaming` de --json-report ; toute troncature (paquet arrive apres la fermeture de son groupe) y "
+        "est signalee. Voir docs/correlation-en-flux.md.",
+    )
+    ap.add_argument(
+        "--streaming-window",
+        type=float,
+        default=DEFAULT_WINDOW_SECONDS,
+        metavar="SECONDES",
+        help=f"Largeur de la fenetre de --streaming (defaut : {DEFAULT_WINDOW_SECONDS:g} s) : au moins le "
+        "transit le plus long entre deux points, plus le delai de retransmission a rattacher.",
     )
     ap.add_argument(
         "--detect-duplicates",
@@ -3322,6 +3356,8 @@ def main():
     if truncation_note:
         r.truncated = True
         r.truncation_note = truncation_note
+    if args.streaming:
+        _run_streaming(args, all_packets, points_order, r)
     marquer(mesures, "rapport")
     print_report(r)
     # Issue #910 : annotations des sidecars (GUI ou `netcross annotations`)

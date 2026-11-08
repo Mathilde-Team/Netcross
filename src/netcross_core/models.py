@@ -622,6 +622,10 @@ class Report:
     # capture) : plus grave qu'un simple echec, voir le constat de l'issue.
     truncated: bool = False
     truncation_note: str = ""
+    # Correlation en flux (#1022) : forme JSON de
+    # `netcross_core.streaming.StreamingResult`, posee par la CLI avec
+    # --streaming ; vide sinon (cle `streaming` absente de --json-report).
+    streaming: dict = field(default_factory=dict)
     # -- objets applicatifs HTTP (Job 25), metadonnees uniquement
     http_objects: list[dict] = field(default_factory=list)
     # -- fichiers extraits (SCENARIO-4, issue #150) : métadonnées des fichiers
