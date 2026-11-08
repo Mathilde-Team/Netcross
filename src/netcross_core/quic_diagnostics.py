@@ -115,6 +115,12 @@ class QuicEvent:
     tls_version: str | None = None
     # Issue #1061 : version QUIC du paquet Initial ("v1" ou "v2")
     quic_version: str = "v1"
+    # Issue #1045 : "initial" (Initial dechiffre par ce module) ou "1rtt"
+    # (paquet a en-tete court lu par tshark avec le fichier de cles : son
+    # dechiffrement, sa connexion tshark et sa trame CONNECTION_CLOSE).
+    kind: str = "initial"
+    connexion: int | None = None
+    fermeture: str | None = None
 
 
 # ------------------------- primitives HKDF (RFC 5869 / RFC 8446 7.1) -------
@@ -393,19 +399,48 @@ def _parse_tls_handshake_from_crypto(crypto_data: bytes) -> dict | None:
     return parse_client_hello(body)
 
 
-def parse_quic_capture(label: str, path: str) -> list[QuicEvent]:
+def parse_quic_capture(label: str, path: str, *, tls_keylog: str | None = None) -> list[QuicEvent]:
     """Lit une capture via pcap_parser (tshark -T ek) et renvoie un
     QuicEvent pour chaque paquet QUIC Initial v1 ou v2 detecte -- decrypte
     avec succes ou non (decryptable=False et sni=None dans ce dernier
-    cas, jamais de donnee inventee)."""
+    cas, jamais de donnee inventee).
+
+    tls_keylog (issue #1045) : fichier de cles TLS du point, transmis a
+    tshark. Chaque paquet 1-RTT (en-tete court) donne alors aussi un
+    QuicEvent ``kind="1rtt"`` : dechiffre ou non, connexion, et trame
+    CONNECTION_CLOSE lue dans le contenu dechiffre. Sans fichier, la
+    lecture est strictement inchangee."""
+    logger.debug("parse_quic_capture: entrée ({}, keylog={})", label, bool(tls_keylog))
     events: list[QuicEvent] = []
-    raw_packets = pcap_parser.parse_capture(path, raise_on_error=False)
+    raw_packets = (
+        pcap_parser.parse_capture(path, raise_on_error=False, tls_keylog=tls_keylog)
+        if tls_keylog
+        else pcap_parser.parse_capture(path, raise_on_error=False)
+    )
     logger.debug("parse_quic_capture: point {}, {} paquet(s) lus depuis {}", label, len(raw_packets), path)
 
     for raw in raw_packets:
         if raw.proto != "UDP" or not raw.payload:
             continue
         payload = raw.payload
+        if tls_keylog and raw.quic_court:
+            events.append(
+                QuicEvent(
+                    point=label,
+                    ts=raw.ts,
+                    src=raw.src,
+                    dst=raw.dst,
+                    sport=raw.sport or 0,
+                    dport=raw.dport or 0,
+                    dcid=b"",
+                    decryptable=raw.quic_dechiffre,
+                    kind="1rtt",
+                    connexion=raw.quic_connexion,
+                    fermeture=raw.quic_fermeture,
+                )
+            )
+            # pas de `continue` : un datagramme peut coalescer un Initial
+            # (en tete) et un paquet 1-RTT, l'Initial reste analyse ci-dessous.
 
         header_info = _parse_long_header(payload)
         if header_info is None:
@@ -488,6 +523,64 @@ def _constats_v2(events: list[QuicEvent]) -> list:
     return constats
 
 
+def _code_fermeture(fermeture: str) -> int | None:
+    """Code numerique d'une fermeture « applicatif 0x42 (raison) »."""
+    logger.debug("_code_fermeture: entrée")
+    morceaux = fermeture.split()
+    try:
+        code = int(morceaux[1], 16)
+    except (IndexError, ValueError) as exc:
+        logger.debug("_code_fermeture: format inattendu ({}) -> retour None", exc)
+        return None
+    logger.debug("_code_fermeture: retour {}", code)
+    return code
+
+
+def constats_1rtt(events: list[QuicEvent]) -> list:
+    """Issue #1045 -- constats tires des paquets 1-RTT lus avec un fichier
+    de cles : couverture du dechiffrement par point, puis chaque fermeture
+    de connexion lue dans le contenu dechiffre (code d'erreur et raison).
+    Une fermeture de code non nul est « a surveiller » (erreur signalee par
+    le pair), un code nul reste informatif (fermeture normale)."""
+    logger.debug("constats_1rtt: entrée ({} paquet(s) 1-RTT)", len(events))
+    from netcross_core.tls_diagnostics import TlsFinding
+
+    par_point: dict[str, list[QuicEvent]] = {}
+    for e in events:
+        par_point.setdefault(e.point, []).append(e)
+    constats = []
+    for point, paquets in par_point.items():
+        dechiffres = sum(1 for e in paquets if e.decryptable)
+        connexions = len({e.connexion for e in paquets})
+        if dechiffres:
+            message = (
+                f"{dechiffres}/{len(paquets)} paquet(s) QUIC 1-RTT dechiffre(s) sur {connexions} connexion(s) "
+                "(fichier de cles) -- trames applicatives visibles"
+            )
+        else:
+            message = (
+                f"aucun des {len(paquets)} paquet(s) QUIC 1-RTT dechiffre malgre le fichier de cles "
+                f"({connexions} connexion(s)) -- cles absentes pour ces connexions"
+            )
+        constats.append(TlsFinding("info", "QUIC", point, message))
+        vues: set[tuple] = set()
+        for e in paquets:
+            if not e.fermeture or (e.connexion, e.src, e.fermeture) in vues:
+                continue
+            vues.add((e.connexion, e.src, e.fermeture))
+            gravite = "info" if _code_fermeture(e.fermeture) == 0 else "a_surveiller"
+            constats.append(
+                TlsFinding(
+                    gravite,
+                    "QUIC",
+                    point,
+                    f"connexion QUIC fermee par {e.src}:{e.sport} : code {e.fermeture} (trame 1-RTT dechiffree)",
+                )
+            )
+    logger.debug("constats_1rtt: retour ({} constat(s))", len(constats))
+    return constats
+
+
 def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None):
     """Compare les ClientHello QUIC vus a chaque point (par DCID -- identifie
     la connexion QUIC de facon stable meme a travers un NAT qui changerait
@@ -495,6 +588,8 @@ def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None
     category/segment/message), comme tls_diagnostics.TlsFinding."""
     from netcross_core.tls_diagnostics import TlsFinding  # reutilise le meme type de resultat
 
+    courts = [e for e in events if e.kind == "1rtt"]
+    events = [e for e in events if e.kind != "1rtt"]
     by_dcid: dict[bytes, dict[str, QuicEvent]] = {}
     for e in events:
         by_dcid.setdefault(e.dcid, {})[e.point] = e
@@ -524,6 +619,7 @@ def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None
                 )
             )
         findings.extend(_constats_v2(events))
+        findings.extend(constats_1rtt(courts))
         logger.debug("diagnose_quic: si not points_order -> retour findings={}", summarize(findings, "findings"))
         return findings
 
@@ -570,6 +666,7 @@ def diagnose_quic(events: list[QuicEvent], points_order: list[str] | None = None
         )
 
     findings.extend(_constats_v2(events))
+    findings.extend(constats_1rtt(courts))
     logger.debug("diagnose_quic: {} constat(s)", len(findings))
     return findings
 
