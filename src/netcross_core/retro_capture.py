@@ -582,10 +582,13 @@ def appliquer_quota(archives_dir: str, quota_octets: int, conserver: str | None 
         return ()
 
     # Gels triés par numéro croissant = ordre chronologique de création.
-    gels = sorted(
-        (os.path.join(archives_dir, nom) for nom in os.listdir(archives_dir) if _GEL_RE.fullmatch(nom)),
-        key=lambda chemin: int(_GEL_RE.search(os.path.basename(chemin)).group(1)),
-    )
+    gels_avec_numero: list[tuple[int, str]] = []
+    for nom in os.listdir(archives_dir):
+        correspondance = _GEL_RE.fullmatch(nom)
+        if correspondance is not None:
+            gels_avec_numero.append((int(correspondance.group(1)), os.path.join(archives_dir, nom)))
+    gels_avec_numero.sort()
+    gels = [chemin for _numero, chemin in gels_avec_numero]
     if not gels:
         logger.debug("appliquer_quota: si aucun gel -> retour tuple vide")
         return ()
