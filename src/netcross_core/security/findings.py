@@ -108,20 +108,57 @@ def _ellipsis(text: str, limit: int) -> str:
 # -- CVE-2 : signatures d'exploits ---------------------------------------
 
 
-def scan_capture_exploits(label: str, path: str, signatures: Sequence[Signature] | None = None) -> list[Detection]:
+def scan_capture_exploits(
+    label: str, path: str, signatures: Sequence[Signature] | None = None, *, tls_keylog: str | None = None
+) -> list[Detection]:
     """Relit une capture via pcap_parser (charge utile brute, que `Pkt` ne
     garde pas) et applique les signatures d'exploits (base par defaut si
     `signatures` est None). Comme `tls_diagnostics.parse_tls_capture`,
     n'echoue pas sur une capture illisible : liste vide (le message
-    d'erreur est deja emis par pcap_parser)."""
-    raw_packets = pcap_parser.parse_capture(path, raise_on_error=False)
+    d'erreur est deja emis par pcap_parser).
+
+    tls_keylog (issue #1045) : fichier de cles TLS du point. Les signatures
+    sont alors AUSSI appliquees au contenu dechiffre par tshark
+    (`pcap_parser.decrypted.read_decrypted_tls`), avec un scanner distinct
+    (etat par flux propre au clair) ; ces detections portent
+    ``decrypted=True``. Un echec de cette seconde lecture est journalise et
+    laisse les detections sur le contenu chiffre intactes."""
     logger.debug(
-        "scan_capture_exploits: {} ({}), signatures={}",
+        "scan_capture_exploits: {} ({}), signatures={}, keylog={}",
         label,
         path,
         "défaut" if signatures is None else len(signatures),
+        bool(tls_keylog),
     )
-    return detect_exploits(raw_packets, signatures, point=label)
+    raw_packets = pcap_parser.parse_capture(path, raise_on_error=False)
+    detections = detect_exploits(raw_packets, signatures, point=label)
+    if not tls_keylog or not raw_packets:
+        logger.debug("scan_capture_exploits: retour sans contenu déchiffré ({} détection(s))", len(detections))
+        return detections
+    detections += _scan_decrypted(label, path, raw_packets, signatures, tls_keylog)
+    logger.debug("scan_capture_exploits: retour ({} détection(s))", len(detections))
+    return detections
+
+
+def _scan_decrypted(
+    label: str, path: str, raw_packets: list, signatures: Sequence[Signature] | None, tls_keylog: str
+) -> list[Detection]:
+    """Detections sur le contenu TLS dechiffre (issue #1045)."""
+    logger.debug("_scan_decrypted: entrée ({})", label)
+    from dataclasses import replace
+
+    from pcap_parser.decrypted import read_decrypted_tls
+
+    try:
+        clair = read_decrypted_tls(path, tls_keylog)
+    except (pcap_parser.TsharkError, pcap_parser.TsharkNotFoundError) as exc:
+        logger.warning("_scan_decrypted: contenu déchiffré illisible pour {} : {}", label, exc)
+        logger.debug("_scan_decrypted: retour [] (lecture déchiffrée en échec)")
+        return []
+    variantes = [replace(raw, payload=clair[raw.frame_number]) for raw in raw_packets if raw.frame_number in clair]
+    trouvees = [replace(d, decrypted=True) for d in detect_exploits(variantes, signatures, point=label)]
+    logger.debug("_scan_decrypted: retour ({} trame(s) en clair, {} détection(s))", len(variantes), len(trouvees))
+    return trouvees
 
 
 def exploit_findings(detections: Iterable[Detection]) -> list[dict[str, Any]]:
@@ -132,7 +169,7 @@ def exploit_findings(detections: Iterable[Detection]) -> list[dict[str, Any]]:
     celui de la premiere occurrence."""
     grouped: dict[tuple, dict[str, Any]] = {}
     for d in detections:
-        key = (d.signature_id, d.point, d.src, d.dst, d.dport)
+        key = (d.signature_id, d.point, d.src, d.dst, d.dport, d.decrypted)
         entry = grouped.get(key)
         if entry is None:
             cves = ", ".join(d.cves)
@@ -141,6 +178,8 @@ def exploit_findings(detections: Iterable[Detection]) -> list[dict[str, Any]]:
                 detail += f" -- {cves}"
             if d.frame_number is not None:
                 detail += f" -- trame {d.frame_number}"
+            if d.decrypted:
+                detail += " -- contenu TLS déchiffré"
             grouped[key] = {
                 "severity": EXPLOIT_SEVERITY.get(d.severity, "faible"),
                 "category": "exploit",

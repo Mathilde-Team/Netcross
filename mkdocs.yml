@@ -75,6 +75,7 @@ nav:
       - Rapport de sécurité: security-report.md
       - Export SIEM (CEF, LEEF, STIX): siem-export.md
       - Journaux Zeek conn.log: zeek-export.md
+      - Couverture du déchiffrement TLS/QUIC: couverture-dechiffrement.md
       - Notifications: notifications.md
       - Plugins: plugins.md
       - Empreintes JA4/HASSH: fingerprints-ja4-hassh.md
@@ -84,6 +85,7 @@ nav:
       - Conversion de formats: conversion-formats.md
       - Module IA local: module-ia.md
       - Rule engine: architecture-rule-engine.md
+      - Mesures actives: mesures-actives.md
   - Architecture:
       - Diagramme de classes: class-diagram.md
       - Internationalisation: i18n.md

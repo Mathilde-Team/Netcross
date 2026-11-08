@@ -11,4 +11,7 @@ le pipeline d'analyse passif. Premier sous-module (issue #1063) :
   TWAMP-Light). Fonction pure : AUCUNE emission reseau, aucun socket,
   aucun sous-processus -- l'execution relevera des sous-issues #1065
   (traceroute), #1066 (TWAMP-Light) et #1068 (CLI/API, accord explicite).
+- `twamp` (issue #1066) : client TWAMP-Light (RFC 5357 annexe I). Seul
+  module qui EMET : une socket UDP vers un reflecteur, uniquement quand
+  `twamp.mesurer` est appelee explicitement, a 10 sondes/s au plus.
 """

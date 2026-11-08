@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from loguru import logger as _loguru_logger
 
-from pcap_parser.ek_fields import as_bool, as_float, g, hex_or_dec_to_int, innermost
+from pcap_parser.ek_fields import all_occurrences, as_bool, as_float, g, hex_or_dec_to_int, innermost
 
 # pcap_parser reste independant de netcross_core (contrat import-linter) :
 # loguru directement, lie au nom du module.
@@ -485,6 +485,23 @@ def _certificate_details(tls: dict) -> dict:
     }
 
 
+def _couche_certificat(layers: dict) -> dict | None:
+    """Couche tls portant le message Certificate (issue #1045).
+
+    Une trame TLS 1.3 dechiffree (fichier de cles) porte souvent plusieurs
+    enregistrements -- EncryptedExtensions, Certificate, CertificateVerify,
+    Finished -- que tshark rend comme autant d'occurrences de la couche
+    ``tls`` : la derniere (``innermost``) est alors CertificateVerify, sans
+    certificat. On prend la derniere occurrence qui porte des dates X.509,
+    a defaut la plus interne (comportement historique).
+    """
+    logger.debug("_couche_certificat: entrée")
+    occurrences = all_occurrences(layers, "tls")
+    avec_dates = [t for t in occurrences if isinstance(t, dict) and "x509af_x509af_utcTime" in t]
+    logger.debug("_couche_certificat: retour ({} occurrence(s), {} avec certificat)", len(occurrences), len(avec_dates))
+    return avec_dates[-1] if avec_dates else innermost(layers, "tls")
+
+
 def extract_tls_certificate(layers: dict) -> dict | None:
     """
     Lit la dissection X.509 native de tshark au sein d'un message TLS
@@ -542,7 +559,7 @@ def extract_tls_certificate(layers: dict) -> dict | None:
     ou sur un TLS 1.3 dont les cles ont ete fournies a tshark
     (SSLKEYLOGFILE), cas rare pour une capture passive sur le terrain.
     """
-    tls = innermost(layers, "tls")
+    tls = _couche_certificat(layers)
     if tls is None:
         logger.debug("extract_tls_certificate: si tls is None -> retour None")
         return None
@@ -631,6 +648,97 @@ def extract_tls_handshake(layers: dict) -> dict | None:
         "server_hello": 2 in handshake_types,
         "application_data": 23 in content_types,
     }
+
+
+def extract_dechiffrement(layers: dict) -> dict | None:
+    """Issue #1043 -- ce paquet porte-t-il du TLS ou du QUIC que tshark a
+    DECHIFFRE (fichier de cles --tls-keylog ou bloc DSB pcapng) ?
+
+    - TLS : ``tls.stream`` identifie la session dans la capture ; tshark
+      n'ajoute ``tls.record.sequence_number`` qu'aux enregistrements qu'il a
+      dechiffres (TLS 1.2 comme 1.3), jamais aux enregistrements en clair
+      (ClientHello, ServerHello) ni aux enregistrements chiffres sans cle.
+    - QUIC : ``quic.connection.number`` identifie la connexion. Les paquets
+      Initial sont toujours dechiffrables (cles derivees du DCID) et ne
+      prouvent donc rien : seul un paquet 1-RTT (en-tete court,
+      ``quic.short``) dont tshark a dissequé les trames (``quic.frame_type``)
+      atteste que les secrets de session etaient disponibles. Sans cle,
+      tshark ne signale PAS d'echec : il n'expose que
+      ``quic.remaining_payload`` (verifie avec tshark 4.6.4 sur
+      tests/data/quic-1rtt.pcap).
+
+    Renvoie None si le paquet ne porte ni couche tls ni couche quic.
+    """
+    tls = innermost(layers, "tls")
+    quics = all_occurrences(layers, "quic")
+    if tls is None and not quics:
+        logger.debug("extract_dechiffrement: ni tls ni quic -> retour None")
+        return None
+    tls_stream = hex_or_dec_to_int(_premier(g(tls, "tls_tls_stream"))) if tls is not None else None
+    tls_dechiffre = tls is not None and "tls_tls_record_sequence_number" in tls
+    quic_connexion = None
+    quic_dechiffre = False
+    quic_court = False
+    quic_fermeture = None
+    for quic in quics:
+        if quic_connexion is None:
+            quic_connexion = hex_or_dec_to_int(_premier(g(quic, "quic_quic_connection_number")))
+        if _quic_1rtt_dechiffre(quic):
+            quic_dechiffre = True
+        quic_court = quic_court or (isinstance(quic, dict) and "quic_quic_short" in quic)
+        quic_fermeture = quic_fermeture or _quic_fermeture(quic)
+    logger.debug("extract_dechiffrement: retour (tls {}, quic {})", tls_dechiffre, quic_dechiffre)
+    return {
+        "tls_stream": tls_stream,
+        "tls_dechiffre": tls_dechiffre,
+        "quic_connexion": quic_connexion,
+        "quic_dechiffre": quic_dechiffre,
+        "quic_court": quic_court,
+        "quic_fermeture": quic_fermeture,
+    }
+
+
+def _quic_fermeture(quic) -> str | None:
+    """Issue #1045 -- trame CONNECTION_CLOSE lisible (dechiffree ou Initial) :
+    « applicatif 0x42 (netcross) » (type 0x1d) ou « transport 0x0a » (0x1c).
+    Seuls le code et la raison publiee par le pair sont repris."""
+    logger.debug("_quic_fermeture: entrée")
+    if not isinstance(quic, dict):
+        logger.debug("_quic_fermeture: couche invalide -> retour None")
+        return None
+    code_app = hex_or_dec_to_int(_premier(g(quic, "quic_quic_cc_error_code_app")))
+    code_transport = hex_or_dec_to_int(_premier(g(quic, "quic_quic_cc_error_code")))
+    if code_app is None and code_transport is None:
+        logger.debug("_quic_fermeture: pas de CONNECTION_CLOSE -> retour None")
+        return None
+    nature, code = ("applicatif", code_app) if code_app is not None else ("transport", code_transport)
+    raison = _premier(g(quic, "quic_quic_cc_reason_phrase"))
+    texte = f"{nature} 0x{code:x}" + (f" ({raison})" if raison else "")
+    logger.debug("_quic_fermeture: retour {}", texte)
+    return texte
+
+
+def _quic_1rtt_dechiffre(quic: dict) -> bool:
+    """Paquet QUIC 1-RTT dont tshark a dechiffre et dissequé les trames."""
+    logger.debug("_quic_1rtt_dechiffre: entrée")
+    resultat = (
+        isinstance(quic, dict)
+        and "quic_quic_short" in quic
+        and "quic_quic_frame_type" in quic
+        and "quic_quic_decryption_failed" not in quic
+    )
+    logger.debug("_quic_1rtt_dechiffre: retour {}", resultat)
+    return resultat
+
+
+def _premier(valeur):
+    """Premiere valeur d'un champ EK scalaire ou liste (enregistrements coalesces)."""
+    logger.debug("_premier: entrée")
+    if isinstance(valeur, list):
+        logger.debug("_premier: liste -> retour premier element")
+        return valeur[0] if valeur else None
+    logger.debug("_premier: retour valeur")
+    return valeur
 
 
 def compute_mos(delay_ms: float, loss_pct: float):

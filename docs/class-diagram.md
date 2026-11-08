@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-219 modules · 317 classes · 792 fonctions publiques de module.
+222 modules · 321 classes · 812 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -32,7 +32,7 @@ flowchart TD
     netcross_ai["netcross_ai"]
     netcross_core["netcross_core"]
     pcap_parser["pcap_parser"]
-    CLI -->|"25 imports"| netcross_report
+    CLI -->|"26 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
     CLI -->|"55 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
@@ -44,9 +44,9 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"55 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"46 imports"| netcross_core
+    netcross_report -->|"48 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"24 imports"| pcap_parser
+    netcross_core -->|"25 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -147,6 +147,7 @@ flowchart LR
 | `pcap_parser.capfile` | couche 1 bis : cadrage binaire minimal des fichiers pcap / pcapng. |
 | `pcap_parser.capinfos_source` | lecture du commentaire de SECTION pcapng (Section Header Block, "capture comment") d'un fichier de capture, via `capinfos -k`. |
 | `pcap_parser.capture` | couche 6 (orchestration) : point d'entree public du package. |
+| `pcap_parser.decrypted` | contenu TLS déchiffré par tshark, trame par trame (issue #1045, chantier #997). |
 | `pcap_parser.ek_fields` | couche 2 : acces bas niveau aux champs d'un paquet EK. |
 | `pcap_parser.ek_source` | couche 1 : execution de tshark -T ek et lecture du flux NDJSON qui en resulte, fichier pcap ou interface live. |
 | `pcap_parser.packet` | couche 5 : assemblage d'un RawPacket normalise a partir des couches EK d'un paquet, une fois l'encapsulation detectee (tunnels.py) et les protocoles applicatifs extraits (protocols.py). |
@@ -297,6 +298,13 @@ classDiagram
         +export_json(path_in, path_out) None
     }
 
+    %% ===== pcap_parser.decrypted =====
+    class mod_pcap_parser_decrypted["pcap_parser.decrypted"] {
+        <<module>>
+        +parse_hex_dump(lignes) dict~int, bytes~
+        +read_decrypted_tls(path, tls_keylog) dict~int, bytes~
+    }
+
     %% ===== pcap_parser.ek_fields =====
     class mod_pcap_parser_ek_fields["pcap_parser.ek_fields"] {
         <<module>>
@@ -433,6 +441,12 @@ classDiagram
         +bool? tcp_checksum_bad
         +str? udp_checksum
         +bool? udp_checksum_bad
+        +int? tls_stream
+        +bool tls_dechiffre
+        +int? quic_connexion
+        +bool quic_dechiffre
+        +bool quic_court
+        +str? quic_fermeture
     }
     class mod_pcap_parser_packet["pcap_parser.packet"] {
         <<module>>
@@ -450,6 +464,7 @@ classDiagram
         +extract_http(layers) dict?
         +extract_tls_certificate(layers) dict?
         +extract_tls_handshake(layers) dict?
+        +extract_dechiffrement(layers) dict?
         +compute_mos(delay_ms, loss_pct)
     }
 
@@ -526,6 +541,7 @@ classDiagram
 | `netcross_core.content` | Extraction des objets applicatifs HTTP/1.x sans conservation du corps. |
 | `netcross_core.correlate` | correlation des paquets entre points de capture (par 5-tuple strict ou par hash de payload en mode NAT-tolerant) et calcul du debit par fenetre temporelle. |
 | `netcross_core.dashboard` | contexte d'analyse partage pour le dashboard analytique interactif (issue #18, section 6.17). |
+| `netcross_core.dechiffrement` | ce que le déchiffrement TLS/QUIC a réellement couvert, point par point (issue #1043, chantier #997). |
 | `netcross_core.detector_inventory` | Inventaire des détecteurs et de leur besoin de vue globale (issue #1020, chantier #995). |
 | `netcross_core.empreinte` | empreinte compacte et invariante d'un paquet pour l'appariement entre points de capture (issue #1021). |
 | `netcross_core.expert_model` | objets de contrat partages entre netcross_core et netcross_report ("Session 0" de FEATURES.md section 13.3 : stabiliser les objets communs avant de batir le moteur d'expertise vise par la comparaison… |
@@ -942,6 +958,16 @@ classDiagram
         +dashboard_document(report, flows, findings, tls_findings, quic_findings, wireshark_expert_events, segment, host, protocol) dict
     }
 
+    %% ===== netcross_core.dechiffrement =====
+    class mod_netcross_core_dechiffrement["netcross_core.dechiffrement"] {
+        <<module>>
+        +compter_sessions(all_packets) dict~str, dict~str, dict~str, int~~~
+        +points_a_signaler(report) list~str~
+        +phrase(point, protocole, compte) str
+        +lignes(report) list~str~
+        +document_json(report) list~dict~
+    }
+
     %% ===== netcross_core.detector_inventory =====
     class Detecteur {
         <<dataclass, frozen>>
@@ -1121,6 +1147,7 @@ classDiagram
         +str? payload_hash
         +str evidence
         +str point
+        +bool decrypted
     }
     class netcross_core_exploit_signatures__FlowState["netcross_core.exploit_signatures._FlowState"] {
         <<dataclass, slots>>
@@ -1648,6 +1675,12 @@ classDiagram
         +bool? tcp_checksum_bad
         +str? udp_checksum
         +bool? udp_checksum_bad
+        +int? tls_stream
+        +bool tls_dechiffre
+        +int? quic_connexion
+        +bool quic_dechiffre
+        +bool quic_court
+        +str? quic_fermeture
         +str? tls_ja4
         +str? tls_ja4_readable
         +str? ssh_hassh
@@ -1824,6 +1857,8 @@ classDiagram
         +list~str~ packet_comments
         +list~dict~ capture_infos
         +dict~str, dict~ link_speeds
+        +dict~str, dict~str, dict~str, int~~~ dechiffrement
+        +list~str~ points_keylog
         +list~ChecksumError~ checksum_errors
     }
     class PacketAnnotation {
@@ -1935,12 +1970,16 @@ classDiagram
         +str? sni
         +str? tls_version
         +str quic_version
+        +str kind
+        +int? connexion
+        +str? fermeture
     }
     class mod_netcross_core_quic_diagnostics["netcross_core.quic_diagnostics"] {
         <<module>>
         +derive_initial_secrets(dcid, version) tuple~bytes, bytes~
         +derive_packet_protection_keys(secret, version) tuple~bytes, bytes, bytes~
-        +parse_quic_capture(label, path) list~QuicEvent~
+        +parse_quic_capture(label, path, tls_keylog) list~QuicEvent~
+        +constats_1rtt(events) list
         +diagnose_quic(events, points_order)
         +print_quic_diagnostics(findings) None
     }
@@ -1948,6 +1987,7 @@ classDiagram
     %% ===== netcross_core.redact =====
     class AddressRedactor {
         +pseudonymize_name(name) str
+        +pseudonymize_address(value) str
         +redact(packets) None
         +entries()
         +mapping() dict~str, str~
@@ -2136,6 +2176,7 @@ classDiagram
 |---|---|
 | `netcross_core.active` | confirmation active du diagnostic passif (chantier #999, parent #993). |
 | `netcross_core.active.planner` | planificateur « constat localise -> mesure active proposee » (issue #1063, sous-issue 1/5 du chantier #999). |
+| `netcross_core.active.twamp` | client TWAMP-Light (RFC 5357, annexe I ; issue #1066, sous-issue 3/5 du chantier #999). |
 
 ### Diagramme
 
@@ -2171,8 +2212,58 @@ classDiagram
         +plan_from_diagnoses(diagnoses, max_flows_per_event) list~ProposedMeasurement~
     }
 
+    %% ===== netcross_core.active.twamp =====
+    class TwampError {
+        <<ValueError>>
+    }
+    class Reponse {
+        <<dataclass, frozen>>
+        +int sequence
+        +float emission
+        +float reception
+        +int sequence_client
+        +float emission_client
+        +int ttl_client
+    }
+    class Sonde {
+        <<dataclass, frozen>>
+        +int sequence
+        +float envoi
+        +float? retour_recu
+        +Reponse? reponse
+        +perdue() bool
+        +aller_retour() float?
+        +aller() float?
+        +retour() float?
+    }
+    class ResultatTwamp {
+        <<dataclass>>
+        +str cible
+        +int port
+        +str debut
+        +bool reflecteur_present
+        +str message
+        +list~Sonde~ sondes
+        +envoyees() int
+        +recues() int
+        +statistiques() dict~str, float or int or None~
+        +to_dict() dict
+    }
+    class mod_netcross_core_active_twamp["netcross_core.active.twamp"] {
+        <<module>>
+        +vers_ntp(instant) int
+        +depuis_ntp(valeur) float
+        +construire_sonde(sequence, instant, taille) bytes
+        +lire_reponse(paquet) Reponse
+        +construire_reponse(sonde, sequence, reception, emission, ttl) bytes
+        +mesurer(cible, port, nombre, intervalle, timeout, horloge, attente) ResultatTwamp
+        +cible_de_proposition(proposition, reflecteur) tuple~str, int~
+    }
+
     %% ===== relations =====
     ProposedMeasurement --> FiveTuple : five_tuple
+    Sonde --> Reponse : reponse
+    ResultatTwamp --> Sonde : sondes
 ```
 
 ## `netcross_core.application`
@@ -3165,7 +3256,7 @@ classDiagram
     %% ===== netcross_core.security.findings =====
     class mod_netcross_core_security_findings["netcross_core.security.findings"] {
         <<module>>
-        +scan_capture_exploits(label, path, signatures) list~Detection~
+        +scan_capture_exploits(label, path, signatures, tls_keylog) list~Detection~
         +exploit_findings(detections) list~dict~str, Any~~
         +anomaly_findings(suspicions) list~dict~str, Any~~
         +dns_tunnel_findings(suspicions) list~dict~str, Any~~
@@ -4096,6 +4187,10 @@ classDiagram
         +series_upper_bound(n_points, n_segments) int
         +segment_label(a, b) str
         +collect_samples(r, run, findings, max_points, max_segments) list~Sample~
+        +render_prometheus_text(samples, comment) str
+        +render_openmetrics(samples) str
+        +write_prom_file(texte, path) str
+        +redact_samples(samples, redactor) list~Sample~
     }
 
     %% ===== netcross_report.path_metrics =====
@@ -4900,7 +4995,7 @@ classDiagram
         +load_packets(captures, parallel, on_progress, max_workers, tls_keylog) list
         +run_analysis_pipeline(captures, options, on_progress) AnalysisResult
         +expand_split_interfaces(captures, workdir, log) list~tuple~str, str~~
-        +run_security_analysis(report, all_packets, captures, log, known_destinations, known_hosts, test_net_external, cve_db, plugins)
+        +run_security_analysis(report, all_packets, captures, log, known_destinations, known_hosts, test_net_external, cve_db, plugins, tls_keylog)
     }
 
     %% ===== netcross_gtk4.annotations_panel =====

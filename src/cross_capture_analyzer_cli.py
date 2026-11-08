@@ -184,6 +184,13 @@ from netcross_core.tls_keylog import (
     verifier_compatibilite,
 )
 from netcross_report.comm_map import build_comm_map, write_comm_map
+from netcross_report.metrics_export import (
+    collect_samples,
+    redact_samples,
+    render_openmetrics,
+    render_prometheus_text,
+    write_prom_file,
+)
 from netcross_report.security_report import build_security_report, print_security_report
 from netcross_report.zeek_export import ZEEK_FORMATS, build_conn_records, write_zeek_conn
 from pcap_parser.capture import split_by_interface
@@ -1329,6 +1336,23 @@ def _check_extraction_args(args) -> tuple[str, ...]:
     return kinds
 
 
+def _write_metrics_files(args, r, findings, redactor) -> None:
+    """--prom-file / --openmetrics-file (issue #1112) : series du catalogue
+    (#1110), etiquettes anonymisees avec --redact."""
+    logger.debug("_write_metrics_files: entrée")
+    samples = collect_samples(r, args.metrics_run, findings=findings)
+    if redactor is not None:
+        samples = redact_samples(samples, redactor)
+    commentaire = "adresses IP/MAC anonymisees (--redact)" if redactor is not None else None
+    if args.prom_file:
+        write_prom_file(render_prometheus_text(samples, comment=commentaire), args.prom_file)
+        print(f"\nMetriques Prometheus ({len(samples)} serie(s)) ecrites dans {args.prom_file}")
+    if args.openmetrics_file:
+        write_prom_file(render_openmetrics(samples), args.openmetrics_file)
+        print(f"\nMetriques OpenMetrics ({len(samples)} serie(s)) ecrites dans {args.openmetrics_file}")
+    logger.debug("_write_metrics_files: retour None")
+
+
 def _run_content_extraction(captures, out_dir, kinds) -> None:
     """Analyse qualitative / extraction des contenus (issue #278)."""
     logger.debug("_run_content_extraction: entrée")
@@ -2032,6 +2056,24 @@ def main():
         help="Format de --zeek-conn : `tsv` (defaut, en-tetes #fields/#types, lisible par zeek-cut) ou "
         "`json` (un objet par ligne, comme LogAscii::use_json).",
     )
+    ap.add_argument(
+        "--prom-file",
+        metavar="FICHIER",
+        help="Ecrit les metriques de l'analyse au format texte Prometheus (issue #1112), pour le textfile "
+        "collector de node_exporter (fichier en .prom, ecriture atomique). Respecte --redact. "
+        "Voir docs/metriques-prometheus.md.",
+    )
+    ap.add_argument(
+        "--openmetrics-file",
+        metavar="FICHIER",
+        help="Ecrit les memes metriques au format OpenMetrics 1.0 (# UNIT, # EOF). Respecte --redact.",
+    )
+    ap.add_argument(
+        "--metrics-run",
+        metavar="ID",
+        default="netcross",
+        help="Valeur de l'etiquette `run` de --prom-file/--openmetrics-file (defaut : netcross).",
+    )
     plug = ap.add_argument_group(
         "plugins (issue #284)",
         "Detecteurs et sorties tierces. Chargement EXPLICITE : un plugin installe n'est execute que "
@@ -2708,6 +2750,8 @@ def main():
                 ("--forensic-search", args.forensic_search),
                 ("--detail-csv", args.detail_csv),
                 ("--zeek-conn", args.zeek_conn),
+                ("--prom-file", args.prom_file),
+                ("--openmetrics-file", args.openmetrics_file),
                 ("--history-db", args.history_db),
                 ("--client-group", args.client_group),
                 ("--redact", args.redact),
@@ -2752,6 +2796,8 @@ def main():
                 ("--forensic-search", args.forensic_search),
                 ("--detail-csv", args.detail_csv),
                 ("--zeek-conn", args.zeek_conn),
+                ("--prom-file", args.prom_file),
+                ("--openmetrics-file", args.openmetrics_file),
                 ("--history-db", args.history_db),
                 ("--client-group", args.client_group),
                 ("--redact", args.redact),
@@ -2861,6 +2907,8 @@ def main():
                 ("--forensic-search", args.forensic_search),
                 ("--detail-csv", args.detail_csv),
                 ("--zeek-conn", args.zeek_conn),
+                ("--prom-file", args.prom_file),
+                ("--openmetrics-file", args.openmetrics_file),
                 ("--history-db", args.history_db),
                 ("--client-group", args.client_group),
                 ("--redact", args.redact),
@@ -3189,10 +3237,11 @@ def main():
     security_detections = []
     if args.security_report:
         for label, path in captures:
-            detections = security_findings.scan_capture_exploits(label, path)
+            detections = security_findings.scan_capture_exploits(label, path, **options_lecture(tls_keylogs, label))
             print(f"[{label}] {len(detections)} signature(s) d'exploit detectee(s) dans {path}")
             security_detections.extend(detections)
 
+    redactor = None
     if args.redact:
         redactor = redact_packets(all_packets)
         print(f"\n{len(redactor)} adresse(s) anonymisee(s) (IP/MAC) avant analyse.")
@@ -3260,6 +3309,7 @@ def main():
     if captures:
         r.capture_comments = read_capture_comments(captures)
         r.capture_infos = read_capture_infos(captures)
+        r.points_keylog = sorted(tls_keylogs)
         from netcross_core.link_speed import resolve_link_speeds
 
         r.link_speeds = resolve_link_speeds(captures, link_speed_overrides)
@@ -3446,8 +3496,8 @@ def main():
             sys.exit(1)
         quic_events = []
         for label, path in captures:
-            events = parse_quic_capture(label, path)
-            print(f"[{label}] {len(events)} paquets QUIC Initial trouves dans {path}")
+            events = parse_quic_capture(label, path, **options_lecture(tls_keylogs, label))
+            print(f"[{label}] {len(events)} paquets QUIC trouves dans {path}")
             quic_events.extend(events)
         quic_findings = diagnose_quic(quic_events, r.points)
         print_quic_diagnostics(quic_findings)
@@ -3465,6 +3515,8 @@ def main():
         zeek_records = build_conn_records(all_packets, r.points, points_order)
         write_zeek_conn(zeek_records, args.zeek_conn, args.zeek_format)
         print(f"\nJournal Zeek conn.log ({args.zeek_format}, {len(zeek_records)} ligne(s)) ecrit dans {args.zeek_conn}")
+    if args.prom_file or args.openmetrics_file:
+        _write_metrics_files(args, r, findings, redactor)
     if args.dashboard:
         import json as _json
 

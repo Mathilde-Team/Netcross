@@ -40,6 +40,9 @@ dev = [
     # tiree par pre-commit, declaree ici pour ne pas dependre d'une dependance
     # transitive
     "pyyaml>=6.0",
+    # validation du texte Prometheus / OpenMetrics dans les tests (issue #1112) :
+    # parseurs de reference du client officiel, a la place de promtool
+    "prometheus-client>=0.20",
 ]
 # API REST (issue #209) : jamais obligatoire pour le cœur ou les rapports.
 # Installé avec : pip install -e ".[api]" ou uv sync --extra api

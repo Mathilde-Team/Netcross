@@ -61,6 +61,34 @@ capture compte 50 ou 5 000 flux. Au-delà de 32 points ou de 64 segments
 (paramètres `max_points` et `max_segments`), le surplus est regroupé sous
 l'étiquette `"_autres"`, ce qui garde la borne.
 
+## Fichier `.prom` et OpenMetrics
+
+Depuis #1112, l'analyse écrit ces séries en texte, sans serveur :
+
+```bash
+netcross --capture LAN=lan.pcap --capture WAN=wan.pcap \
+    --prom-file /var/lib/node_exporter/textfile/netcross.prom \
+    --openmetrics-file netcross.om --metrics-run nuit-du-08
+```
+
+- `--prom-file FICHIER` : format texte Prometheus 0.0.4, celui du *textfile
+  collector* de node_exporter (`--collector.textfile.directory`). Le fichier
+  est écrit de façon atomique (fichier temporaire du même dossier, puis
+  renommage) : node_exporter ne lit jamais un fichier incomplet. Il passe
+  `promtool check metrics`.
+- `--openmetrics-file FICHIER` : mêmes séries en OpenMetrics 1.0 : famille de
+  compteur sans `_total`, `# UNIT` quand le nom finit par l'unité, `# EOF`
+  final.
+- `--metrics-run ID` : valeur de l'étiquette `run` (par défaut `netcross`).
+- Avec `--redact`, toute adresse IP ou MAC présente dans une valeur
+  d'étiquette (point nommé d'après son adresse, identifiant de run) est
+  remplacée par le même pseudonyme que dans les paquets et `--redact-map`.
+  Le fichier `.prom` commence alors par le commentaire
+  `# adresses IP/MAC anonymisees (--redact)`.
+
+Les tests valident les deux sorties avec les parseurs de référence de
+`prometheus_client` (dépendance de développement), faute de `promtool` en CI.
+
 ## Limites
 
 - Le catalogue ne couvre que les grandeurs disponibles dans le rapport. Les
