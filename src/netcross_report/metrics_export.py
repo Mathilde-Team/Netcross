@@ -26,11 +26,31 @@ capture et de segments, jamais du volume de trafic (voir
 ``series_upper_bound``). Les points au-dela de ``max_points`` sont
 regroupes sous ``point="_autres"`` (idem pour les segments) afin de garder
 la borne meme si l'appelant fournit un nombre anormal de points.
+
+Exposition texte (issue #1112, sous-issue 2/5) :
+
+- ``render_prometheus_text()`` : format texte Prometheus 0.0.4, celui que lit
+  le *textfile collector* de node_exporter et que valide
+  ``promtool check metrics`` ; ``write_prom_file()`` l'ecrit de facon
+  atomique (fichier temporaire du meme dossier puis ``os.replace``) pour que
+  node_exporter ne lise jamais un fichier a moitie ecrit ;
+- ``render_openmetrics()`` : OpenMetrics 1.0 (``# UNIT``, famille sans
+  ``_total``, ``# EOF`` final), pour la route ``/metrics`` (#1113) ;
+- ``redact_samples()`` : avec ``--redact``, toute adresse IP ou MAC presente
+  dans une valeur d'etiquette (point de capture nomme d'apres son adresse,
+  identifiant de run) est remplacee par le pseudonyme du run (meme table que
+  les paquets et ``--redact-map``). Les series elles-memes ne portent
+  jamais d'adresse (voir ci-dessus).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import contextlib
+import math
+import os
+import re
+import tempfile
+from dataclasses import dataclass, replace
 
 from netcross_core.logging_config import get_logger
 
@@ -255,3 +275,163 @@ def collect_samples(
 
     logger.debug("collect_samples: retour {} serie(s)", len(out))
     return out
+
+
+# -- exposition texte (issue #1112) ------------------------------------------------------
+
+
+def _family(sample_name: str) -> MetricSpec | None:
+    """Metrique du catalogue a laquelle appartient une serie (``_count`` et
+    ``_sum`` d'un resume compris)."""
+    logger.debug("_family: entrée ({})", sample_name)
+    spec = METRICS_BY_NAME.get(sample_name)
+    if spec is None:
+        for suffixe in ("_count", "_sum"):
+            if sample_name.endswith(suffixe):
+                spec = METRICS_BY_NAME.get(sample_name[: -len(suffixe)])
+                break
+    logger.debug("_family: retour {}", spec.name if spec else None)
+    return spec
+
+
+def _escape_help(texte: str) -> str:
+    """Echappement d'une ligne ``# HELP`` (barre oblique inverse et saut de ligne)."""
+    logger.debug("_escape_help: retour str")
+    return texte.replace("\\", "\\\\").replace("\n", "\\n")
+
+
+def _escape_label(valeur: str) -> str:
+    """Echappement d'une valeur d'etiquette (``\\``, ``"`` et saut de ligne)."""
+    logger.debug("_escape_label: retour str")
+    return valeur.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+
+def _format_value(valeur: float) -> str:
+    """Valeur d'une serie : entier sans decimale, ``NaN``, ``+Inf``/``-Inf``,
+    sinon la representation exacte la plus courte (``repr``)."""
+    logger.debug("_format_value: entrée")
+    if math.isnan(valeur):
+        logger.debug("_format_value: si NaN -> retour NaN")
+        return "NaN"
+    if math.isinf(valeur):
+        logger.debug("_format_value: si infini -> retour Inf signe")
+        return "+Inf" if valeur > 0 else "-Inf"
+    if valeur.is_integer() and abs(valeur) < 1e15:
+        logger.debug("_format_value: si entier -> retour sans decimale")
+        return str(int(valeur))
+    logger.debug("_format_value: retour repr")
+    return repr(valeur)
+
+
+def _sample_line(sample: Sample) -> str:
+    """Ligne ``nom{etiquettes} valeur`` d'une serie."""
+    logger.debug("_sample_line: entrée ({})", sample.name)
+    etiquettes = ",".join(f'{k}="{_escape_label(v)}"' for k, v in sample.labels)
+    nom = f"{sample.name}{{{etiquettes}}}" if etiquettes else sample.name
+    ligne = f"{nom} {_format_value(sample.value)}"
+    logger.debug("_sample_line: retour str")
+    return ligne
+
+
+def _grouped(samples) -> list[tuple[MetricSpec, list[Sample]]]:
+    """Series regroupees par metrique, dans l'ordre de ``METRICS`` (une
+    famille ne doit apparaitre qu'une fois dans le texte). Une serie hors
+    catalogue est refusee : aucun nom ne s'invente a l'exposition."""
+    logger.debug("_grouped: entrée")
+    par_famille: dict[str, list[Sample]] = {}
+    for sample in samples:
+        spec = _family(sample.name)
+        if spec is None:
+            logger.debug("_grouped: serie hors catalogue -> ValueError")
+            raise ValueError(f"serie hors catalogue : {sample.name}")
+        par_famille.setdefault(spec.name, []).append(sample)
+    groupes = [(m, par_famille[m.name]) for m in METRICS if m.name in par_famille]
+    logger.debug("_grouped: retour {} famille(s)", len(groupes))
+    return groupes
+
+
+def render_prometheus_text(samples, comment: str | None = None) -> str:
+    """Texte Prometheus 0.0.4 (textfile collector de node_exporter, promtool).
+
+    ``# HELP`` et ``# TYPE`` precedent chaque famille ; un compteur garde son
+    nom complet en ``_total``. ``comment`` (une ligne, facultatif) est ecrit
+    en tete comme commentaire, par exemple pour signaler ``--redact``.
+    """
+    logger.debug("render_prometheus_text: entrée")
+    lignes = []
+    if comment:
+        lignes.append("# " + " ".join(comment.split()))
+    for spec, series in _grouped(samples):
+        lignes.append(f"# HELP {spec.name} {_escape_help(spec.help)}")
+        lignes.append(f"# TYPE {spec.name} {spec.type}")
+        lignes.extend(_sample_line(s) for s in series)
+    texte = "\n".join(lignes) + "\n"
+    logger.debug("render_prometheus_text: retour {} ligne(s)", len(lignes))
+    return texte
+
+
+def render_openmetrics(samples) -> str:
+    """Texte OpenMetrics 1.0 : famille sans ``_total`` pour un compteur,
+    ``# UNIT`` quand le nom se termine par l'unite, ``# EOF`` final."""
+    logger.debug("render_openmetrics: entrée")
+    lignes = []
+    for spec, series in _grouped(samples):
+        famille = spec.name.removesuffix("_total") if spec.type == COUNTER else spec.name
+        lignes.append(f"# TYPE {famille} {spec.type}")
+        if spec.unit and famille.endswith("_" + spec.unit):
+            lignes.append(f"# UNIT {famille} {spec.unit}")
+        lignes.append(f"# HELP {famille} {_escape_help(spec.help)}")
+        lignes.extend(_sample_line(s) for s in series)
+    lignes.append("# EOF")
+    logger.debug("render_openmetrics: retour {} ligne(s)", len(lignes))
+    return "\n".join(lignes) + "\n"
+
+
+def write_prom_file(texte: str, path) -> str:
+    """Ecrit ``texte`` dans ``path`` de facon atomique : fichier temporaire du
+    meme dossier puis ``os.replace``. node_exporter ignore les fichiers qui
+    ne finissent pas par ``.prom`` : le temporaire n'est donc jamais lu, et
+    le fichier final est toujours complet."""
+    logger.debug("write_prom_file: entrée")
+    chemin = os.fspath(path)
+    dossier = os.path.dirname(os.path.abspath(chemin))
+    fd, temporaire = tempfile.mkstemp(prefix=".netcross-", suffix=".tmp", dir=dossier)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(texte)
+        os.chmod(temporaire, 0o644)
+        os.replace(temporaire, chemin)
+    except OSError as exc:
+        logger.debug("write_prom_file: echec d'ecriture ({}) -> suppression du temporaire", exc)
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(temporaire)
+        logger.debug("write_prom_file: levee propagee")
+        raise
+    logger.debug("write_prom_file: retour chemin")
+    return chemin
+
+
+_ADRESSE = re.compile(
+    r"(?<![0-9A-Za-z:.])(?:"
+    r"(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}"  # MAC
+    r"|(?:\d{1,3}\.){3}\d{1,3}"  # IPv4
+    r"|[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,7}"  # IPv6
+    r")(?![0-9A-Za-z:.])"
+)
+
+
+def redact_samples(samples, redactor) -> list[Sample]:
+    """Series dont les valeurs d'etiquette ne contiennent plus aucune
+    adresse IP ou MAC reelle : chacune est remplacee par son pseudonyme dans
+    ``redactor`` (``netcross_core.redact.AddressRedactor`` du run, donc meme
+    pseudonyme que dans les paquets et ``--redact-map``)."""
+    logger.debug("redact_samples: entrée")
+
+    def anonymiser(valeur: str) -> str:
+        resultat = _ADRESSE.sub(lambda m: redactor.pseudonymize_address(m.group(0)), valeur)
+        logger.debug("redact_samples.anonymiser: retour str")
+        return resultat
+
+    sortie = [replace(s, labels=tuple((k, anonymiser(v)) for k, v in s.labels)) for s in samples]
+    logger.debug("redact_samples: retour {} serie(s)", len(sortie))
+    return sortie
