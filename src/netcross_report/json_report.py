@@ -322,6 +322,25 @@ def build_json_report_document(
         "generated_at": _now_iso(),
         "points": list(r.points),
         "pairs": [list(p) for p in r.pairs],
+        # Issue #996 : estimation d'horloge par paire -- decalage a t0,
+        # derive (ppm), intervalles 95 %, echantillons et methode ; les
+        # latences du rapport sont DEJA corrigees (par paquet), ces
+        # valeurs permettent d'auditer la correction.
+        "clock_offsets": [
+            {
+                "pair": [a, b],
+                "offset_ms": est.decalage_ms,
+                "t0": est.t0,
+                "drift_ppm": est.derive_ppm,
+                "ci_offset_ms": est.ic_decalage_ms,
+                "ci_drift_ppm": est.ic_derive_ppm,
+                "samples": est.n_echantillons,
+                "kept": est.n_conserves,
+                "method": est.methode,
+                "forced": est.manuel,
+            }
+            for (a, b), est in r.clock_offset_estimate.items()
+        ],
         "meta": dict(meta) if meta else {},
         "findings": [_finding_dict(f) for f in findings],
         "triage": [_segment_score_dict(s) for s in ranked],

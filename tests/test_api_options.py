@@ -87,6 +87,7 @@ def test_options_par_defaut_enregistrees():
         "history": False,
         "history_label": None,
         "plugins": (),
+        "tls_keylogs": [],
     }
 
 
