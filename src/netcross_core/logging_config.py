@@ -48,6 +48,16 @@ bibliothèques). ``configure_logging`` le réactive avec
 ce module (dépendance ``netcross_core`` -> ``pcap_parser``, conforme au
 contrat de couches) : son ``disable`` s'exécute donc toujours AVANT le
 premier ``enable``, quel que soit l'ordre des imports de l'appelant.
+
+Amorçage du journal (issue #954)
+--------------------------------
+
+Ce module reste lui aussi silencieux jusqu'à l'installation des handlers
+choisis par ``configure_logging``. Ses traces préalables ne passent donc
+pas par le handler DEBUG par défaut de loguru et ne sont pas conservées.
+Seul son espace de noms est désactivé : importer le module ne retire ni
+ne masque les handlers de l'appelant. Après configuration, les entrées et
+sorties suivent le niveau demandé, y compris lors d'une reconfiguration.
 """
 
 from __future__ import annotations
@@ -65,6 +75,11 @@ from loguru import logger as _logger
 # tout appel à configure_logging -- sinon un import de pcap_parser postérieur
 # annulerait le logger.enable("pcap_parser") ci-dessous.
 import pcap_parser  # noqa: F401
+
+# Comme pcap_parser, ce module ne journalise qu'une fois l'application
+# configurée. Ne pas retirer les handlers globaux à l'import : ils peuvent
+# appartenir à l'appelant, qui n'a pas encore demandé notre configuration.
+_logger.disable(__name__)
 
 DEBUG_LEVELS = frozenset({"TRACE", "DEBUG"})
 DEFAULT_LEVEL = "INFO"
@@ -92,6 +107,7 @@ _HANDLER_IDS: list[int] = []
 
 def level_from_env() -> str:
     """Niveau demandé par l'environnement (``NETCROSS_LOG_LEVEL`` puis ``NETCROSS_DEBUG``)."""
+    _logger.debug("level_from_env: entrée")
     level = os.environ.get("NETCROSS_LOG_LEVEL", "").strip()
     if level:
         _logger.debug("level_from_env: NETCROSS_LOG_LEVEL défini -> retour {}", level.upper())
@@ -105,6 +121,7 @@ def level_from_env() -> str:
 
 def is_debug_level(level: str) -> bool:
     """Vrai si ``level`` active le mode debug (``DEBUG`` ou ``TRACE``)."""
+    _logger.debug("is_debug_level: entrée")
     result = level.strip().upper() in DEBUG_LEVELS
     _logger.debug("is_debug_level: niveau={} -> retour {}", level, result)
     return result
@@ -118,6 +135,7 @@ def configure_logging(level: str | None = None, *, log_file: str | None = None, 
     configuration déjà posée (utilisé par ``enable_debug`` après lecture
     des options de la ligne de commande).
     """
+    _logger.debug("configure_logging: entrée")
     global _CONFIGURED, _LEVEL
     if _CONFIGURED and not force:
         _logger.debug("configure_logging: déjà configuré (force=False) -> retour")
@@ -167,6 +185,7 @@ def configure_logging(level: str | None = None, *, log_file: str | None = None, 
         )
     _CONFIGURED = True
     _LEVEL = requested
+    _logger.enable(__name__)
 
     if niveau_inconnu:
         _logger.warning("niveau de log inconnu {!r}, repli sur {}", requested_invalide, DEFAULT_LEVEL)
@@ -181,12 +200,14 @@ def configure_logging(level: str | None = None, *, log_file: str | None = None, 
 
 def enable_debug(level: str = "DEBUG", *, log_file: str | None = None) -> None:
     """Active le mode debug à chaud (option ``--debug`` d'une CLI ou de la GUI)."""
+    _logger.debug("enable_debug: entrée")
     configure_logging(level, log_file=log_file, force=True)
     _logger.debug("enable_debug: fin (level={}, log_file={})", level, log_file or "aucun")
 
 
 def current_level() -> str:
     """Niveau effectivement configuré."""
+    _logger.debug("current_level: entrée")
     if not _CONFIGURED:
         configure_logging()
     _logger.debug("current_level: retour {}", _LEVEL)
@@ -195,6 +216,7 @@ def current_level() -> str:
 
 def is_debug_enabled() -> bool:
     """Vrai si le mode debug est actif."""
+    _logger.debug("is_debug_enabled: entrée")
     result = is_debug_level(current_level())
     _logger.debug("is_debug_enabled: retour {}", result)
     return result
@@ -202,6 +224,7 @@ def is_debug_enabled() -> bool:
 
 def add_debug_argument(parser) -> None:
     """Ajoute l'option ``--debug`` commune à un ``argparse.ArgumentParser``."""
+    _logger.debug("add_debug_argument: entrée")
     parser.add_argument(
         DEBUG_FLAG,
         action="store_true",
@@ -213,6 +236,7 @@ def add_debug_argument(parser) -> None:
 
 def apply_debug_argument(args) -> None:
     """Active le mode debug si ``args.debug`` est vrai (après ``parse_args``)."""
+    _logger.debug("apply_debug_argument: entrée")
     if getattr(args, "debug", False):
         enable_debug()
     _logger.debug("apply_debug_argument: fin (args.debug={})", getattr(args, "debug", False))
@@ -220,6 +244,7 @@ def apply_debug_argument(args) -> None:
 
 def get_logger(name: str):
     """Retourne un logger loguru configuré pour le module ``name``."""
+    _logger.debug("get_logger: entrée")
     if not _CONFIGURED:
         configure_logging()
     _logger.debug("get_logger: retour logger lié à {}", name)
