@@ -61,6 +61,7 @@ def _calls_logger(node: ast.AST) -> bool:
 
 
 def _called_name(func: ast.expr) -> str | None:
+    logger.debug("_called_name: entrée")
     if isinstance(func, ast.Name):
         logger.debug("_called_name: si isinstance(func, ast.Name) -> retour func.id")
         return func.id
@@ -76,6 +77,7 @@ class _Usage(ast.NodeVisitor):
     et le graphe « fonction -> noms appelés »."""
 
     def __init__(self) -> None:
+        logger.debug("__init__: entrée")
         self.in_loop: set[str] = set()
         self.referenced: set[str] = set()
         self.calls: dict[str, set[str]] = {}
@@ -84,6 +86,7 @@ class _Usage(ast.NodeVisitor):
         logger.debug("_Usage.__init__: fin")
 
     def _visit_loop(self, node: ast.AST) -> None:
+        logger.debug("_visit_loop: entrée")
         self._loop_depth += 1
         self.generic_visit(node)
         self._loop_depth -= 1
@@ -93,6 +96,7 @@ class _Usage(ast.NodeVisitor):
         """Boucle chaude seulement si elle parcourt des unites fines (paquets,
         enregistrements, lignes, flux...) -- une boucle sur quelques
         captures ou points de capture reste froide."""
+        logger.debug("_visit_iter: entrée")
         if any(_HOT_ITER_RE.search(ast.unparse(it)) for it in iters):
             self._visit_loop(node)
         else:
@@ -118,6 +122,7 @@ class _Usage(ast.NodeVisitor):
     visit_ListComp = visit_SetComp = visit_DictComp = visit_GeneratorExp = _visit_comp  # noqa: N815
 
     def _visit_func(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        logger.debug("_visit_func: entrée")
         self._func.append(node.name)
         depth, self._loop_depth = self._loop_depth, 0
         self.calls.setdefault(node.name, set())
@@ -135,6 +140,7 @@ class _Usage(ast.NodeVisitor):
         logger.debug("_Usage.visit_Lambda: fin")
 
     def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+        logger.debug("visit_Call: entrée")
         name = _called_name(node.func)
         if name:
             if self._loop_depth:
@@ -154,6 +160,7 @@ class _Usage(ast.NodeVisitor):
     def _reference(self, name: str, ctx: ast.expr_context) -> None:
         # toute reference non appelee (rappel, valeur de dict de dispatch,
         # clé de tri, gestionnaire de signal...) : potentiellement chaude
+        logger.debug("_reference: entrée")
         if isinstance(ctx, ast.Load):
             self.referenced.add(name)
         logger.debug("_Usage._reference: fin")
@@ -170,6 +177,7 @@ class _Usage(ast.NodeVisitor):
 
 
 def _parse_or_empty(path: Path) -> ast.Module:
+    logger.debug("_parse_or_empty: entrée")
     try:
         logger.debug("_parse_or_empty: retour ast.parse(…)")
         return ast.parse(path.read_text(encoding="utf-8"))
@@ -181,6 +189,7 @@ def _parse_or_empty(path: Path) -> ast.Module:
 
 
 def hot_names(src: Path = SRC) -> set[str]:
+    logger.debug("hot_names: entrée")
     usage = _Usage()
     for path in src.rglob("*.py"):
         usage.visit(_parse_or_empty(path))
@@ -197,6 +206,7 @@ def hot_names(src: Path = SRC) -> set[str]:
 
 
 def _params(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
+    logger.debug("_params: entrée")
     a = fn.args
     names = [p.arg for p in (*a.posonlyargs, *a.args, *a.kwonlyargs)]
     if a.vararg:
@@ -208,6 +218,7 @@ def _params(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
 
 
 def _is_excluded(fn: ast.FunctionDef | ast.AsyncFunctionDef, hot: set[str]) -> str | None:
+    logger.debug("_is_excluded: entrée")
     if fn.name.startswith("__") and fn.name.endswith("__") and fn.name != "__init__":
         logger.debug(
             "_is_excluded: si fn.name.startswith('__') and fn.name.endswith('__') and (fn… -> retour 'méthode spécial…"
@@ -232,6 +243,7 @@ def _is_excluded(fn: ast.FunctionDef | ast.AsyncFunctionDef, hot: set[str]) -> s
 
 
 def _body_start(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.stmt | None:
+    logger.debug("_body_start: entrée")
     body = fn.body
     first = body[0]
     if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
@@ -244,6 +256,7 @@ def _body_start(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.stmt | None:
 
 
 def _raises(fn: ast.AST) -> list[ast.Raise]:
+    logger.debug("_raises: entrée")
     found: list[ast.Raise] = []
 
     def walk(node: ast.AST) -> None:
@@ -261,6 +274,7 @@ def _raises(fn: ast.AST) -> list[ast.Raise]:
 
 
 def _exc_name(node: ast.Raise) -> str:
+    logger.debug("_exc_name: entrée")
     exc = node.exc
     if isinstance(exc, ast.Call):
         exc = exc.func
@@ -271,6 +285,7 @@ def _exc_name(node: ast.Raise) -> str:
 def _split_message(msg: str, width: int = 90) -> list[str]:
     """Coupe un message long en litteraux concatenes (un espace en fin de
     morceau), pour tenir dans la limite de 120 colonnes."""
+    logger.debug("_split_message: entrée")
     chunks: list[str] = []
     current = ""
     for word in msg.split(" "):
@@ -292,6 +307,7 @@ def _qualname(stack: list[str], name: str) -> str:
 def instrument_source(
     text: str, hot: set[str], force: frozenset[str] = frozenset()
 ) -> tuple[str, list[str], list[str]]:
+    logger.debug("instrument_source: entrée")
     tree = ast.parse(text)
     lines = text.splitlines(keepends=True)
     if not any(
@@ -311,6 +327,7 @@ def instrument_source(
     skipped: list[str] = []
 
     def visit(node: ast.AST, stack: list[str], nested: bool) -> None:
+        logger.debug("visit: entrée")
         for child in ast.iter_child_nodes(node):
             if isinstance(child, ast.ClassDef):
                 visit(child, [*stack, child.name], nested)
@@ -320,6 +337,7 @@ def instrument_source(
         logger.debug("instrument_source.visit: fin")
 
     def handle(fn: ast.FunctionDef | ast.AsyncFunctionDef, stack: list[str], nested: bool) -> None:
+        logger.debug("handle: entrée")
         if (fn.end_lineno or fn.lineno) - fn.lineno <= TRIVIAL_LINES or _calls_logger(fn):
             logger.debug(
                 "instrument_source.handle: si (fn.end_lineno or fn.lineno) - fn.lineno <= TRIVIAL_LINES o… -> retour"
@@ -368,6 +386,7 @@ def instrument_source(
         logger.debug("instrument_source.handle: fin")
 
     def _raise_logs(fn: ast.AST, qual: str, level: str) -> list[tuple[int, str]]:
+        logger.debug("_raise_logs: entrée")
         out: list[tuple[int, str]] = []
         for r in _raises(fn):
             r_line = lines[r.lineno - 1]
@@ -393,6 +412,7 @@ def instrument_source(
 
 
 def _add_import(text: str) -> str:
+    logger.debug("_add_import: entrée")
     tree = ast.parse(text)
     last = None
     for node in tree.body:
@@ -408,6 +428,7 @@ def _add_import(text: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("files", nargs="+", type=Path)
     parser.add_argument("--dry-run", action="store_true")

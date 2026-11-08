@@ -66,6 +66,7 @@ class RegleInvalideError(ValueError):
 def charger_regle(chemin: Path) -> dict:
     """Lit le fichier de regle et controle les champs dont depend la
     verification (le reste est transmis tel quel a l'API)."""
+    logger.debug("charger_regle: entrée")
     try:
         regle = json.loads(chemin.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -120,6 +121,7 @@ def _branches_couvertes(filtre: object, branche: str) -> bool:
     branches ; avec un filtre, seul un nom exact est reconnu (les motifs
     glob ne sont pas utilises dans ce depot, et les accepter sans les
     evaluer risquerait un faux positif)."""
+    logger.debug("_branches_couvertes: entrée")
     if not isinstance(filtre, dict):
         logger.debug("_branches_couvertes: si not isinstance(filtre, dict) -> retour True")
         return True
@@ -134,6 +136,7 @@ def _branches_couvertes(filtre: object, branche: str) -> bool:
 
 
 def tourne_sur_pr(workflow: dict, branche: str) -> bool:
+    logger.debug("tourne_sur_pr: entrée")
     on = _declencheurs(workflow)
     if on == "pull_request":
         logger.debug("tourne_sur_pr: si on == 'pull_request' -> retour True")
@@ -153,6 +156,7 @@ def jobs_de_pr(workflows: Iterable[dict], branche: str) -> set[str]:
     executes sur une pull_request vers ``branche``. Un job conditionne par
     ``if:`` est exclu : il peut ne jamais publier de statut, et le rendre
     obligatoire bloquerait les PR ou il est saute."""
+    logger.debug("jobs_de_pr: entrée")
     noms: set[str] = set()
     for workflow in workflows:
         if not isinstance(workflow, dict) or not tourne_sur_pr(workflow, branche):
@@ -166,6 +170,7 @@ def jobs_de_pr(workflows: Iterable[dict], branche: str) -> set[str]:
 
 
 def lire_workflows(dossier: Path) -> list[dict]:
+    logger.debug("lire_workflows: entrée")
     import yaml  # dependance de dev (pyproject.toml), inutile hors de ce mode
 
     logger.debug("lire_workflows: retour liste")
@@ -173,6 +178,7 @@ def lire_workflows(dossier: Path) -> list[dict]:
 
 
 def verifier_hors_ligne(regle: dict, workflows: list[dict], branche: str) -> list[str]:
+    logger.debug("verifier_hors_ligne: entrée")
     disponibles = jobs_de_pr(workflows, branche)
     logger.debug("verifier_hors_ligne: retour liste")
     return [
@@ -194,6 +200,7 @@ def comparer(regle: dict, branche_api: dict, protection_api: dict | None) -> tup
     d'administration). ``protection_api`` : reponse de
     ``GET /branches/{b}/protection``, ou None quand le jeton n'a pas acces.
     Retourne (ecarts, non_verifiables)."""
+    logger.debug("comparer: entrée")
     ecarts: list[str] = []
     non_verifiables: list[str] = []
     nom = branche_api.get("name", "?")
@@ -240,6 +247,7 @@ def _get(url: str, jeton: str | None) -> dict | None:
     """GET JSON ; None sur 401/403/404 : ressource reservee ou inexistante.
     Sans jeton, l'API repond 401 sur /protection ; avec un jeton sans droit
     d'administration, 403 ou 404 selon le type de jeton."""
+    logger.debug("_get: entrée")
     requete = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
     if jeton:
         requete.add_header("Authorization", f"Bearer {jeton}")
@@ -256,6 +264,7 @@ def _get(url: str, jeton: str | None) -> dict | None:
 
 
 def verifier_en_ligne(regle: dict, depot: str, branche: str, jeton: str | None) -> tuple[list[str], list[str]]:
+    logger.debug("verifier_en_ligne: entrée")
     branche_api = _get(f"{API}/repos/{depot}/branches/{branche}", jeton)
     if branche_api is None:
         logger.debug("verifier_en_ligne: si branche_api is None -> levée RuntimeError")
@@ -266,6 +275,7 @@ def verifier_en_ligne(regle: dict, depot: str, branche: str, jeton: str | None) 
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--branche", default="dev")
     parser.add_argument("--regle", type=Path, default=REGLE_PAR_DEFAUT)

@@ -38,6 +38,7 @@ TRIVIAL_LINES = instrument_loguru.TRIVIAL_LINES
 
 def _body_start(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.stmt | None:
     """Première instruction du corps, après une éventuelle docstring."""
+    logger.debug("_body_start: entrée")
     body = fn.body
     first = body[0]
     if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
@@ -51,6 +52,7 @@ def _body_start(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> ast.stmt | None:
 
 def _is_debug_entry(stmt: ast.stmt | None) -> bool:
     """Vrai si l'instruction est un appel logger.debug(...) (ou logger.opt(...).debug(...))."""
+    logger.debug("_is_debug_entry: entrée")
     if not isinstance(stmt, ast.Expr) or not isinstance(stmt.value, ast.Call):
         logger.debug("_is_debug_entry: si not isinstance(stmt, ast.Expr) or not isinstance(stmt.value… -> retour False")
         return False
@@ -67,6 +69,7 @@ def _is_debug_entry(stmt: ast.stmt | None) -> bool:
 
 def audit_entrees() -> tuple[int, int]:
     """Renvoie (fonctions éligibles, fonctions sans trace d'entrée)."""
+    logger.debug("audit_entrees: entrée")
     hot = hot_names()
     logger.debug("audit_entrees() appelée | {} nom(s) de chemin chaud", len(hot))
     eligibles = manquantes = 0
@@ -96,6 +99,7 @@ def audit_entrees() -> tuple[int, int]:
 
 
 def main() -> None:
+    logger.debug("main: entrée")
     ap = argparse.ArgumentParser()
     ap.add_argument("--total", action="store_true", help="affiche uniquement le total des entrées non conformes")
     args = ap.parse_args()

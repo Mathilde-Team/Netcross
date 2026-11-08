@@ -288,6 +288,7 @@ def comm_map_to_dot(cmap) -> str:
 def write_comm_map(path: str, cmap) -> str:
     """Ecrit la cartographie : DOT si ``path`` finit par .dot ou .gv, JSON
     sinon. Renvoie le format ecrit (``dot`` ou ``json``)."""
+    logger.debug("write_comm_map: entrée")
     import json
 
     fmt = "dot" if str(path).lower().endswith((".dot", ".gv")) else "json"

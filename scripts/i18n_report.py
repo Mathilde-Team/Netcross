@@ -63,12 +63,14 @@ def _unquote(text: str) -> str:
 def parse_po(text: str) -> list[Entry]:
     """Analyse minimale d'un catalogue PO (entrees, drapeaux, references,
     pluriels, entrees obsoletes ``#~``). L'en-tete (msgid vide) est inclus."""
+    logger.debug("parse_po: entrée")
     entries: list[Entry] = []
     cur = Entry()
     field_name: str | None = None
     started = False
 
     def flush() -> None:
+        logger.debug("flush: entrée")
         nonlocal cur, started, field_name
         if started:
             entries.append(cur)
@@ -128,6 +130,7 @@ def parse_po(text: str) -> list[Entry]:
 
 def read_linguas(lang_dir: Path = LANG_DIR) -> list[str]:
     """Locales declarees dans lang/LINGUAS (commentaires ignores)."""
+    logger.debug("read_linguas: entrée")
     locales = []
     for line in (lang_dir / "LINGUAS").read_text(encoding="utf-8").splitlines():
         code = line.split("#", 1)[0].strip()
@@ -151,6 +154,7 @@ class LocaleStats:
 
 
 def locale_stats(locale: str, po_text: str | None, root: Path = ROOT) -> LocaleStats:
+    logger.debug("locale_stats: entrée")
     stats = LocaleStats(locale)
     if po_text is None:
         stats.missing = True
@@ -183,6 +187,7 @@ def template_ids(text: str) -> set[str]:
 
 def template_changes(since: str, lang_dir: Path = LANG_DIR) -> tuple[list[str], list[str]]:
     """Chaines ajoutees/supprimees dans messages.pot depuis la revision git."""
+    logger.debug("template_changes: entrée")
     rel = (lang_dir / "messages.pot").relative_to(ROOT).as_posix()
     try:
         old = subprocess.run(
@@ -198,6 +203,7 @@ def template_changes(since: str, lang_dir: Path = LANG_DIR) -> tuple[list[str], 
 
 
 def collect(lang_dir: Path = LANG_DIR, compiled: Path | None = None, root: Path = ROOT) -> list[LocaleStats]:
+    logger.debug("collect: entrée")
     result = []
     for loc in read_linguas(lang_dir):
         po = lang_dir / f"{loc}.po"
@@ -225,6 +231,7 @@ def summary(stats: list[LocaleStats]) -> dict[str, int]:
 
 
 def render_text(stats: list[LocaleStats], compiled: bool, added: list[str], removed: list[str]) -> str:
+    logger.debug("render_text: entrée")
     tot = summary(stats)
     n = tot["languages"]
     lines = [
@@ -255,6 +262,7 @@ def render_text(stats: list[LocaleStats], compiled: bool, added: list[str], remo
 
 
 def render_markdown(stats: list[LocaleStats], compiled: bool, added: list[str], removed: list[str]) -> str:
+    logger.debug("render_markdown: entrée")
     tot = summary(stats)
     n = tot["languages"]
     out = [
@@ -283,6 +291,7 @@ def render_markdown(stats: list[LocaleStats], compiled: bool, added: list[str], 
 
 
 def main(argv: list[str] | None = None) -> int:
+    logger.debug("main: entrée")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     fmt = parser.add_mutually_exclusive_group()
     fmt.add_argument("--markdown", action="store_true")
