@@ -360,7 +360,7 @@ def mesurer(
         logger.info("TWAMP-Light {} : cible {}:{} injoignable ({}), aucune sonde envoyée", debut, cible, port, exc)
         logger.debug("mesurer: retour (cible injoignable)")
         return ResultatTwamp(cible, port, debut, False, f"cible injoignable : {cible}:{port} ({exc})")
-    refus = None
+    refus: OSError | None = None
     with sock:
         for sequence in range(nombre):
             envoi = horloge()
