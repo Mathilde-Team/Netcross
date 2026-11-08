@@ -80,10 +80,12 @@ def parse_hex_dump(lignes: Iterable[str]) -> dict[int, bytes]:
     return {n: bytes(v) for n, v in resultat.items()}
 
 
-def _arguments(path: str, tls_keylog: str) -> list[str]:
-    """Ligne de commande tshark de la lecture du contenu déchiffré."""
+def _arguments(tls_keylog: str) -> list[str]:
+    """Ligne de commande tshark de la lecture du contenu déchiffré. La capture
+    arrive sur l'entrée standard (``-r -``), comme le repli de pcap_parser
+    pour les tshark confinés (snap, AppArmor) qui ne peuvent pas l'ouvrir."""
     logger.debug("_arguments: entrée")
-    args = [_tshark_path(), "-n", "-r", path]
+    args = [_tshark_path(), "-n", "-r", "-"]
     for pref in tls_keylog_prefs(tls_keylog):
         args += ["-o", pref]
     args += ["-o", 'gui.column.format:"No.","%m"', "-Y", "tls.app_data", "-P", "-x"]
@@ -99,11 +101,18 @@ def read_decrypted_tls(path: str, tls_keylog: str) -> dict[int, bytes]:
     continue sur le seul contenu chiffré).
     """
     logger.debug("read_decrypted_tls: entrée ({})", path)
-    args = _arguments(path, tls_keylog)
+    args = _arguments(tls_keylog)
+    try:
+        capture = open(path, "rb")  # noqa: SIM115 -- fermé par le with ci-dessous
+    except OSError as exc:
+        logger.debug("read_decrypted_tls: capture illisible -> levée TsharkError")
+        raise TsharkError(f"capture illisible : {path} ({exc.strerror})") from exc
     # stderr dans un fichier temporaire : un tube non lu pendant la lecture
     # de stdout pourrait se remplir et bloquer tshark.
-    with tempfile.TemporaryFile(mode="w+", errors="replace") as journal:
-        with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=journal, text=True, errors="replace") as proc:
+    with capture, tempfile.TemporaryFile(mode="w+", errors="replace") as journal:
+        with subprocess.Popen(
+            args, stdin=capture, stdout=subprocess.PIPE, stderr=journal, text=True, errors="replace"
+        ) as proc:
             assert proc.stdout is not None
             resultat = parse_hex_dump(proc.stdout)
             code = proc.wait()

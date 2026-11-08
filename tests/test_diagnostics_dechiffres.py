@@ -28,8 +28,15 @@ from tls13_keylog_capture import ecrire_capture  # noqa: E402
 
 avec_tshark = pytest.mark.skipif(shutil.which("tshark") is None, reason="tshark absent")
 DONNEES = Path(__file__).parent / "data"
-QUIC_PCAP = str(DONNEES / "quic-1rtt.pcap")
-QUIC_CLES = str(DONNEES / "quic-1rtt-keys.txt")
+
+
+@pytest.fixture
+def quic(tmp_path):
+    """Capture QUIC et clés copiées en répertoire temporaire (tshark confiné
+    par AppArmor en CI, voir tests/test_dechiffrement.py)."""
+    for nom in ("quic-1rtt.pcap", "quic-1rtt-keys.txt"):
+        shutil.copy(DONNEES / nom, tmp_path / nom)
+    return str(tmp_path / "quic-1rtt.pcap"), str(tmp_path / "quic-1rtt-keys.txt")
 
 
 @pytest.fixture(scope="module")
@@ -127,10 +134,17 @@ def test_read_decrypted_tls_reel(tls13):
     assert b"HTTP/1.1" in textes
 
 
-@avec_tshark
-def test_read_decrypted_tls_echec(tmp_path):
-    with pytest.raises(TsharkError):
+def test_read_decrypted_tls_capture_absente(tmp_path):
+    with pytest.raises(TsharkError, match="capture illisible"):
         read_decrypted_tls(str(tmp_path / "absente.pcap"), str(tmp_path / "k.txt"))
+
+
+@avec_tshark
+def test_read_decrypted_tls_echec_tshark(tmp_path):
+    pas_une_capture = tmp_path / "faux.pcap"
+    pas_une_capture.write_bytes(b"ceci n'est pas une capture")
+    with pytest.raises(TsharkError, match="tshark a échoué"):
+        read_decrypted_tls(str(pas_une_capture), str(tmp_path / "k.txt"))
 
 
 # --- signatures d'exploits sur le contenu déchiffré --------------------------------
@@ -219,9 +233,9 @@ def test_constats_1rtt_synthetiques():
 
 
 @avec_tshark
-def test_quic_1rtt_reel_avec_cle():
+def test_quic_1rtt_reel_avec_cle(quic):
     pytest.importorskip("cryptography")
-    evenements = parse_quic_capture("CLIENT", QUIC_PCAP, tls_keylog=QUIC_CLES)
+    evenements = parse_quic_capture("CLIENT", quic[0], tls_keylog=quic[1])
     courts = [e for e in evenements if e.kind == "1rtt"]
     assert courts
     assert all(e.decryptable for e in courts)
@@ -234,9 +248,9 @@ def test_quic_1rtt_reel_avec_cle():
 
 
 @avec_tshark
-def test_quic_sans_cle_inchange():
+def test_quic_sans_cle_inchange(quic):
     pytest.importorskip("cryptography")
-    evenements = parse_quic_capture("CLIENT", QUIC_PCAP)
+    evenements = parse_quic_capture("CLIENT", quic[0])
     assert evenements
     assert all(e.kind == "initial" for e in evenements)
     assert not [c for c in diagnose_quic(evenements, []) if "1-RTT" in c.message]
