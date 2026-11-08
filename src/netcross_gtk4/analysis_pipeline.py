@@ -286,6 +286,7 @@ def _run_pipeline(
     advanced = options.advanced or AdvancedSettings()
     advanced_errors = validate_advanced(advanced, security=options.security, redact=options.redact)
     if advanced_errors:
+        logger.debug("_run_pipeline: si advanced_errors -> levée ValueError")
         raise ValueError("; ".join(advanced_errors))
     known_destinations = load_host_set(advanced.known_destinations, "--known-destinations")
     known_hosts = load_host_set(advanced.known_hosts, "--known-hosts")
