@@ -195,6 +195,10 @@ class Pkt:
     # Adresses A/AAAA d'une reponse DNS (issue #344, fast flux), reportees
     # depuis RawPacket.dns_answers ; tuple vide hors reponse DNS.
     dns_answers: tuple[str, ...] = ()
+    # Points de reception media (adresse, port) annonces par le SDP d'un
+    # message SIP (issue #1120), reportes depuis RawPacket.sip_sdp_media ;
+    # tuple vide hors SIP avec SDP. Consommes par voip.build_calls.
+    sip_sdp_media: tuple[tuple[str, int], ...] = ()
     # Metadonnees radio 802.11 par trame (issue #1142), reportees depuis
     # RawPacket.radio ; None hors capture 802.11.
     radio: RadioInfo | None = None

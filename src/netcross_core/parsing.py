@@ -136,6 +136,7 @@ def _to_pkt(label: str, raw: RawPacket) -> Pkt:
         http_content_length=raw.http_content_length,
         tcp_len=raw.tcp_len,
         dns_answers=raw.dns_answers,
+        sip_sdp_media=raw.sip_sdp_media,
         radio=raw.radio,
         comment=raw.comment,
         ip_checksum=raw.ip_checksum,

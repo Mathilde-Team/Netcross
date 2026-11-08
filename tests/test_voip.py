@@ -1,3 +1,5 @@
+import dataclasses
+
 import pytest
 
 from netcross_core.analysis import analyse
@@ -243,3 +245,134 @@ def test_build_calls_sans_bye_se_termine_a_l_appel_suivant():
     assert [c.call_id for c in calls] == ["call-1", "call-2"]
     assert [s["label"] for s in calls[0].rtp_streams] == ["dans-call-1"]
     assert [s["label"] for s in calls[1].rtp_streams] == ["frontiere"]
+
+
+# -- Issue #1120 : association SIP/RTP par SDP, repli fenetre temporelle --------
+
+
+def _sip_sdp(point, ts, msg, cseq, call_id, src, dst, media):
+    return _pkt(
+        point,
+        ts,
+        src=src,
+        dst=dst,
+        sport=5060,
+        dport=5060,
+        sip_call_id=call_id,
+        sip_msg_type=msg,
+        sip_cseq=cseq,
+        sip_sdp_media=media,
+    )
+
+
+def _rtp_flow(point, ts, seq, src, sport, dst, dport, ssrc):
+    return _pkt(
+        point,
+        ts,
+        src=src,
+        dst=dst,
+        sport=sport,
+        dport=dport,
+        is_rtp=True,
+        rtp_seq=seq,
+        rtp_ts=seq * 160,
+        rtp_ssrc=ssrc,
+    )
+
+
+def _deux_appels_simultanes():
+    """Appel 1 (alice <-> bob) puis appel 2 (carol <-> dave) etabli avant que
+    le media de l'appel 1 ne demarre : sans BYE, la fenetre temporelle de
+    l'appel 1 se ferme a l'INVITE de l'appel 2, donc le repli temporel
+    rattacherait a tort le media de l'appel 1 a l'appel 2."""
+    alice, bob, carol, dave = "10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"
+    return [
+        _sip_sdp("A", 1.0, "INVITE", "1 INVITE", "call-1", alice, bob, ((alice, 40000),)),
+        _sip_sdp("A", 1.1, "200 OK", "1 INVITE", "call-1", bob, alice, ((bob, 50000),)),
+        _sip_sdp("A", 2.0, "INVITE", "1 INVITE", "call-2", carol, dave, ((carol, 41000),)),
+        _sip_sdp("A", 2.1, "200 OK", "1 INVITE", "call-2", dave, carol, ((dave, 51000),)),
+        # Media de l'appel 1, dans les deux sens, apres l'INVITE de l'appel 2.
+        _rtp_flow("A", 2.5, 1, alice, 40000, bob, 50000, 0x11),
+        _rtp_flow("A", 2.52, 2, alice, 40000, bob, 50000, 0x11),
+        _rtp_flow("A", 2.6, 1, bob, 50000, alice, 40000, 0x12),
+        _rtp_flow("A", 2.62, 2, bob, 50000, alice, 40000, 0x12),
+        # Media de l'appel 2.
+        _rtp_flow("A", 2.7, 1, carol, 41000, dave, 51000, 0x21),
+        _rtp_flow("A", 2.72, 2, carol, 41000, dave, 51000, 0x21),
+    ]
+
+
+def test_sdp_associe_deux_appels_simultanes_la_ou_le_repli_temporel_se_trompe():
+    packets = _deux_appels_simultanes()
+    r = analyse({}, ["A"], packets)
+    calls = {c["call_id"]: c for c in r.voip_calls}
+    assert sorted(s["label"].split(" (")[0] for s in calls["call-1"]["rtp_streams"]) == [
+        "10.0.0.1:40000 -> 10.0.0.2:50000",
+        "10.0.0.2:50000 -> 10.0.0.1:40000",
+    ]
+    assert [s["label"].split(" (")[0] for s in calls["call-2"]["rtp_streams"]] == ["10.0.0.3:41000 -> 10.0.0.4:51000"]
+    assert calls["call-1"]["correlation_method"] == "sdp"
+    assert calls["call-2"]["correlation_method"] == "sdp"
+    assert {s["correlation_method"] for c in calls.values() for s in c["rtp_streams"]} == {"sdp"}
+    # Le flux du rapport global n'est pas modifie par l'association.
+    assert all("correlation_method" not in s for s in r.rtp_streams)
+
+    # Contre-epreuve : sans SDP, le repli temporel se trompe (tout va a
+    # l'appel 2, dont la fenetre contient le debut des trois flux).
+    sans_sdp = [dataclasses.replace(p, sip_sdp_media=()) for p in packets]
+    r2 = analyse({}, ["A"], sans_sdp)
+    calls2 = {c["call_id"]: c for c in r2.voip_calls}
+    assert calls2["call-1"]["rtp_streams"] == []
+    assert len(calls2["call-2"]["rtp_streams"]) == 3
+    assert calls2["call-2"]["correlation_method"] == "time_window"
+    assert calls2["call-1"]["correlation_method"] == "time_window"
+
+
+def test_sdp_et_repli_temporel_donnent_une_methode_mixte():
+    from netcross_core.voip import build_calls
+
+    pkts = [
+        _sip_sdp("A", 1.0, "INVITE", "1 INVITE", "c1", "10.0.0.1", "10.0.0.2", (("10.0.0.1", 4000),)),
+        _sip_sdp("A", 1.1, "200 OK", "1 INVITE", "c1", "10.0.0.2", "10.0.0.1", ()),
+    ]
+    streams = [
+        {"first_ts": 1.5, "label": "sdp", "dst": "10.0.0.1", "dport": 4000},
+        {"first_ts": 1.6, "label": "temps", "dst": "10.0.0.1", "dport": 9999},
+    ]
+    calls, _ = build_calls(pkts, streams)
+    assert calls[0].correlation_method == "mixed"
+    assert [(s["label"], s["correlation_method"]) for s in calls[0].rtp_streams] == [
+        ("sdp", "sdp"),
+        ("temps", "time_window"),
+    ]
+
+
+def test_sdp_ports_reutilises_choix_temporel_entre_appels_sdp():
+    """Deux appels successifs annoncent le meme point media : le flux va a
+    celui dont la fenetre le contient ; hors de toute fenetre, a l'appel SDP
+    dont l'INVITE est la plus proche."""
+    from netcross_core.voip import build_calls
+
+    media = (("10.0.0.1", 4000),)
+    pkts = [
+        _sip_sdp("A", 1.0, "INVITE", "1 INVITE", "c1", "10.0.0.1", "10.0.0.2", media),
+        _sip_sdp("A", 2.0, "BYE", "2 BYE", "c1", "10.0.0.1", "10.0.0.2", ()),
+        _sip_sdp("A", 10.0, "INVITE", "1 INVITE", "c2", "10.0.0.1", "10.0.0.2", media),
+        _sip_sdp("A", 11.0, "BYE", "2 BYE", "c2", "10.0.0.1", "10.0.0.2", ()),
+    ]
+    streams = [
+        {"first_ts": 10.5, "label": "dans-c2", "dst": "10.0.0.1", "dport": 4000},
+        {"first_ts": 3.0, "label": "hors-fenetre", "dst": "10.0.0.1", "dport": 4000},
+    ]
+    calls, _ = build_calls(pkts, streams)
+    by_id = {c.call_id: [s["label"] for s in c.rtp_streams] for c in calls}
+    assert by_id == {"c1": ["hors-fenetre"], "c2": ["dans-c2"]}
+    assert all(c.correlation_method == "sdp" for c in calls)
+
+
+def test_appel_sans_flux_reste_time_window():
+    from netcross_core.voip import build_calls
+
+    calls, _ = build_calls([_sip("A", 1.0, "INVITE", "1 INVITE")], [])
+    assert calls[0].correlation_method == "time_window"
+    assert calls[0].to_dict()["correlation_method"] == "time_window"
