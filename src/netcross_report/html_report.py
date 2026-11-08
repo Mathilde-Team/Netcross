@@ -61,6 +61,7 @@ from pathlib import Path
 
 from netcross_core.i18n import N_, _, active_language
 from netcross_core.logging_config import get_logger
+from netcross_report.evidence_frames import CATEGORY_PROTOCOLS, GENERIC_PROTOCOL, finding_protocol
 
 logger = get_logger(__name__)
 
@@ -142,6 +143,19 @@ th { background: #f9fafb; font-weight: 600; color: #374151; }
 .sip-reecrit { background: #ffedd5; color: #7c2d12; }
 .sip-retransmis { background: #fef9c3; color: #713f12; }
 .sip-resume { color: #374151; font-size: .875rem; margin: .25rem 0 .5rem; }
+.filtres { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin: 0 0 .5rem; font-size: .875rem; }
+.filtres select { font: inherit; margin-left: .35rem; }
+.compteur { color: #374151; font-size: .82rem; margin: 0 0 .5rem; }
+.preuves { display: flex; flex-wrap: wrap; gap: .25rem; }
+.preuve { font: inherit; font-size: .78rem; cursor: pointer; background: #f9fafb; color: #111827;
+  border: 1px solid #2563eb; border-radius: 6px; padding: .05rem .45rem; }
+.preuve:hover, .preuve:focus-visible, .preuve[aria-pressed="true"] { background: #dbeafe; outline: 2px solid #1d4ed8; }
+.detail-preuve { margin-top: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; padding: .85rem 1rem; }
+.detail-preuve h3 { font-size: 1rem; margin: 0 0 .5rem; }
+.detail-preuve dl { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1.25rem; margin: .75rem 0 0; }
+.detail-preuve dt { color: #4b5563; } .detail-preuve dd { margin: 0; font-variant-numeric: tabular-nums; }
+.diagramme-preuve td { font-variant-numeric: tabular-nums; }
+.trame-preuve th, .trame-preuve td { background: #dbeafe; font-weight: 650; }
 @media print { body { padding: 0; } th { position: static; } }
 """
 
@@ -183,7 +197,12 @@ _JS = """
     return t;
   }
 
-  var findings = doc.findings || [];
+  var findings = (doc.findings || []).map(function (f) {
+    var copie = {};
+    Object.keys(f).forEach(function (k) { copie[k] = f[k]; });
+    copie.protocol = f.protocol || L.category_protocols[f.category] || L.generic_protocol;
+    return copie;
+  });
   var parSev = {};
   findings.forEach(function (f) { parSev[f.severity] = (parSev[f.severity] || 0) + 1; });
 
@@ -339,10 +358,113 @@ _JS = """
 
   var constats = el("section", {"aria-labelledby": "titre-constats"});
   constats.appendChild(el("h2", {"id": "titre-constats"}, L.findings));
-  var tc = tableau(L.findings_caption, [L.severity, L.category, L.segment, L.message],
-    findings.map(function (f) { return [badge(f.severity), f.category, f.segment, f.message]; }), L.no_findings);
+  var preuves = {};
+  (doc.evidence_frames || []).forEach(function (p) { preuves[p.ref] = p; });
+  var panneauPreuve = el("div", {"id": "detail-preuve", "class": "detail-preuve", "aria-live": "polite"});
+  function texteTrame(c) { return "#" + c.frame_number + " (" + fixe(c.rel_ms, 3) + " ms)"; }
+  function montrerPreuve(ref, bouton) {
+    panneauPreuve.textContent = "";
+    panneauPreuve.setAttribute("data-preuve", ref);
+    var p = preuves[ref];
+    var morceaux = ref.split("#");
+    var titre = L.evidence_title.replace("{point}", morceaux[0]).replace("{frame}", morceaux[1]);
+    panneauPreuve.appendChild(el("h3", p ? {"id": p.anchor} : null, titre));
+    boutonsPreuve.forEach(function (b) { b.setAttribute("aria-pressed", b === bouton ? "true" : "false"); });
+    if (!p || !p.found) { panneauPreuve.appendChild(el("p", {"class": "vide"}, L.evidence_not_found)); return; }
+    panneauPreuve.appendChild(el("p", null, p.summary));
+    var t = panneauPreuve.appendChild(el("table", {"class": "diagramme-preuve"}));
+    t.appendChild(el("caption", null, L.evidence_caption));
+    var tr = el("tr");
+    tr.appendChild(el("th", {"scope": "col"}, L.evidence_frame));
+    p.points.forEach(function (pt) { tr.appendChild(el("th", {"scope": "col"}, pt)); });
+    t.appendChild(el("thead")).appendChild(tr);
+    var corps = t.appendChild(el("tbody"));
+    p.rows.forEach(function (r) {
+      var ligne = corps.appendChild(el("tr", r.evidence ? {"class": "trame-preuve", "aria-current": "true"} : null));
+      ligne.appendChild(el("th", {"scope": "row"}, r.summary));
+      p.points.forEach(function (pt) {
+        var c = r.cells[pt];
+        ligne.appendChild(el("td", c ? null : {"class": "sip-perdu"}, c ? texteTrame(c) : L.evidence_absent));
+      });
+    });
+    if (p.transits.length) {
+      var dl = panneauPreuve.appendChild(el("dl"));
+      p.transits.forEach(function (tr2) {
+        dl.appendChild(el("dt", null, L.transit + " " + tr2.segment));
+        var brut = tr2.corrected ? "" : " (" + L.transit_raw + ")";
+        dl.appendChild(el("dd", null, fixe(tr2.transit_ms, 3) + " ms" + brut));
+      });
+    }
+  }
+  var boutonsPreuve = [];
+  function cellulePreuves(f) {
+    var refs = (f.evidence || []).filter(function (e) {
+      return e.frame_number !== undefined && e.frame_number !== null;
+    });
+    if (!refs.length) { return ""; }
+    var span = el("span", {"class": "preuves"});
+    refs.forEach(function (e) {
+      var ref = e.point + "#" + e.frame_number;
+      var aria = L.evidence_title.replace("{point}", e.point).replace("{frame}", e.frame_number);
+      var b = el("button", {"type": "button", "class": "preuve", "data-preuve": ref, "aria-controls": "detail-preuve",
+        "aria-pressed": "false", "aria-label": aria}, e.point + " #" + e.frame_number);
+      b.addEventListener("click", function () { montrerPreuve(ref, b); });
+      boutonsPreuve.push(b);
+      span.appendChild(b);
+    });
+    return span;
+  }
+  var filtres = el("div", {"class": "filtres", "role": "group", "aria-label": L.filters});
+  var criteres = [["severite", L.severity, "severity"], ["segment", L.segment, "segment"],
+    ["protocole", L.protocol, "protocol"]];
+  var menus = criteres.map(function (c) {
+    var id = "filtre-" + c[0];
+    var lab = filtres.appendChild(el("label", {"for": id}, c[1] + " "));
+    var menu = el("select", {"id": id});
+    menu.appendChild(el("option", {"value": ""}, L.filter_all));
+    var vus = [];
+    findings.forEach(function (f) {
+      var v = f[c[2]];
+      if (v !== null && v !== undefined && vus.indexOf(v) < 0) { vus.push(v); }
+    });
+    if (c[2] === "severity") {
+      vus.sort(function (a, b) { return L.severity_order.indexOf(a) - L.severity_order.indexOf(b); });
+    } else { vus.sort(); }
+    vus.forEach(function (v) {
+      menu.appendChild(el("option", {"value": v}, c[2] === "severity" ? (L.severities[v] || v) : v));
+    });
+    lab.appendChild(menu);
+    return menu;
+  });
+  var compteur = el("p", {"id": "compteur-constats", "class": "compteur", "aria-live": "polite"});
+  var lignesConstats = [];
+  function filtrer() {
+    var choix = menus.map(function (m) { return m.value || ""; });
+    var n = 0;
+    lignesConstats.forEach(function (ligne, i) {
+      var f = findings[i];
+      var garde = criteres.every(function (c, j) { return !choix[j] || String(f[c[2]]) === choix[j]; });
+      if (garde) { ligne.removeAttribute("hidden"); n += 1; } else { ligne.setAttribute("hidden", ""); }
+    });
+    compteur.textContent = L.counter.replace("{shown}", n).replace("{total}", findings.length);
+  }
+  menus.forEach(function (m) { m.addEventListener("change", filtrer); });
+  var tc = tableau(L.findings_caption, [L.severity, L.category, L.protocol, L.segment, L.message, L.evidence],
+    findings.map(function (f) {
+      return [badge(f.severity), f.category, f.protocol, f.segment, f.message, cellulePreuves(f)];
+    }), L.no_findings);
   tc.setAttribute("id", "table-constats");
+  if (findings.length) {
+    constats.appendChild(filtres);
+    constats.appendChild(compteur);
+    tc.childNodes[tc.childNodes.length - 1].childNodes.forEach(function (ligne) { lignesConstats.push(ligne); });
+    filtrer();
+  }
   constats.appendChild(tc);
+  if (boutonsPreuve.length) {
+    panneauPreuve.appendChild(el("p", {"class": "vide"}, L.evidence_hint));
+    constats.appendChild(panneauPreuve);
+  }
   racine.appendChild(constats);
   racine.setAttribute("data-rendu", "js");
 })();
@@ -398,6 +520,25 @@ def _labels() -> dict:
         "sip_retransmitted": _("retransmis"),
         "sip_rewritten": _("reecrit"),
         "no_sip": _("Aucun message SIP pour cet appel."),
+        "protocol": _("Protocole"),
+        "filters": _("Filtrer les constats"),
+        "filter_all": _("Tous"),
+        "counter": _("{shown} / {total} constat(s) affiche(s)"),
+        "evidence": _("Preuves"),
+        "evidence_hint": _("Selectionner une preuve pour voir la trame a chaque point de capture."),
+        "evidence_title": _("Preuve : trame {frame} au point {point}"),
+        "evidence_not_found": _("Trame introuvable dans les paquets correles : aucun diagramme."),
+        "evidence_caption": _(
+            "Trame de preuve et ses voisines de la meme conversation, vues a chaque point (date en ms depuis la preuve)"
+        ),
+        "evidence_frame": _("Trame"),
+        "evidence_absent": _("non vue"),
+        "evidence_static": _("Preuves vues a chaque point"),
+        "transit": _("Transit"),
+        "transit_raw": _("non corrige du decalage d'horloge"),
+        # Protocole filtrable d'un constat sans cle ``protocol`` (#1077).
+        "category_protocols": dict(CATEGORY_PROTOCOLS),
+        "generic_protocol": GENERIC_PROTOCOL,
         # Separateur decimal des valeurs affichees (« . » en anglais).
         "decimal": _(","),
         "segment_fields": [{**champ, "libelle": _(str(champ["libelle"]))} for champ in _SEGMENT_FIELDS],
@@ -540,6 +681,20 @@ def _static_sip(doc: dict, labels: dict) -> str:
     return "".join(blocs)
 
 
+def _static_evidence_links(finding: dict, ancres: dict) -> str:
+    """Preuves d'un constat (sans JS) : lien vers le diagramme statique s'il existe."""
+    logger.debug("_static_evidence_links: entrée")
+    liens = []
+    for e in finding.get("evidence") or []:
+        if e.get("frame_number") is None:
+            continue
+        texte = _e(f"{e['point']} #{e['frame_number']}")
+        ancre = ancres.get(f"{e['point']}#{e['frame_number']}")
+        liens.append(f'<a href="#{_e(ancre)}">{texte}</a>' if ancre else texte)
+    logger.debug("_static_evidence_links: retour {} preuve(s)", len(liens))
+    return ", ".join(liens)
+
+
 def _static_body(doc: dict, labels: dict) -> str:
     """Rendu sans JavaScript (``<noscript>``) : synthese, score, triage, constats."""
     logger.debug("_static_body: entrée")
@@ -561,16 +716,26 @@ def _static_body(doc: dict, labels: dict) -> str:
         ],
         labels["no_triage"],
     )
+    ancres = {p["ref"]: p["anchor"] for p in doc.get("evidence_frames") or [] if p.get("found")}
     constats = _static_table(
         labels["findings_caption"],
-        [labels["severity"], labels["category"], labels["segment"], labels["message"]],
+        [
+            labels["severity"],
+            labels["category"],
+            labels["protocol"],
+            labels["segment"],
+            labels["message"],
+            labels["evidence"],
+        ],
         [
             [
                 f'<span class="badge sev-{_e(f.get("severity"))}">'
                 f"{_e(labels['severities'].get(f.get('severity'), f.get('severity')))}</span>",
                 _e(f.get("category")),
+                _e(f.get("protocol") or finding_protocol(f.get("category"))),
                 _e(f.get("segment")),
                 _e(f.get("message")),
+                _static_evidence_links(f, ancres),
             ]
             for f in findings
         ],
@@ -585,8 +750,55 @@ def _static_body(doc: dict, labels: dict) -> str:
         f"{_static_sip(doc, labels)}"
         f"<h2>{_e(labels['triage'])}</h2>{triage}"
         f"<h2>{_e(labels['findings'])}</h2>{constats}"
+        f"{_static_evidence(doc, labels)}"
     )
     logger.debug("_static_body: retour {} caractere(s)", len(corps))
+    return corps
+
+
+def _ms(v: float, labels: dict) -> str:
+    """Duree en ms a 3 decimales, separateur decimal de la langue (comme ``fixe`` en JS)."""
+    logger.debug("_ms: entrée")
+    texte = f"{v:.3f}".replace(".", labels["decimal"])
+    logger.debug("_ms: retour {}", texte)
+    return texte
+
+
+def _static_evidence(doc: dict, labels: dict) -> str:
+    """Diagrammes de preuve statiques (sans JS) : un tableau par preuve
+    trouvee, ancre ``preuve-<point>-<trame>`` comme le rendu JS."""
+    logger.debug("_static_evidence: entrée")
+    blocs = []
+    for p in doc.get("evidence_frames") or []:
+        if not p.get("found"):
+            continue
+        ev_point = p["ref"].rsplit("#", 1)[0]
+        titre = labels["evidence_title"].format(point=ev_point, frame=p["frame_number"])
+        lignes = [
+            [_e(r["summary"])]
+            + [
+                _e(f"#{c['frame_number']} ({_ms(c['rel_ms'], labels)} ms)")
+                if (c := r["cells"].get(pt))
+                else _e(labels["evidence_absent"])
+                for pt in p["points"]
+            ]
+            for r in p["rows"]
+        ]
+        transits = "".join(
+            f"<li>{_e(labels['transit'])} {_e(t['segment'])} : {_ms(t['transit_ms'], labels)} ms"
+            f"{'' if t['corrected'] else ' (' + _e(labels['transit_raw']) + ')'}</li>"
+            for t in p["transits"]
+        )
+        blocs.append(
+            f'<h3 id="{_e(p["anchor"])}">{_e(titre)}</h3>'
+            + _static_table(labels["evidence_caption"], [labels["evidence_frame"], *p["points"]], lignes, "")
+            + (f"<ul>{transits}</ul>" if transits else "")
+        )
+    if not blocs:
+        logger.debug("_static_evidence: retour vide")
+        return ""
+    corps = f"<h2>{_e(labels['evidence_static'])}</h2>" + "".join(blocs)
+    logger.debug("_static_evidence: retour {} preuve(s)", len(blocs))
     return corps
 
 

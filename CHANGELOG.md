@@ -8,6 +8,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Constats filtrables et preuves cliquables du rapport HTML (#1077) : filtres par sévérité, segment et protocole avec
+  compteur, et pour chaque preuve un diagramme centré sur la trame (voisines de la même conversation, même trame aux
+  autres points, transit corrigé du décalage d'horloge), avec ancre `#preuve-<point>-<trame>` et équivalent sans
+  JavaScript. Clé `evidence_frames` du JSON quand `packet_flows` est fourni. Voir docs/preuves-cliquables.md.
 - Échelle SIP multi-points (#1125) : pour chaque appel, une ligne par message SIP et une colonne par point de capture,
   dans le PDF, le rapport HTML (avec ou sans JavaScript) et le JSON (`sip_ladders`). Un message perdu entre deux
   points (« ABSENT »), retransmis ou réécrit (SDP, premier Via, Contact modifiés par un ALG ou un SBC) est mis en
