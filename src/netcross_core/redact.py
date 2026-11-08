@@ -180,6 +180,20 @@ class AddressRedactor:
         logger.debug("AddressRedactor.pseudonymize_name: retour {}", summarize(pseudo, "pseudo"))
         return pseudo
 
+    def pseudonymize_address(self, value: str) -> str:
+        """Pseudonyme d'une adresse IP ou MAC isolee (meme table que les
+        paquets) ; une valeur qui n'est pas une adresse est rendue telle
+        quelle. Sert aux sorties dont une etiquette peut reprendre une
+        adresse, comme les metriques Prometheus (#1112)."""
+        logger.debug("AddressRedactor.pseudonymize_address: debut")
+        kind = "mac" if _is_mac(value) else _ip_kind(value)
+        if kind is None:
+            logger.debug("AddressRedactor.pseudonymize_address: si pas une adresse -> retour inchange")
+            return value
+        pseudo = self._pseudonym(value, kind)
+        logger.debug("AddressRedactor.pseudonymize_address: retour pseudonyme")
+        return pseudo
+
     def redact(self, packets) -> None:
         """Mutation en place de chaque paquet de `packets` (Pkt ou
         RawPacket, voir docstring de module)."""

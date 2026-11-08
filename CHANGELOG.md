@@ -8,6 +8,9 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- `--prom-file` et `--openmetrics-file` (#1112) : métriques de l'analyse au format texte Prometheus (textfile
+  collector de node_exporter, écriture atomique) et OpenMetrics 1.0 ; `--metrics-run` fixe l'étiquette `run` ;
+  `--redact` anonymise les adresses présentes dans les étiquettes. Voir docs/metriques-prometheus.md.
 - Diagnostics sur le contenu déchiffré (#1045) : avec un fichier de clés, le certificat TLS 1.3 est lu (détection de
   substitution entre points), les paquets QUIC 1-RTT et leurs fermetures (CONNECTION_CLOSE) donnent des constats,
   et les signatures d'exploits sont aussi appliquées au contenu TLS en clair. Voir `docs/couverture-dechiffrement.md`.
