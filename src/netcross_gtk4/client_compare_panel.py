@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 
 class ClientComparisonPanel(Gtk.Box):
     def __init__(self):
+        logger.debug("ClientComparisonPanel.__init__: entrée")
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         logger.debug("ClientComparisonPanel: construction du panneau")
         for side in ("top", "bottom", "start", "end"):
@@ -35,6 +36,7 @@ class ClientComparisonPanel(Gtk.Box):
         self.status_label = Gtk.Label(label="", halign=Gtk.Align.START, wrap=True, xalign=0.0)
         self.append(self.status_label)
         self.set_comparison(None)
+        logger.debug("ClientComparisonPanel.__init__: fin")
 
     def set_comparison(self, comparison) -> None:
         self.comparison = comparison
@@ -48,14 +50,17 @@ class ClientComparisonPanel(Gtk.Box):
 
         write_client_diff_csv(self.comparison, str(path))
         self.status_label.set_text(f"Detail de la comparaison client vs client ecrit dans {path}")
+        logger.debug("ClientComparisonPanel.export_to: fin")
 
     def _on_csv_clicked(self, _btn):
         if self.comparison is None:
+            logger.debug("ClientComparisonPanel._on_csv_clicked: si self.comparison is None -> retour")
             return
         dialog = Gtk.FileDialog()
         dialog.set_initial_name("comparaison-postes.csv")
         root = self.get_root()
         dialog.save(root if isinstance(root, Gtk.Window) else None, None, self._on_csv_chosen)
+        logger.debug("ClientComparisonPanel._on_csv_clicked: fin")
 
     def _on_csv_chosen(self, dialog, result):
         try:
@@ -65,9 +70,11 @@ class ClientComparisonPanel(Gtk.Box):
             return
         path = gfile.get_path() if gfile is not None else None
         if not path:
+            logger.debug("ClientComparisonPanel._on_csv_chosen: si not path -> retour")
             return
         try:
             self.export_to(path)
         except OSError as exc:
             logger.warning("ClientComparisonPanel: export impossible ({})", exc)
             self.status_label.set_text(f"Export impossible : {exc}")
+        logger.debug("ClientComparisonPanel._on_csv_chosen: fin")

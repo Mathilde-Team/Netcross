@@ -1,0 +1,86 @@
+# Image de CI préconstruite (issue #968).
+#
+# Construit .github/ci-image/Dockerfile et la pousse vers
+# ghcr.io/mathilde-team/netcross-ci:26.04, que les jobs en conteneur de ci.yml
+# utilisent au lieu de réinstaller leurs paquets apt à chaque run.
+#
+# Déclencheurs :
+#   - pull_request touchant le Dockerfile ou ce workflow : construction seule,
+#     sans pousser (vérifie que l'image se construit avant la fusion) ;
+#   - push sur dev touchant le Dockerfile ou ce workflow : construction et push ;
+#   - planifié, tous les lundis à 04:00 UTC : reconstruction pour les mises à
+#     jour de sécurité d'ubuntu:26.04 et des paquets ;
+#   - manuel (workflow_dispatch).
+
+name: Image de CI
+
+"on":
+  pull_request:
+    branches: [dev]
+    paths:
+      - ".github/ci-image/**"
+      - ".github/workflows/ci-image.yml"
+  push:
+    branches: [dev]
+    paths:
+      - ".github/ci-image/**"
+      - ".github/workflows/ci-image.yml"
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write  # push vers ghcr.io (paquet de l'organisation)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/mathilde-team/netcross-ci
+  TAG: "26.04"
+
+jobs:
+  image:
+    name: Construction de l'image de CI
+    # Runner maison avec Docker sur l'hôte (même label que les jobs en
+    # conteneur de ci.yml) ; repli inchangé : NETCROSS_RUNS_ON.
+    runs-on: ${{ fromJSON(vars.NETCROSS_RUNS_ON || '{"group":"maison","labels":["self-hosted","linux","docker"]}') }}
+    steps:
+      - name: Checkout du dépôt
+        uses: actions/checkout@v7
+
+      - name: Construction
+        # --pull : repart toujours du dernier ubuntu:26.04 (mises à jour de sécurité).
+        run: |
+          docker build --pull \
+            -t "$IMAGE:$TAG" \
+            -t "$IMAGE:$TAG-${GITHUB_SHA::12}" \
+            .github/ci-image
+
+      - name: Contrôle des outils attendus par ci.yml
+        run: |
+          docker run --rm "$IMAGE:$TAG" bash -c '
+            set -e
+            for outil in git curl gcc sudo python3 tshark editcap capinfos pdftotext msgfmt \
+                         pkg-config Xvfb xauth dpkg-buildpackage rpmbuild; do
+              command -v "$outil" >/dev/null || { echo "outil manquant : $outil"; exit 1; }
+            done
+            python3 -m venv --help >/dev/null
+            tshark --version | sed -n 1p
+          '
+
+      - name: Connexion à ghcr.io
+        if: github.event_name != 'pull_request'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:$TAG-${GITHUB_SHA::12}"
+
+      - name: Déconnexion de ghcr.io
+        if: always() && github.event_name != 'pull_request'
+        run: docker logout ghcr.io
