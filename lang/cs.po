@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: netcross\n"
 "Report-Msgid-Bugs-To: https://github.com/MathildeDec/Netcross/issues\n"
-"POT-Creation-Date: 2026-09-23 07:01+0000\n"
+"POT-Creation-Date: 2026-10-30 11:11+0000\n"
 "PO-Revision-Date: 2026-09-23 07:01+0000\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -77,7 +77,7 @@ msgstr ""
 msgid "Protocole"
 msgstr ""
 
-#: src/netcross_gtk4/stats_view.py
+#: src/netcross_gtk4/stats_view.py src/netcross_report/html_report.py
 msgid "Segment"
 msgstr ""
 
@@ -134,4 +134,92 @@ msgstr ""
 #: src/netcross_gtk4/stats_view.py
 #, python-brace-format
 msgid "{v:.1f} Mo"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "A surveiller"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Anomalie"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Aucun constat : rien d'anormal detecte."
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Aucun segment a prioriser."
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Bon"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Categorie"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Categories"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Constats"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Critique"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Degrade"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Genere le"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Information"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Message"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Points de capture"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Rapport Netcross"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Score"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Score de sante"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Segments classes du plus au moins prioritaire"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Segments par priorite"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Severite"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Synthese"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Tous les constats de l'analyse"
 msgstr ""
