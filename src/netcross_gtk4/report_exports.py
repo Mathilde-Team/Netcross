@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from netcross_core.logging_config import get_logger
+from netcross_core.redact import SCOPE_ALL, scope_label
 
 logger = get_logger(__name__)
 
@@ -60,7 +61,7 @@ def record_history(report, settings: HistorySettings, *, findings=None, tls=None
         findings=findings,
         tls_findings=tls,
         quic_findings=quic,
-        meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if redact else None,
+        meta={"Anonymisation": scope_label(SCOPE_ALL)} if redact else None,
         label=settings.label,
     )
     label_txt = f" (etiquette: {settings.label})" if settings.label else ""
@@ -78,7 +79,7 @@ def record_diff_history(findings, baseline, current, settings: HistorySettings, 
         baseline,
         current,
         settings.db_path,
-        meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if redact else None,
+        meta={"Anonymisation": scope_label(SCOPE_ALL)} if redact else None,
         label=settings.label,
     )
     label_txt = f" (etiquette: {settings.label})" if settings.label else ""

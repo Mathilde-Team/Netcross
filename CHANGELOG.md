@@ -8,6 +8,12 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- `--redact-scope adresses|noms|tout` (#1153, chantier #1007) : `--redact` anonymise désormais aussi, par défaut, les
+  noms DNS (`dns_qry_name`), la cible HTTP (`http_uri` : hôte pseudonymisé, chemin `/res-N`), le SAN (joker conservé),
+  le sujet et l'émetteur des certificats TLS (`CN=dn-N`), le Call-ID (`call-N@example.invalid`), le User-Agent et le
+  Server SIP (`agent-N`), avec la table de noms commune (#1151), ainsi que les IP du SAN. Les pseudonymes restent
+  stables pendant le run (dialogues SIP, certificats auto-signés). `--redact-map` exporte ces tables ; la GUI, l'API et
+  `cross_capture_diff_cli.py` appliquent la portée « tout ». `--redact-scope adresses` rend le comportement antérieur.
 - Constats filtrables et preuves cliquables du rapport HTML (#1077) : filtres par sévérité, segment et protocole avec
   compteur, et pour chaque preuve un diagramme centré sur la trame (voisines de la même conversation, même trame aux
   autres points, transit corrigé du décalage d'horloge), avec ancre `#preuve-<point>-<trame>` et équivalent sans

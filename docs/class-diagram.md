@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-227 modules · 330 classes · 832 fonctions publiques de module.
+227 modules · 330 classes · 833 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -34,15 +34,15 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"26 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"56 imports"| netcross_core
+    CLI -->|"60 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"32 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
-    netcross_gtk4 -->|"112 imports"| netcross_core
+    netcross_gtk4 -->|"113 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
     netcross_api -->|"21 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"55 imports"| netcross_core
+    netcross_api -->|"56 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"49 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
@@ -2025,7 +2025,8 @@ classDiagram
     }
     class mod_netcross_core_redact["netcross_core.redact"] {
         <<module>>
-        +redact_packets(packets) AddressRedactor
+        +scope_label(scope) str
+        +redact_packets(packets, scope) AddressRedactor
         +redaction_map_csv(entries) str
         +write_redaction_map_csv(redactor, path) None
     }

@@ -22,14 +22,22 @@ Perimetre assume, volontairement etroit (nom du flag CLI : --redact,
   actif, RFC/IEEE 802 -- jamais une vraie adresse assignee par un
   constructeur).
 
-Explicitement HORS PERIMETRE de cette passe (voir FEATURES.md section
-5.2, ligne "Anonymisation") -- ce sont des NOMS, pas des ADRESSES, et
-laisses tels quels : noms DNS (dns_qry_name), URI/host HTTP (http_uri),
-SAN de certificat TLS (tls_cert_san, tls_cert_san_ip) et sujet/emetteur
-(tls_cert_subject/tls_cert_issuer), identifiants SIP (sip_call_id/
-sip_user_agent/sip_server). Une capture "redigee" avec ce module reste
-donc potentiellement identifiante via ces canaux -- limite assumee et
-documentee (README.md, "Limites connues"), pas un oubli.
+Portee (issue #1153, option --redact-scope, defaut ``tout``) :
+
+- ``adresses`` : uniquement les adresses ci-dessus (comportement historique),
+  plus les adresses IP du SAN des certificats (tls_cert_san_ip) ;
+- ``noms`` : uniquement les champs nommes, via la table de noms commune
+  (netcross_core.pseudonyms, #1151) : noms DNS (dns_qry_name), cible HTTP
+  (http_uri : hote pseudonymise, chemin et requete remplaces par
+  ``/res-N``), SAN de certificat TLS (tls_cert_san, joker conserve),
+  sujet/emetteur (tls_cert_subject/tls_cert_issuer -> ``CN=dn-N``),
+  identifiants SIP (sip_call_id -> ``call-N@example.invalid``,
+  sip_user_agent/sip_server -> ``agent-N``) ;
+- ``tout`` : les deux.
+
+Chaque valeur reelle garde un pseudonyme stable pendant tout le run : les
+regroupements (dialogue SIP par Call-ID, certificat auto-signe quand sujet =
+emetteur, requetes vers un meme hote) restent exacts apres anonymisation.
 
 Egalement HORS PERIMETRE, par construction architecturale plutot que
 par choix : les diagnostics TLS/QUIC (netcross_core.tls_diagnostics/
@@ -72,9 +80,10 @@ from __future__ import annotations
 import csv
 import ipaddress
 import re
+from urllib.parse import urlsplit
 
 from netcross_core.logging_config import get_logger, summarize
-from netcross_core.pseudonyms import NamePseudonymizer, PseudonymTable
+from netcross_core.pseudonyms import PSEUDO_DOMAIN, NamePseudonymizer, PseudonymTable
 
 logger = get_logger(__name__)
 
@@ -129,6 +138,65 @@ def _mac_pseudonym(index: int) -> str:
 
 _GENERATORS = {"ipv4": _ipv4_pseudonym, "ipv6": _ipv6_pseudonym, "mac": _mac_pseudonym}
 
+SCOPE_ADDRESSES = "adresses"
+SCOPE_NAMES = "noms"
+SCOPE_ALL = "tout"
+SCOPES = (SCOPE_ADDRESSES, SCOPE_NAMES, SCOPE_ALL)
+SCOPE_LABELS = {
+    SCOPE_ADDRESSES: "adresses IP/MAC anonymisees (--redact)",
+    SCOPE_NAMES: "noms DNS/HTTP/TLS/SIP anonymises (--redact --redact-scope noms)",
+    SCOPE_ALL: "adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (--redact)",
+}
+
+KIND_DN = "dn"
+KIND_CALL_ID = "call-id"
+KIND_AGENT = "agent"
+KIND_RESOURCE = "ressource"
+
+
+def _dn_pseudonym(index: int) -> str:
+    logger.debug("_dn_pseudonym: index={}", index)
+    result = f"CN=dn-{index + 1}"
+    logger.debug("_dn_pseudonym: retour {}", result)
+    return result
+
+
+def _call_id_pseudonym(index: int) -> str:
+    logger.debug("_call_id_pseudonym: index={}", index)
+    result = f"call-{index + 1}@{PSEUDO_DOMAIN}"
+    logger.debug("_call_id_pseudonym: retour {}", result)
+    return result
+
+
+def _agent_pseudonym(index: int) -> str:
+    logger.debug("_agent_pseudonym: index={}", index)
+    result = f"agent-{index + 1}"
+    logger.debug("_agent_pseudonym: retour {}", result)
+    return result
+
+
+def _resource_pseudonym(index: int) -> str:
+    logger.debug("_resource_pseudonym: index={}", index)
+    result = f"/res-{index + 1}"
+    logger.debug("_resource_pseudonym: retour {}", result)
+    return result
+
+
+_LABEL_GENERATORS = {
+    KIND_DN: _dn_pseudonym,
+    KIND_CALL_ID: _call_id_pseudonym,
+    KIND_AGENT: _agent_pseudonym,
+    KIND_RESOURCE: _resource_pseudonym,
+}
+
+
+def scope_label(scope: str) -> str:
+    """Mention « Anonymisation » des rapports pour la portee ``scope``."""
+    logger.debug("scope_label: {}", scope)
+    label = SCOPE_LABELS[scope]
+    logger.debug("scope_label: retour {}", label)
+    return label
+
 
 def _ip_kind(value: str) -> str | None:
     """ "ipv4"/"ipv6" si `value` est une adresse IP syntaxiquement valide,
@@ -156,17 +224,25 @@ class AddressRedactor:
     .redact() sur une autre liste avec le MEME objet reutilise les
     pseudonymes deja attribues pour toute adresse deja rencontree."""
 
-    def __init__(self) -> None:
+    def __init__(self, scope: str = SCOPE_ALL) -> None:
         # Issue #1151 : table commune (netcross_core.pseudonyms), adresse
         # reelle -> (pseudonyme, type). Non idempotente : une adresse
         # reelle situee dans la plage des pseudonymes recoit son propre
         # pseudonyme (voir PseudonymTable).
-        logger.debug("AddressRedactor.__init__: debut")
+        logger.debug("AddressRedactor.__init__: debut (portée {})", scope)
+        if scope not in SCOPES:
+            logger.debug("AddressRedactor.__init__: levée ValueError (portée)")
+            raise ValueError(f"portée d'anonymisation inconnue : {scope!r} (attendu : {', '.join(SCOPES)})")
+        self.scope = scope
+        self.addresses = scope in (SCOPE_ADDRESSES, SCOPE_ALL)
+        self.named_fields = scope in (SCOPE_NAMES, SCOPE_ALL)
         self._table = PseudonymTable(_GENERATORS, idempotent=False)
         # Table des NOMS (host-N[.domain-M].example.invalid), partagee par
         # tous les champs nommes et exportee avec --redact-map ; appliquee
         # aux champs types DNS/HTTP/TLS/SIP par #1153.
         self.names = NamePseudonymizer()
+        # Valeurs nommees qui ne sont pas des noms d'hote (#1153).
+        self._labels = PseudonymTable(_LABEL_GENERATORS)
         logger.debug("AddressRedactor.__init__: fin")
 
     def _pseudonym(self, addr: str, kind: str) -> str:
@@ -199,12 +275,98 @@ class AddressRedactor:
 
     def redact(self, packets) -> None:
         """Mutation en place de chaque paquet de `packets` (Pkt ou
-        RawPacket, voir docstring de module)."""
+        RawPacket, voir docstring de module), selon la portee."""
+        logger.debug("AddressRedactor.redact: portée {}", self.scope)
         for pk in packets:
-            self._redact_one(pk)
+            if self.addresses:
+                self._redact_one(pk)
+            if self.named_fields:
+                self._redact_names(pk)
         logger.debug("AddressRedactor.redact: fin")
 
+    def _label(self, value: str, kind: str) -> str:
+        logger.debug("AddressRedactor._label: kind={}", kind)
+        pseudo = self._labels.pseudonym(value, kind)
+        logger.debug("AddressRedactor._label: retour {}", summarize(pseudo, "pseudo"))
+        return pseudo
+
+    def _host(self, host: str) -> str:
+        """Hote d'une URI ou d'un SAN : adresse IP -> pseudonyme d'adresse,
+        sinon pseudonyme de nom."""
+        logger.debug("AddressRedactor._host: debut")
+        kind = _ip_kind(host.strip("[]"))
+        if kind is not None:
+            pseudo = self._pseudonym(host.strip("[]"), kind)
+            result = f"[{pseudo}]" if host.startswith("[") else pseudo
+            logger.debug("AddressRedactor._host: retour adresse pseudonymisée")
+            return result
+        result = self.pseudonymize_name(host)
+        logger.debug("AddressRedactor._host: retour nom pseudonymisé")
+        return result
+
+    def _san_name(self, name: str) -> str:
+        """Nom du SAN ; un joker garde son ``*.`` et un joker de TLD seul
+        (``*.fr``, non identifiant) reste tel quel pour l'audit."""
+        logger.debug("AddressRedactor._san_name: debut")
+        if name.startswith("*."):
+            rest = name[2:]
+            if "." not in rest.strip("."):
+                logger.debug("AddressRedactor._san_name: retour joker de TLD inchangé")
+                return name
+            result = f"*.{self.pseudonymize_name(rest)}"
+            logger.debug("AddressRedactor._san_name: retour joker pseudonymisé")
+            return result
+        result = self._host(name)
+        logger.debug("AddressRedactor._san_name: retour")
+        return result
+
+    def _uri(self, uri: str) -> str:
+        """Cible HTTP : forme absolue (hote pseudonymise, chemin ``/res-N``),
+        forme autorite de CONNECT (``hote:port``), chemin seul ou ``*``."""
+        logger.debug("AddressRedactor._uri: debut")
+        if uri in ("", "/", "*"):
+            logger.debug("AddressRedactor._uri: retour cible neutre inchangée")
+            return uri
+        if "://" in uri:
+            parts = urlsplit(uri)
+            host = parts.hostname or ""
+            port = f":{parts.port}" if parts.port else ""
+            shown = f"[{host}]" if ":" in host else host
+            target = uri.split("://", 1)[1][len(parts.netloc) :]
+            path = self._label(target, KIND_RESOURCE) if target not in ("", "/") else target
+            result = f"{parts.scheme}://{self._host(shown) if host else ''}{port}{path}"
+            logger.debug("AddressRedactor._uri: retour forme absolue")
+            return result
+        if not uri.startswith("/"):
+            host, sep, port = uri.rpartition(":")
+            result = f"{self._host(host)}:{port}" if sep and port.isdigit() else self._host(uri)
+            logger.debug("AddressRedactor._uri: retour forme autorité")
+            return result
+        result = self._label(uri, KIND_RESOURCE)
+        logger.debug("AddressRedactor._uri: retour chemin pseudonymisé")
+        return result
+
+    def _redact_names(self, pk) -> None:
+        """Champs nommes DNS/HTTP/TLS/SIP (issue #1153)."""
+        logger.debug("AddressRedactor._redact_names: debut")
+        if getattr(pk, "dns_qry_name", None):
+            pk.dns_qry_name = self.pseudonymize_name(pk.dns_qry_name)
+        if getattr(pk, "http_uri", None):
+            pk.http_uri = self._uri(pk.http_uri)
+        if getattr(pk, "tls_cert_san", None):
+            pk.tls_cert_san = tuple(self._san_name(n) if n else n for n in pk.tls_cert_san)
+        for field in ("tls_cert_subject", "tls_cert_issuer"):
+            if getattr(pk, field, None):
+                setattr(pk, field, self._label(getattr(pk, field), KIND_DN))
+        if getattr(pk, "sip_call_id", None):
+            pk.sip_call_id = self._label(pk.sip_call_id, KIND_CALL_ID)
+        for field in ("sip_user_agent", "sip_server"):
+            if getattr(pk, field, None):
+                setattr(pk, field, self._label(getattr(pk, field), KIND_AGENT))
+        logger.debug("AddressRedactor._redact_names: fin")
+
     def _redact_one(self, pk) -> None:
+        logger.debug("AddressRedactor._redact_one: debut")
         if pk.proto == "STP":
             # src/dst portent ici une adresse MAC Ethernet (eth.src/
             # eth.dst), pas une IP -- voir pcap_parser.packet.build_packet.
@@ -239,6 +401,11 @@ class AddressRedactor:
                 for addr, port in sdp_media
             )
 
+        san_ip = getattr(pk, "tls_cert_san_ip", None)
+        if san_ip:
+            pk.tls_cert_san_ip = tuple(
+                self._pseudonym(addr, kind) if (kind := _ip_kind(addr)) is not None else addr for addr in san_ip
+            )
         # Issue #1125 : adresses des en-tetes Via/Contact, meme pseudonyme
         # que src/dst pour que la comparaison entre points reste exacte.
         if getattr(pk, "sip_via", None):
@@ -282,7 +449,7 @@ class AddressRedactor:
         logger.debug("AddressRedactor.entries()")
         addresses = sorted(self._table.entries(), key=lambda t: (t[2], t[1]))
         logger.debug("AddressRedactor.entries: retour {} adresse(s) + noms", len(addresses))
-        return addresses + self.names.entries()
+        return addresses + self.names.entries() + self._labels.entries()
 
     def __len__(self) -> int:
         """Nombre d'ADRESSES pseudonymisees (messages « N adresse(s)
@@ -298,13 +465,13 @@ class AddressRedactor:
         return {addr: pseudo for addr, pseudo, _kind in self._table.entries()}
 
 
-def redact_packets(packets) -> AddressRedactor:
+def redact_packets(packets, scope: str = SCOPE_ALL) -> AddressRedactor:
     """Raccourci pour le cas simple (un seul appel, un seul jeu de
     paquets) : construit un AddressRedactor neuf, redige `packets`,
     renvoie le redacteur (mapping/entries() consultables ensuite,
     notamment pour --redact-map)."""
     logger.debug("redact_packets: packets={}", summarize(packets, "packets"))
-    redactor = AddressRedactor()
+    redactor = AddressRedactor(scope)
     redactor.redact(packets)
     logger.debug("redact_packets: retour redactor={}", summarize(redactor, "redactor"))
     return redactor
