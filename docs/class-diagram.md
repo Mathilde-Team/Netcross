@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-220 modules · 313 classes · 801 fonctions publiques de module.
+221 modules · 317 classes · 808 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -2142,6 +2142,7 @@ classDiagram
 |---|---|
 | `netcross_core.active` | confirmation active du diagnostic passif (chantier #999, parent #993). |
 | `netcross_core.active.planner` | planificateur « constat localise -> mesure active proposee » (issue #1063, sous-issue 1/5 du chantier #999). |
+| `netcross_core.active.twamp` | client TWAMP-Light (RFC 5357, annexe I ; issue #1066, sous-issue 3/5 du chantier #999). |
 
 ### Diagramme
 
@@ -2177,8 +2178,58 @@ classDiagram
         +plan_from_diagnoses(diagnoses, max_flows_per_event) list~ProposedMeasurement~
     }
 
+    %% ===== netcross_core.active.twamp =====
+    class TwampError {
+        <<ValueError>>
+    }
+    class Reponse {
+        <<dataclass, frozen>>
+        +int sequence
+        +float emission
+        +float reception
+        +int sequence_client
+        +float emission_client
+        +int ttl_client
+    }
+    class Sonde {
+        <<dataclass, frozen>>
+        +int sequence
+        +float envoi
+        +float? retour_recu
+        +Reponse? reponse
+        +perdue() bool
+        +aller_retour() float?
+        +aller() float?
+        +retour() float?
+    }
+    class ResultatTwamp {
+        <<dataclass>>
+        +str cible
+        +int port
+        +str debut
+        +bool reflecteur_present
+        +str message
+        +list~Sonde~ sondes
+        +envoyees() int
+        +recues() int
+        +statistiques() dict~str, float or int or None~
+        +to_dict() dict
+    }
+    class mod_netcross_core_active_twamp["netcross_core.active.twamp"] {
+        <<module>>
+        +vers_ntp(instant) int
+        +depuis_ntp(valeur) float
+        +construire_sonde(sequence, instant, taille) bytes
+        +lire_reponse(paquet) Reponse
+        +construire_reponse(sonde, sequence, reception, emission, ttl) bytes
+        +mesurer(cible, port, nombre, intervalle, timeout, horloge, attente) ResultatTwamp
+        +cible_de_proposition(proposition, reflecteur) tuple~str, int~
+    }
+
     %% ===== relations =====
     ProposedMeasurement --> FiveTuple : five_tuple
+    Sonde --> Reponse : reponse
+    ResultatTwamp --> Sonde : sondes
 ```
 
 ## `netcross_core.application`
