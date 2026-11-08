@@ -18,6 +18,7 @@ class Node {
     this._ecouteurs = {};
   }
   setAttribute(k, v) { this.attributes[k] = String(v); }
+  removeAttribute(k) { delete this.attributes[k]; }
   getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attributes, k) ? this.attributes[k] : null; }
   appendChild(n) { n.parentNode = this; this.childNodes.push(n); return n; }
   removeChild(n) { this.childNodes = this.childNodes.filter((c) => c !== n); n.parentNode = null; return n; }
@@ -67,6 +68,12 @@ function serialiser(n) {
     children: n.childNodes.map(serialiser),
   };
 }
+function parAttribut(attr, valeur) {
+  let b = null;
+  parcourir(elements.rapport, (n) => { if (!b && n.getAttribute(attr) === String(valeur)) { b = n; } });
+  if (!b) { throw new Error("element absent : " + attr + "=" + valeur); }
+  return b;
+}
 function bouton(i) {
   let b = null;
   parcourir(elements.rapport, (n) => { if (n.tagName === "button" && n.getAttribute("data-index") === String(i)) { b = n; } });
@@ -76,7 +83,11 @@ function bouton(i) {
 function etat() {
   const d = document.getElementById("detail-segment");
   const actif = document.activeElement;
+  const p = document.getElementById("detail-preuve");
+  const c = document.getElementById("compteur-constats");
   return {
+    preuve: p ? p.textContent : null,
+    compteur: c ? c.textContent : null,
     detail: d ? d.textContent : null,
     detail_segment: d ? d.getAttribute("data-segment") : null,
     actif: actif ? actif.getAttribute("data-index") : null,
@@ -86,7 +97,15 @@ function etat() {
 new Function(entree.script)();
 const etats = [];
 (entree.actions || []).forEach((a) => {
-  const b = bouton(a.index);
+  // Menu deroulant (#1077) : on fixe sa valeur puis on declenche « change ».
+  if (a.type === "choix") {
+    const m = parAttribut("id", a.id);
+    m.value = a.value;
+    m.dispatch("change");
+    etats.push(Object.assign(etat(), { empeche: false }));
+    return;
+  }
+  const b = a.attr ? parAttribut(a.attr, a.valeur) : bouton(a.index);
   let ev = null;
   if (a.type === "survol") { ev = b.dispatch("mouseenter"); }
   if (a.type === "focus") { b.focus(); }

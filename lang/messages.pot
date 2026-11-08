@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: netcross\n"
 "Report-Msgid-Bugs-To: https://github.com/MathildeDec/Netcross/issues\n"
-"POT-Creation-Date: 2026-11-08 13:40+0000\n"
+"POT-Creation-Date: 2026-11-08 14:37+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -69,7 +69,7 @@ msgstr ""
 msgid "Endpoint"
 msgstr ""
 
-#: src/netcross_gtk4/stats_view.py
+#: src/netcross_gtk4/stats_view.py src/netcross_report/html_report.py
 msgid "Protocole"
 msgstr ""
 
@@ -380,6 +380,62 @@ msgstr ""
 
 #: src/netcross_report/html_report.py
 msgid "Aucun message SIP pour cet appel."
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Filtrer les constats"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Tous"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+#, python-brace-format
+msgid "{shown} / {total} constat(s) affiche(s)"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Preuves"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Selectionner une preuve pour voir la trame a chaque point de capture."
+msgstr ""
+
+#: src/netcross_report/html_report.py
+#, python-brace-format
+msgid "Preuve : trame {frame} au point {point}"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Trame introuvable dans les paquets correles : aucun diagramme."
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid ""
+"Trame de preuve et ses voisines de la meme conversation, vues a chaque point "
+"(date en ms depuis la preuve)"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Trame"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "non vue"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Preuves vues a chaque point"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Transit"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "non corrige du decalage d'horloge"
 msgstr ""
 
 #: src/netcross_report/html_report.py
