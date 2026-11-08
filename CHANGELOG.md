@@ -14,6 +14,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   Server SIP (`agent-N`), avec la table de noms commune (#1151), ainsi que les IP du SAN. Les pseudonymes restent
   stables pendant le run (dialogues SIP, certificats auto-signés). `--redact-map` exporte ces tables ; la GUI, l'API et
   `cross_capture_diff_cli.py` appliquent la portée « tout ». `--redact-scope adresses` rend le comportement antérieur.
+- Constats filtrables et preuves cliquables du rapport HTML (#1077) : filtres par sévérité, segment et protocole avec
+  compteur, et pour chaque preuve un diagramme centré sur la trame (voisines de la même conversation, même trame aux
+  autres points, transit corrigé du décalage d'horloge), avec ancre `#preuve-<point>-<trame>` et équivalent sans
+  JavaScript. Clé `evidence_frames` du JSON quand `packet_flows` est fourni. Voir docs/preuves-cliquables.md.
 - Débit crête multi-échelle en fenêtre glissante (#1133, chantier microrafales #1005) : `netcross_core.multiscale`
   cherche, pour chaque point et chaque échelle (100 µs, 1 ms, 10 ms par défaut), la fenêtre la plus chargée en octets.
   Le calcul est exact, incrémental (paquet par paquet, compatible avec `--streaming`) et à mémoire bornée par la

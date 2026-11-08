@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-226 modules · 330 classes · 828 fonctions publiques de module.
+227 modules · 330 classes · 833 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -44,7 +44,7 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"56 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"48 imports"| netcross_core
+    netcross_report -->|"49 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"25 imports"| pcap_parser
 ```
@@ -4053,6 +4053,7 @@ classDiagram
 | `netcross_report.batch_runner` | Moteur du mode lot (issues #277, #872), commun à la CLI (``cross_capture_batch_cli.py``), à l'API (``POST /batches``) et à la GUI. |
 | `netcross_report.charts` | graphiques matplotlib exportes en PNG pour le PDF. |
 | `netcross_report.comm_map` | cartographie des communications observees (Job 15/issue #15, FEATURES.md section 6.6). |
+| `netcross_report.evidence_frames` | Preuves cliquables du rapport HTML : trame de preuve vue a chaque point (issue #1077, sous-issue 3/6 du chantier #1000). |
 | `netcross_report.expert_events` | construit les vues `ExpertEvent`/ `Diagnosis` (Session 36, cinquieme et sixieme objets de contrat de la Session 0, FEATURES.md section 13.3) a partir d'une liste de `Finding`/ `DiffFinding` deja… |
 | `netcross_report.history` | persiste un resume de chaque run (analyse ou diff) dans une base SQLite locale, pour observer une tendance dans le temps (score de sante, nombre de constats par severite) sur des runs successifs --… |
 | `netcross_report.html_report` | rapport HTML autonome alimente par le JSON du rapport (issue #1073, sous-issue 1/6 du chantier #1000). |
@@ -4177,6 +4178,16 @@ classDiagram
         +write_comm_map(path, cmap) str
     }
 
+    %% ===== netcross_report.evidence_frames =====
+    class mod_netcross_report_evidence_frames["netcross_report.evidence_frames"] {
+        <<module>>
+        +finding_protocol(category) str
+        +evidence_ref(point, frame_number) str
+        +evidence_anchor(point, frame_number) str
+        +capture_point(point) str
+        +build_evidence_frames(findings, packet_flows, points, clock_offsets, context, limit) list~dict~
+    }
+
     %% ===== netcross_report.expert_events =====
     class mod_netcross_report_expert_events["netcross_report.expert_events"] {
         <<module>>
@@ -4220,7 +4231,7 @@ classDiagram
     %% ===== netcross_report.json_report =====
     class mod_netcross_report_json_report["netcross_report.json_report"] {
         <<module>>
-        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report) dict
+        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows) dict
         +generate_json_report(r, output_path, title, kwargs) str
         +generate_json_diff(findings, baseline, current, output_path, title, meta, tls_findings_baseline, tls_findings_current, quic_findings_baseline, quic_findings_current, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, names) str
     }
