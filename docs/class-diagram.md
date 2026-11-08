@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-212 modules · 308 classes · 756 fonctions publiques de module.
+213 modules · 309 classes · 758 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -46,7 +46,7 @@ flowchart TD
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"42 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"21 imports"| pcap_parser
+    netcross_core -->|"23 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -95,6 +95,8 @@ flowchart LR
     OsGuess["netcross_core.discovery.os_detect.OsGuess"]
     PacketAnnotation["netcross_core.models.PacketAnnotation"]
     Pkt["netcross_core.models.Pkt"]
+    RadioInfo["pcap_parser.radio.RadioInfo"]
+    RawPacket["pcap_parser.packet.RawPacket"]
     ReportContext["netcross_gtk4.report_exports.ReportContext"]
     Report["netcross_core.models.Report"]
     SegmentScore["netcross_report.triage.SegmentScore"]
@@ -126,6 +128,8 @@ flowchart LR
     LoadedPlugins -->|detectors| Detector
     LoadedPlugins -->|exporters| Exporter
     ModelPack -->|baseline| Baseline
+    Pkt -->|radio| RadioInfo
+    RawPacket -->|radio| RadioInfo
     Report -->|clock_offset_estimate| EstimationHorloge
     Report -->|clock_offset_samples| EchantillonHorloge
     SegmentScore -->|findings| Finding
@@ -144,6 +148,7 @@ flowchart LR
 | `pcap_parser.ek_source` | couche 1 : execution de tshark -T ek et lecture du flux NDJSON qui en resulte, fichier pcap ou interface live. |
 | `pcap_parser.packet` | couche 5 : assemblage d'un RawPacket normalise a partir des couches EK d'un paquet, une fois l'encapsulation detectee (tunnels.py) et les protocoles applicatifs extraits (protocols.py). |
 | `pcap_parser.protocols` | couche 4 : RTP / DHCP / SIP. |
+| `pcap_parser.radio` | metadonnees radio 802.11 par paquet (issue #1142). |
 | `pcap_parser.remote` | sources de capture distantes (issue #166). |
 | `pcap_parser.tunnels` | couche 3 : detection de la pile d'encapsulation (VLAN/MPLS/GRE/VXLAN/GTP-U/ERSPAN/CAPWAP) et selection de la couche IP/TCP/UDP/ICMP la plus interne a utiliser pour l'analyse. |
 
@@ -416,6 +421,7 @@ classDiagram
         +int? http_content_length
         +int? tcp_len
         +tuple~str, ...~ dns_answers
+        +RadioInfo? radio
         +str? comment
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -440,6 +446,22 @@ classDiagram
         +extract_tls_certificate(layers) dict?
         +extract_tls_handshake(layers) dict?
         +compute_mos(delay_ms, loss_pct)
+    }
+
+    %% ===== pcap_parser.radio =====
+    class RadioInfo {
+        <<dataclass, frozen, slots>>
+        +int? rssi_dbm
+        +int? mcs
+        +float? data_rate_mbps
+        +bool? retry
+        +int? channel
+        +int? frequency_mhz
+    }
+    class mod_pcap_parser_radio["pcap_parser.radio"] {
+        <<module>>
+        +extract_radio(layers) RadioInfo?
+        +missing_radiotap_note(path) str?
     }
 
     %% ===== pcap_parser.remote =====
@@ -475,6 +497,7 @@ classDiagram
     CaptureStructure --> InterfaceRecord : interfaces
     CaptureInfo --> InterfaceRecord : interfaces
     TsharkError <|-- CaptureAccessError
+    RawPacket --> RadioInfo : radio
 ```
 
 ## `netcross_core`
@@ -1557,6 +1580,7 @@ classDiagram
         +tuple~Banner, ...~ service_banners
         +int? tcp_len
         +tuple~str, ...~ dns_answers
+        +RadioInfo? radio
         +str? ip_checksum
         +bool? ip_checksum_bad
         +str? tcp_checksum
