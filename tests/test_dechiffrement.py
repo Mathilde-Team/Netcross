@@ -269,4 +269,19 @@ def test_compteur_quic_reel(avec_cle, attendu):
 
     options = {"tls_keylog": str(DONNEES / "quic-1rtt-keys.txt")} if avec_cle else {}
     paquets = parse_capture("CLIENT", str(DONNEES / "quic-1rtt.pcap"), **options)
-    assert compter_sessions(paquets) == {"CLIENT": {"quic": {"sessions": 1, "dechiffrees": attendu}}}
+    assert compter_sessions(paquets) == {"CLIENT": {"quic": {"sessions": 1, "dechiffrees": attendu}}}, _vue_tshark(
+        options
+    )
+
+
+def _vue_tshark(options: dict) -> str:
+    """Champs QUIC vus par tshark, joints au message d'échec (diagnostic CI)."""
+    args = ["tshark", "-n", "-r", str(DONNEES / "quic-1rtt.pcap")]
+    if options:
+        args += ["-o", f"tls.keylog_file:{options['tls_keylog']}"]
+    champs = ["frame.number", "quic.short", "quic.frame_type", "quic.decryption_failed", "quic.connection.number"]
+    for champ in champs:
+        args += ["-e", champ]
+    sortie = subprocess.run([*args, "-T", "fields"], capture_output=True, text=True, check=False)
+    paquets = subprocess.run(["tshark", "-n", "-r", args[3], *args[4:6]], capture_output=True, text=True, check=False)
+    return f"{sortie.stdout}\n{sortie.stderr}\n{paquets.stdout}"
