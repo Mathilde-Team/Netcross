@@ -37,7 +37,7 @@ import io
 import os
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +64,13 @@ from netcross_core.logging_config import get_logger, summarize
 from netcross_core.notify.request import NotifySettings, send_notifications
 from netcross_core.notify.request import validate_settings as validate_notify
 from netcross_core.security.findings import apply_security_findings, scan_capture_exploits
+from netcross_core.tls_keylog import (
+    TlsKeylogError,
+    options_lecture,
+    options_lecture_parallele,
+    resoudre_keylogs,
+    verifier_compatibilite,
+)
 from netcross_report.json_report import build_json_report_document
 from netcross_report.security_report import build_security_report
 from netcross_report.synthesis import build_findings
@@ -131,6 +138,18 @@ _KNOWN_DEST_FILE = File(
     default=None, description="Destinations connues (JSON, liste d'IP) — équiv. --known-destinations"
 )
 _KNOWN_HOSTS_FILE = File(default=None, description="Hôtes connus (JSON, liste d'IP) — équiv. --known-hosts")
+# Issue #1040 : fichiers de clés TLS (équiv. --tls-keylog)
+_TLS_KEYLOG_FILES = File(
+    default=None,
+    description="Fichier(s) de clés TLS (format SSLKEYLOGFILE) transmis à tshark pour déchiffrer "
+    "les sessions TLS — équiv. --tls-keylog ; incompatible avec redact. Copie temporaire en 0600, "
+    "supprimée à la fin de l'analyse ; le contenu n'est ni journalisé ni enregistré.",
+)
+_TLS_KEYLOG_LABELS_FORM = Form(
+    default=None,
+    description="Points des fichiers tls_keylog, séparés par des virgules, un par fichier "
+    "(« * » = tous les points). Absent : chaque fichier vaut pour tous les points (un seul fichier).",
+)
 # Issue #671 : split_interfaces et fichiers multiples par point
 _SPLIT_INTERFACES_FORM = Form(
     default=False,
@@ -354,6 +373,9 @@ class ApiAnalysisOptions:
 
     # Issue #867 : plugins autorisés (équiv. --plugins)
     plugins: tuple[str, ...] = ()
+    # Issue #1040 : fichier de clés TLS par point (chemins temporaires,
+    # jamais recopiés dans les métadonnées : seuls les points le sont)
+    tls_keylogs: tuple[tuple[str, str], ...] = ()
 
 
 def _options_metadata(options: ApiAnalysisOptions) -> dict:
@@ -373,6 +395,7 @@ def _options_metadata(options: ApiAnalysisOptions) -> dict:
             ],
         }
     )
+    data["tls_keylogs"] = sorted(label for label, _ in options.tls_keylogs)
     logger.debug("_options_metadata: retour")
     return data
 
@@ -573,13 +596,22 @@ def _tls_quic_findings(
     return tls_findings, quic_findings
 
 
-def _read_captures(captures: list[tuple[str, str]], parallel_workers: int | None) -> list:
+def _read_captures(
+    captures: list[tuple[str, str]],
+    parallel_workers: int | None,
+    tls_keylogs: tuple[tuple[str, str], ...] = (),
+) -> list:
     """Lit les captures, une par une ou en parallèle (``parallel_workers``,
-    issue #672) ; mêmes erreurs dans les deux cas."""
+    issue #672) ; mêmes erreurs dans les deux cas. ``tls_keylogs`` (issue
+    #1040) : fichier de clés TLS par point, transmis à tshark."""
+    logger.debug("_read_captures: entrée ({} capture(s), keylog={})", len(captures), bool(tls_keylogs))
+    keylogs = dict(tls_keylogs)
     if parallel_workers:
         from pcap_parser.capture import parse_captures_parallel
 
-        all_packets, stats = parse_captures_parallel(captures, max_workers=parallel_workers)
+        all_packets, stats = parse_captures_parallel(
+            captures, max_workers=parallel_workers, **options_lecture_parallele(keylogs, captures)
+        )
         for entry in stats:
             if entry["error"]:
                 logger.warning("parsing de la capture {} impossible : {}", entry["label"], entry["error"])
@@ -592,7 +624,7 @@ def _read_captures(captures: list[tuple[str, str]], parallel_workers: int | None
     packets: list = []
     for label, path in captures:
         try:
-            pkts = parse_capture(label, path)
+            pkts = parse_capture(label, path, **options_lecture(keylogs, label))
         except Exception as exc:
             logger.warning("parsing de la capture {} impossible : {}", label, exc)
             raise AnalysisError(f"Erreur de parsing pour {label}: {exc}") from exc
@@ -678,7 +710,7 @@ def _analyse_captures(
     mémoire pour les exports texte/PDF/CSV de l'issue #670.
     Exécuté hors de la boucle asyncio."""
     options = options or ApiAnalysisOptions()
-    all_packets = _read_captures(captures, options.parallel_workers)
+    all_packets = _read_captures(captures, options.parallel_workers, options.tls_keylogs)
     try:
         # Issue #672 : --max-packets/--sample, appliqués AVANT la corrélation,
         # avec la note de troncature de la CLI (jamais silencieuse, #283).
@@ -975,6 +1007,76 @@ _UPLOAD_RESPONSES: dict = {
 }
 
 
+def _fichiers_tls_keylog(files: Any) -> list[UploadFile]:
+    """Fichiers ``tls_keylog`` réellement envoyés (nom non vide) ; la valeur par
+    défaut ``File(...)`` d'un appel direct de la fonction vaut « aucun »."""
+    logger.debug("_fichiers_tls_keylog: entrée")
+    fichiers = [f for f in files if getattr(f, "filename", None)] if isinstance(files, list) else []
+    logger.debug("_fichiers_tls_keylog: retour, {} fichier(s)", len(fichiers))
+    return fichiers
+
+
+def _verifier_tls_keylog_redact(files: list[UploadFile] | None, redact: bool) -> None:
+    """400 si des fichiers de clés TLS accompagnent ``redact=true`` (issue #1040),
+    vérifié avant toute copie sur disque."""
+    logger.debug("_verifier_tls_keylog_redact: entrée")
+    try:
+        verifier_compatibilite(_fichiers_tls_keylog(files), redact=redact)
+    except TlsKeylogError as exc:
+        logger.debug("_verifier_tls_keylog_redact: refus ({})", exc)
+        detail = str(exc).replace("--tls-keylog", "tls_keylog").replace("--redact", "redact=true")
+        logger.debug("_verifier_tls_keylog_redact: except TlsKeylogError -> levée HTTPException")
+        raise HTTPException(status_code=400, detail=detail) from exc
+    logger.debug("_verifier_tls_keylog_redact: retour")
+
+
+async def _save_tls_keylogs(
+    files: list[UploadFile] | None, labels: str | None, points: list[str]
+) -> tuple[tuple[tuple[str, str], ...], list[str]]:
+    """Copie les fichiers de clés TLS (équiv. ``--tls-keylog``, issue #1040).
+
+    Retourne ``(fichier par point, chemins temporaires)`` ; les chemins sont
+    supprimés à la fin de l'analyse avec les autres fichiers joints. Copie en
+    0600 (``NamedTemporaryFile``, droits forcés) ; contenu jamais journalisé.
+    400 si le nombre de points ne correspond pas ou si un point est inconnu.
+    """
+    logger.debug("_save_tls_keylogs: entrée")
+    fichiers = _fichiers_tls_keylog(files)
+    labels = labels if isinstance(labels, str) else None
+    if not fichiers:
+        if labels:
+            logger.debug("_save_tls_keylogs: refus, points sans fichier")
+            raise HTTPException(status_code=400, detail="tls_keylog_labels fourni sans fichier tls_keylog")
+        logger.debug("_save_tls_keylogs: retour, aucun fichier")
+        return (), []
+    noms = [n.strip() for n in labels.split(",")] if labels else ["*"] * len(fichiers)
+    if len(noms) != len(fichiers):
+        logger.debug("_save_tls_keylogs: refus, nombre de points")
+        raise HTTPException(
+            status_code=400,
+            detail=f"tls_keylog_labels : {len(noms)} point(s) pour {len(fichiers)} fichier(s) tls_keylog",
+        )
+    chemins: list[str] = []
+    try:
+        for fichier in fichiers:
+            chemin = await _save_upload(fichier, "tls_keylog")
+            os.chmod(chemin, 0o600)
+            chemins.append(chemin)
+        specs = [c if n in ("", "*") else f"{n}={c}" for n, c in zip(noms, chemins, strict=True)]
+        keylogs = resoudre_keylogs(specs, points)
+    except BaseException as exc:
+        logger.debug("_save_tls_keylogs: échec ({}), {} copie(s) supprimée(s)", type(exc).__name__, len(chemins))
+        for chemin in chemins:
+            Path(chemin).unlink(missing_ok=True)
+        if isinstance(exc, TlsKeylogError):
+            logger.debug("_save_tls_keylogs: refus, HTTPException 400")
+            raise HTTPException(status_code=400, detail=str(exc).replace("--tls-keylog", "tls_keylog")) from exc
+        logger.debug("_save_tls_keylogs: relance de l'exception en cours")
+        raise
+    logger.debug("_save_tls_keylogs: retour, {} point(s)", len(keylogs))
+    return tuple(sorted(keylogs.items())), chemins
+
+
 async def _save_optional_file(file: UploadFile | None, suffix: str) -> str | None:
     """Sauvegarde un fichier optionnel (names, known_destinations, known_hosts)
     sur disque. Retourne le chemin ou None si aucun fichier fourni."""
@@ -1028,6 +1130,8 @@ async def upload_capture(
     known_destinations: UploadFile | None = _KNOWN_DEST_FILE,
     known_hosts: UploadFile | None = _KNOWN_HOSTS_FILE,
     extra_files: list[UploadFile] | None = _EXTRA_FILES,
+    tls_keylog: list[UploadFile] | None = _TLS_KEYLOG_FILES,
+    tls_keylog_labels: str | None = _TLS_KEYLOG_LABELS_FORM,
     split_interfaces: bool = _SPLIT_INTERFACES_FORM,
     rule_engine: bool = _RULE_ENGINE_FORM,
     expert_section: bool = _EXPERT_SECTION_FORM,
@@ -1068,6 +1172,7 @@ async def upload_capture(
     ``detect_duplicates``, ``exclude_duplicates`` et ``duplicate_threshold_ms``
     sont les équivalents des options de même nom de la CLI.
     """
+    _verifier_tls_keylog_redact(tls_keylog, redact)
     names_path = await _save_optional_file(names, ".json")
     known_dest_path = await _save_optional_file(known_destinations, ".json")
     known_hosts_path = await _save_optional_file(known_hosts, ".json")
@@ -1117,11 +1222,21 @@ async def upload_capture(
                 logger.debug("upload_capture: refus")
                 raise HTTPException(status_code=400, detail="Nom de fichier manquant dans extra_files")
             captures.append((label, await _save_upload(ef, label)))
+    try:
+        keylogs, keylog_paths = await _save_tls_keylogs(tls_keylog, tls_keylog_labels, [label])
+    except HTTPException:
+        logger.debug("upload_capture: fichiers de clés refusés, captures supprimées")
+        for _label, path in captures:
+            Path(path).unlink(missing_ok=True)
+        logger.debug("upload_capture: relance HTTPException")
+        raise
+    if keylogs:
+        options = replace(options, tls_keylogs=keylogs)
     metadata: dict[str, Any] = {"filename": file.filename, "label": label}
     if extra_files:
         metadata["extra_files"] = [f.filename for f in extra_files]
     metadata["split_interfaces"] = split_interfaces
-    extra_paths = [p for p in (names_path, known_dest_path, known_hosts_path) if p]
+    extra_paths = [p for p in (names_path, known_dest_path, known_hosts_path, *keylog_paths) if p]
     logger.debug("upload_capture: retour await _dispatch(captures, metadata, None, …")
     return await _dispatch(
         captures,
@@ -1254,6 +1369,8 @@ async def upload_multi_capture(
     names: UploadFile | None = _NAMES_FILE,
     known_destinations: UploadFile | None = _KNOWN_DEST_FILE,
     known_hosts: UploadFile | None = _KNOWN_HOSTS_FILE,
+    tls_keylog: list[UploadFile] | None = _TLS_KEYLOG_FILES,
+    tls_keylog_labels: str | None = _TLS_KEYLOG_LABELS_FORM,
     split_interfaces: bool = _SPLIT_INTERFACES_FORM,
     rule_engine: bool = _RULE_ENGINE_FORM,
     expert_section: bool = _EXPERT_SECTION_FORM,
@@ -1292,6 +1409,7 @@ async def upload_multi_capture(
     même label sont concaténés dans l'ordre chronologique (rotation),
     comme ``--capture NOM=a,b`` en CLI.
     """
+    _verifier_tls_keylog_redact(tls_keylog, redact)
     names_path = await _save_optional_file(names, ".json")
     known_dest_path = await _save_optional_file(known_destinations, ".json")
     known_hosts_path = await _save_optional_file(known_hosts, ".json")
@@ -1367,8 +1485,18 @@ async def upload_multi_capture(
         logger.debug("upload_multi_capture: except BaseException -> relance de l'exception en cours")
         raise
 
+    try:
+        keylogs, keylog_paths = await _save_tls_keylogs(tls_keylog, tls_keylog_labels, label_list)
+    except HTTPException:
+        logger.debug("upload_multi_capture: fichiers de clés refusés, captures supprimées")
+        for _label, path in captures:
+            Path(path).unlink(missing_ok=True)
+        logger.debug("upload_multi_capture: relance HTTPException")
+        raise
+    if keylogs:
+        options = replace(options, tls_keylogs=keylogs)
     metadata = {"files": [f.filename for f in files], "labels": label_list, "points_order": order_list}
-    extra_files = [p for p in (names_path, known_dest_path, known_hosts_path) if p]
+    extra_files = [p for p in (names_path, known_dest_path, known_hosts_path, *keylog_paths) if p]
     logger.debug("upload_multi_capture: retour await _dispatch(captures, metadata, order_list, m…")
     return await _dispatch(
         captures,

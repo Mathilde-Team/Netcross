@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from netcross_core.extract.contents import KINDS, prepare_out_dir
-from netcross_core.logging_config import get_logger
+from netcross_core.logging_config import get_logger, summarize
 
 logger = get_logger(__name__)
 
@@ -34,15 +34,25 @@ def selected_kinds(flags: dict[str, bool]) -> tuple[str, ...]:
     if not kinds:
         logger.debug("selected_kinds: aucun type coche")
         raise ValueError("cochez au moins un type de contenu")
+    logger.debug("selected_kinds: retour kinds={}", summarize(kinds, "kinds"))
     return kinds
 
 
 def unavailable_reason(captures: Sequence[tuple[str, str]] | None, redacted: bool) -> str | None:
     """Motif d'indisponibilite, ou None si l'extraction est possible."""
     if not captures:
+        logger.debug(
+            "unavailable_reason: si not captures -> retour UNAVAILABLE_NO_FILES={}",
+            summarize(UNAVAILABLE_NO_FILES, "UNAVAILABLE_NO_FILES"),
+        )
         return UNAVAILABLE_NO_FILES
     if redacted:
+        logger.debug(
+            "unavailable_reason: si redacted -> retour UNAVAILABLE_REDACTED={}",
+            summarize(UNAVAILABLE_REDACTED, "UNAVAILABLE_REDACTED"),
+        )
         return UNAVAILABLE_REDACTED
+    logger.debug("unavailable_reason: retour None")
     return None
 
 
