@@ -124,6 +124,10 @@ class AlarmEvent:
 
     timestamp : horodatage du feed() qui a déclenché cet événement.
 
+    severity : sévérité du signal à l'origine de l'alarme ("info",
+    "a_surveiller" ou "anomalie"). Utile au gel rétroactif (issue #1087)
+    pour filtrer sur une sévérité minimale sans importer netcross_report.
+
     message : description humaine prête à afficher/notification.
     """
 
@@ -132,6 +136,7 @@ class AlarmEvent:
     state: str
     timestamp: float
     message: str
+    severity: str = "anomalie"
 
 
 @dataclass
@@ -151,11 +156,15 @@ class _SegmentState:
     alarmed : True si une alarme est actuellement levée pour ce
     segment. Empêche le re-déclenchement (flapping) tant que la
     condition n'est pas retombée sous clear_threshold.
+
+    last_severity : sévérité du dernier signal positif vu pour ce
+    segment — reportée sur l'AlarmEvent émis (issue #1087).
     """
 
     samples: list[tuple[float, bool]] = field(default_factory=list)
     active_since: float | None = None
     alarmed: bool = False
+    last_severity: str = "anomalie"
 
 
 class AlarmEngine:
@@ -221,10 +230,12 @@ class AlarmEngine:
         # Indexer les signaux reçus ce cycle par (rule_id, segment).
         active_keys: set[tuple[str, str]] = set()
         signal_values: dict[tuple[str, str], float | None] = {}
+        signal_severities: dict[tuple[str, str], str] = {}
         for sig in signals:
             key = (sig.rule_id, sig.segment)
             active_keys.add(key)
             signal_values[key] = sig.value
+            signal_severities[key] = sig.severity
 
         logger.debug("feed: {} signal(s) reçu(s), {} config(s)", len(signals), len(self._configs))
 
@@ -247,6 +258,11 @@ class AlarmEngine:
                 sig_key = (cfg.rule_id, seg)
                 sig_present = sig_key in active_keys
                 sig_value = signal_values.get(sig_key)
+
+                # Mémoriser la sévérité du dernier signal vu pour ce
+                # segment — reportée sur l'AlarmEvent émis (issue #1087).
+                if sig_present:
+                    state.last_severity = signal_severities.get(sig_key, state.last_severity)
 
                 is_positive = self._is_positive(cfg, sig_present, sig_value)
                 is_clear = self._is_cleared(cfg, sig_present, sig_value)
@@ -385,6 +401,7 @@ class AlarmEngine:
                 segment=segment,
                 state="raised",
                 timestamp=timestamp,
+                severity=state.last_severity,
                 message=(
                     f"Alarme levée : {cfg.rule_id} sur {segment} (persistance {persistence:.1f}s, ratio {ratio:.0%})"
                 ),
@@ -405,5 +422,6 @@ class AlarmEngine:
                 segment=segment,
                 state="cleared",
                 timestamp=timestamp,
+                severity=state.last_severity,
                 message=f"Alarme cleared : {cfg.rule_id} sur {segment} retombée sous le seuil",
             )
