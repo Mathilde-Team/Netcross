@@ -8,7 +8,9 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from netcross_core.clock_sync import EchantillonHorloge, EstimationHorloge
 from netcross_core.logging_config import get_logger
+from pcap_parser.radio import RadioInfo
 
 logger = get_logger(__name__)
 
@@ -193,6 +195,13 @@ class Pkt:
     # Adresses A/AAAA d'une reponse DNS (issue #344, fast flux), reportees
     # depuis RawPacket.dns_answers ; tuple vide hors reponse DNS.
     dns_answers: tuple[str, ...] = ()
+    # Points de reception media (adresse, port) annonces par le SDP d'un
+    # message SIP (issue #1120), reportes depuis RawPacket.sip_sdp_media ;
+    # tuple vide hors SIP avec SDP. Consommes par voip.build_calls.
+    sip_sdp_media: tuple[tuple[str, int], ...] = ()
+    # Metadonnees radio 802.11 par trame (issue #1142), reportees depuis
+    # RawPacket.radio ; None hors capture 802.11.
+    radio: RadioInfo | None = None
     # -- Checksums IP/TCP/UDP (Job 43/issue #163) : valeurs brutes (chaine
     # hex) et verdicts tri-etats (True=invalide, False=valide, None=non
     # determine) reportes tels quels depuis RawPacket. Pas encore consommes
@@ -291,6 +300,9 @@ class Report:
     bucket_seconds: float = 1.0
     rtp_clock_rate: int = 8000
     seen_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    # issue #1110 : paquets vus a chaque point (seen_count compte des FLUX) --
+    # alimente netcross_point_packets_total (netcross_report.metrics_export)
+    packet_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     loss_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     # issue #352 : paquets vus en amont dont le couple d'hotes n'echange
     # jamais rien a ce point (ni aller ni retour) -- trafic hors chemin
@@ -504,9 +516,13 @@ class Report:
     # confirmer, jamais un diagnostic definitif -- voir la docstring du module.
     exploit_suspicion: dict[str, dict[str, int]] = field(default_factory=lambda: defaultdict(lambda: defaultdict(int)))
     exploit_suspicion_flows: list[dict] = field(default_factory=list)
-    # -- decalage d'horloge (via handshakes TCP, hypothese de chemin symetrique) --
-    clock_offset_samples: dict[tuple[str, str], list[float]] = field(default_factory=lambda: defaultdict(list))
-    clock_offset_estimate: dict[tuple[str, str], tuple[float, float, int]] = field(default_factory=dict)
+    # -- decalage d'horloge (issue #996 : filtre au delai minimal +
+    # Theil-Sen, echantillons handshakes TCP et couples DNS ; voir
+    # clock_sync.py) --
+    clock_offset_samples: dict[tuple[str, str], list[EchantillonHorloge]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+    clock_offset_estimate: dict[tuple[str, str], EstimationHorloge] = field(default_factory=dict)
     # -- VLAN 802.1Q --
     vlan_seen: dict[str, set[int]] = field(default_factory=lambda: defaultdict(set))
     vlan_change: dict[tuple[str, str], int] = field(default_factory=lambda: defaultdict(int))
@@ -711,6 +727,12 @@ class Report:
     # print_report(). Vide si capinfos est absent ou si la capture ne
     # porte aucune metadonnee (cas le plus frequent).
     capture_infos: list[dict] = field(default_factory=list)
+    # -- Vitesse de lien et resolution d'horodatage par point (issue
+    # #1132) -- remplie par l'appelant via
+    # netcross_core.link_speed.resolve_link_speeds(captures, overrides) :
+    # point -> {speed_bps, speed_source ("if_speed", "--link-speed" ou
+    # None), ts_resolution (s), interfaces}. Vide hors CLI.
+    link_speeds: dict[str, dict] = field(default_factory=dict)
     # -- Integrite/qualite de capture (Job 43/issue #163) -- voir
     # netcross_core.forensic.validate_checksums().
     checksum_errors: list[ChecksumError] = field(default_factory=list)

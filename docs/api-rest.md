@@ -221,7 +221,8 @@ résumé porte `history_error`. `history=true` sans `NETCROSS_HISTORY_DB`, ou
 
 Table de correspondance (équivalent de `--redact-map`, issue #876) :
 `GET /analyses/{id}/redact-map` et `GET /comparisons/{id}/redact-map`
-rendent le CSV `adresse_reelle,pseudonyme,type` de `--redact-map`. Une
+rendent le CSV `adresse_reelle,pseudonyme,type` de `--redact-map` (lignes
+`nom`/`domaine` en plus pour la table des noms, issue #1151). Une
 comparaison anonymise baseline et courant avec la même table : une adresse
 garde le même pseudonyme des deux côtés. La table n'existe qu'en mémoire du
 serveur (jamais en SQLite : 409 après redémarrage), 404 sans `redact`.
@@ -232,6 +233,22 @@ avec lui.
 curl -X POST "http://localhost:8000/captures/multi?wait=true" \
   -F "files=@lan.pcap" -F "files=@dc.pcap" -F "labels=LAN,DC" \
   -F "nat_tolerant=true" -F "tls=true"
+```
+
+Fichiers de clés TLS (équivalent de `--tls-keylog`, issue #1040) : un ou
+plusieurs fichiers `tls_keylog` (format `SSLKEYLOGFILE`) et, en option,
+`tls_keylog_labels` (un point par fichier, séparés par des virgules, `*` =
+tous les points ; absent = le fichier vaut pour tous les points). Chaque
+fichier est copié dans un fichier temporaire en 0600, transmis à tshark puis
+supprimé à la fin de l'analyse ; ni son contenu ni son chemin ne sont
+enregistrés (seuls les noms de points figurent dans `options.tls_keylogs`).
+400 avec `redact=true`, sur un point inconnu ou si le nombre de points ne
+correspond pas au nombre de fichiers.
+
+```bash
+curl -X POST "http://localhost:8000/captures/multi?wait=true" \
+  -F "files=@client.pcap" -F "files=@serveur.pcap" -F "labels=CLIENT,SERVEUR" \
+  -F "tls_keylog=@keys.txt" -F "tls_keylog_labels=CLIENT"
 ```
 
 ### Récupérer le rapport structuré (issue #330)
