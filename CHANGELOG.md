@@ -8,6 +8,7 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Journaux de flux au format Zeek `conn.log` (#1115) : `--zeek-conn FICHIER` écrit une ligne par connexion et par point, colonnes Zeek standard (`#fields`/`#types`, lisible par `zeek-cut`) puis colonnes `netcross_*` (segment, latence et pertes par segment avec `--order`) ; `--zeek-format json` pour un objet par ligne. Respecte `--redact`. Voir docs/zeek-export.md.
 - Image de CI préconstruite (#968, étape 1) : `.github/ci-image/Dockerfile` (paquets apt des jobs `quality`, `gtk4` et
   `packaging`) et workflow `ci-image.yml`. L'image est construite sur chaque PR qui la modifie, puis poussée vers
   `ghcr.io/mathilde-team/netcross-ci:26.04` à chaque modification fusionnée dans `dev`, chaque lundi (mises à jour de
