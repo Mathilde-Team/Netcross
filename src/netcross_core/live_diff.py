@@ -139,8 +139,7 @@ class LiveDiffEngine:
         gel: GelManager | None = None,
     ):
         logger.debug(
-            "LiveDiffEngine.__init__: baseline_report={} config={} on_alarm={} alarm_engine={} "
-            "ring_buffer={} gel={}",
+            "LiveDiffEngine.__init__: baseline_report={} config={} on_alarm={} alarm_engine={} ring_buffer={} gel={}",
             summarize(baseline_report, "baseline_report"),
             summarize(config, "config"),
             summarize(on_alarm, "on_alarm"),
