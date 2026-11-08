@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-223 modules · 324 classes · 815 fonctions publiques de module.
+223 modules · 326 classes · 819 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -283,6 +283,7 @@ classDiagram
         +ring_inventory(directory, prefix, reader) list~RingFile~
         +select_ring_files(inventory, start, end, include_unknown) list~RingFile~
         +merge_captures(paths, output_path, dedup) None
+        +cut_capture_window(path, output_path, start, end) None
         +replay_capture(path, interface, speed, loop) None
         +replay_command(path, interface, speed, loop) list~str~
         +start_replay(path, interface, speed, loop) subprocess.Popen
@@ -2034,10 +2035,35 @@ classDiagram
         +float end
         +Mapping~str, Sequence~str~~ files
         +str message
+        +Mapping~str, tuple~float, float~~ fenetres
+        +str dossier
+        +float? horodatage_alarme
         +str? ignored_reason
     }
     class GelManager {
         +on_alarm(event) GelReport?
+    }
+    class FichierIncident {
+        <<dataclass, frozen>>
+        +str point
+        +str source
+        +str segment
+        +str empreinte
+    }
+    class ManifesteIncident {
+        <<dataclass, frozen>>
+        +str incident
+        +Mapping~str, object~ alarme
+        +tuple~float, float~ fenetre
+        +tuple~FichierIncident, ...~ fichiers
+        +vers_json() str
+        +depuis_json(texte)$ ManifesteIncident
+    }
+    class mod_netcross_core_retro_capture["netcross_core.retro_capture"] {
+        <<module>>
+        +empreinte_sha256(chemin) str
+        +archiver_incident(rapport, decoupeur) ManifesteIncident
+        +verifier_manifeste(manifeste) list~str~
     }
 
     %% ===== netcross_core.stats =====
@@ -2207,6 +2233,7 @@ classDiagram
     Pkt --> Banner : service_banners
     Report --> ChecksumError : checksum_errors
     Report --> SequenceGap : sequence_gaps
+    ManifesteIncident --> FichierIncident : fichiers
 ```
 
 ## `netcross_core.active`
