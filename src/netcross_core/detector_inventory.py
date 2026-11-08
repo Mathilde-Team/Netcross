@@ -249,6 +249,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         "le délai bout en bout dépend du décalage d'horloge estimé par handshake",
     ),
     Detecteur(
+        "rtp_match",
+        PHASE,
+        FENETRE_BORNEE,
+        "par jambe RTP (point, 5-tuple, SSRC) : couples (séquence, horodatage RTP)",
+        "durée du flux RTP, plus 5 s de recouvrement entre jambes",
+        ("rtp_matches",),
+        "appariement entre points malgré NAT/SBC (#1121) : décalage constant de séquence et d'horodatage",
+    ),
+    Detecteur(
         "response_time",
         PHASE,
         FENETRE_BORNEE,
