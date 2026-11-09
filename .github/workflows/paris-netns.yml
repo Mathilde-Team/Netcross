@@ -1,0 +1,64 @@
+name: Traceroute Paris (réseau isolé)
+
+"on":
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paris-netns-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paris-netns:
+    name: Paris réel (TCP, UDP, ICMP, pertes)
+    # VM hébergée éphémère : aucun privilège ajouté aux runners maison,
+    # aucune donnée réelle, aucun secret, aucune sonde vers Internet.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: ubuntu:26.04
+      options: --privileged
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Outils réseau et backend figé
+        run: |
+          DEBIAN_FRONTEND=noninteractive apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            git ca-certificates curl python3 iproute2 iptables \
+            scamper=20211212-1.2build2
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          # Ce paquet renvoie 255 avec « -v », même pour une version valide.
+          test "$(dpkg-query -W -f='${Version}' scamper)" = 20211212-1.2build2
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: false
+          version: "0.13.4"
+      - name: Python et dépendances verrouillées
+        run: |
+          uv python install 3.14.8
+          uv sync --locked --python 3.14.8 --extra dev
+      - name: Quatre tests réels, aucun skip
+        env:
+          PYTHONPATH: src
+        run: |
+          uv run pytest tests/integration/paris_netns.py -q -rs --junitxml=paris-netns.xml
+          uv run python -c 'import xml.etree.ElementTree as E; r=E.parse("paris-netns.xml"); s=r.findall(".//testsuite"); assert sum(int(x.get("tests","0")) for x in s)==4; assert sum(int(x.get("skipped","0")) for x in s)==0'
+      - name: Résultats synthétiques
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: paris-netns-${{ github.run_id }}-${{ github.run_attempt }}
+          path: paris-netns.xml
+          if-no-files-found: warn
