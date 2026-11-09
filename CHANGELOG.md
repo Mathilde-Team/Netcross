@@ -8,6 +8,13 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- État par flux avec expiration (#1023, chantier pipeline en flux #995) : `--flow-timeouts` (délais par
+  protocole à la Zeek, format `TCP=3600,UDP=60,ICMP=60,AUTRE=60`) configure la table d'état de flux de
+  `--streaming` — un flux inactif depuis son délai libère son état (mémoire bornée par les flux actifs),
+  la réouverture après expiration est comptée, et le détecteur de coupure NAT/pare-feu silencieuse y est
+  incrémental : mêmes constats que le détecteur batch, exposés dans `streaming.flow_state` de
+  `--json-report` (clés `records`, `expired`, `reopened`, `peak_active`, `nat_cutoffs`…) et les lignes
+  « État par flux » du rapport texte. Voir docs/etat-flux.md.
 - Campagne de performance multi-cœurs documentée (#1018, banc de performance #994) :
   `docs/performance.md` présente les mesures du pipeline complet (`tshark` inclus) sur les jeux
   synthétiques — tables jeux × degré de parallélisme (2 à 10 points, 10⁴ à 10⁶ paquets par point,
