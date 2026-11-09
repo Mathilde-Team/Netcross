@@ -31,4 +31,7 @@ RUN echo "wireshark-common wireshark-common/install-setuid boolean false" | debc
       gir1.2-gtk-4.0 libgirepository-2.0-dev libcairo2-dev pkg-config xvfb xauth \
       # Construction des paquets (job packaging)
       debhelper dpkg-dev rpm \
+      # Dépendances du .deb installé : aucun index apt conservé dans l'image.
+      python3-cryptography python3-loguru python3-reportlab python3-matplotlib \
+      python3-networkx python3-gi \
  && rm -rf /var/lib/apt/lists/*

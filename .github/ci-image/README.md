@@ -34,6 +34,13 @@ Pendant la transition depuis une image déjà publiée sans Node.js, le repli
 reste fonctionnel. Après une modification de dépendance système, mettre à
 jour le Dockerfile, le contrôle des outils et la liste du job concerné.
 
+Les dépendances `Depends` et `Recommends` du `.deb` sont aussi préinstallées
+et contrôlées dans le job paquets. L'image supprime ses index apt ; sans
+ce contrôle, le test d'installation du `.deb` ne pourrait pas résoudre
+une dépendance absente lorsque toutes les gardes de construction passent.
+Le repli recharge les index et installe ces dépendances pendant la transition
+depuis une ancienne image, sans retirer le test de fumée du paquet installé.
+
 ## Validation et limites
 
 Les tests `tests/test_ci_prebuilt_image.py` exécutent les gardes Bash avec

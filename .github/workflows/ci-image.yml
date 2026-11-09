@@ -68,6 +68,7 @@ jobs:
               command -v "$outil" >/dev/null || { echo "outil manquant : $outil"; exit 1; }
             done
             python3 -m venv --help >/dev/null
+            python3 -c "import cryptography, loguru, reportlab, matplotlib, networkx, gi"
             tshark --version | sed -n 1p
           '
 

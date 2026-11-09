@@ -524,15 +524,21 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Outils de construction (debhelper, rpm) et tshark
+        # Le test de fumée installe le .deb avec ses Depends/Recommends.
+        # L'image nettoie les index apt : contrôler aussi ces dépendances.
         run: |
           echo "wireshark-common wireshark-common/install-setuid boolean false" \
             | debconf-set-selections
           if ! dpkg-query -W -f='${db:Status-Status}\n' \
-              build-essential debhelper dpkg-dev gettext rpm tshark 2>/dev/null \
+              build-essential debhelper dpkg-dev gettext rpm tshark python3 \
+              python3-cryptography python3-loguru python3-reportlab python3-matplotlib \
+              python3-networkx python3-gi gir1.2-gtk-4.0 2>/dev/null \
               | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
             DEBIAN_FRONTEND=noninteractive apt-get update -qq
             DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-              build-essential debhelper dpkg-dev gettext rpm tshark
+              build-essential debhelper dpkg-dev gettext rpm tshark python3 \
+              python3-cryptography python3-loguru python3-reportlab python3-matplotlib \
+              python3-networkx python3-gi gir1.2-gtk-4.0
           fi
 
       - name: Construction du .deb

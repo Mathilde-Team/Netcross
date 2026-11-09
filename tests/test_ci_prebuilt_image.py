@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
 from pathlib import Path
@@ -141,3 +142,16 @@ def test_publication_et_frequence_existantes_conservees():
     push = next(step for step in image["jobs"]["image"]["steps"] if step["name"] == "Push")
     assert push["if"] == "github.event_name != 'pull_request'"
     assert "docker push" in push["run"]
+
+
+def test_garde_paquets_couvre_depends_et_recommends_du_deb():
+    control = (ROOT / "build-deb/debian/control").read_text(encoding="utf-8")
+    depends = control.split("\nDepends:", 1)[1].split("\nSuggests:", 1)[0]
+    requis = set(re.findall(r"\b(?:python3(?:-[a-z0-9-]+)?|tshark|gir1\.2-gtk-4\.0)\b", depends))
+    assert len(requis) == 9
+    etape = next(step for job_id, step in APT_STEPS if job_id == "packaging" and "debhelper" in step["name"])
+    controle = _garde(etape["run"]).split("dpkg-query -W ", 1)[1].split("2>/dev/null", 1)[0]
+    paquets = set(shlex.split(controle.replace("\\\n", " "))[1:])
+    assert requis <= paquets
+    image = (ROOT / ".github/workflows/ci-image.yml").read_text(encoding="utf-8")
+    assert "import cryptography, loguru, reportlab, matplotlib, networkx, gi" in image

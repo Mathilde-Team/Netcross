@@ -24,3 +24,16 @@ et un code de sortie nul. Les hooks, mypy, MkDocs strict et actionlint
 avec ShellCheck restent verts. La construction et le téléchargement de
 l'image restent à vérifier par les workflows, sans revendiquer un gain
 chronométré ni modifier les autorisations du compte local.
+
+Le premier run a réellement téléchargé l'image mais son test du `.deb`
+installé a révélé une dépendance absente, avec index apt nettoyés :
+https://github.com/Mathilde-Team/Netcross/actions/runs/42718455188/job/129505955596.
+La correction préinstalle les Depends/Recommends, les contrôle dans le
+job paquets et teste leur alignement avec `build-deb/debian/control`.
+L'installation et l'analyse réelles du paquet restent obligatoires ;
+aucun contrôle n'est retiré pour résoudre cet échec.
+
+Après correction, les 71 tests dédiés et la nouvelle suite complète passent :
+7 426 réussis, 1 ignoré existant, 111 avertissements en 249,20 secondes,
+98,08 % de couverture combinée et code de sortie zéro. Les hooks, mypy,
+MkDocs strict et actionlint avec ShellCheck sont verts avant le nouveau push.
