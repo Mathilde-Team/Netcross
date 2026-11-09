@@ -23,6 +23,7 @@ class Node {
   appendChild(n) { n.parentNode = this; this.childNodes.push(n); return n; }
   removeChild(n) { this.childNodes = this.childNodes.filter((c) => c !== n); n.parentNode = null; return n; }
   get firstChild() { return this.childNodes[0] || null; }
+  get lastChild() { return this.childNodes[this.childNodes.length - 1] || null; }
   get textContent() { return this._texte + this.childNodes.map((c) => c.textContent).join(""); }
   set textContent(v) { this.childNodes = []; this._texte = String(v); }
   addEventListener(type, f) { (this._ecouteurs[type] = this._ecouteurs[type] || []).push(f); }
@@ -47,6 +48,8 @@ Object.keys(entree.elements).forEach((id) => {
 const document = {
   activeElement: null,
   createElement: (tag) => new Node(tag),
+  // SVG du rapport (#1079) : le harnais ne dessine pas, la structure suffit.
+  createElementNS: (_ns, tag) => new Node(tag),
   getElementById(id) {
     if (elements[id]) { return elements[id]; }
     let trouve = null;
@@ -102,6 +105,14 @@ const etats = [];
     const m = parAttribut("id", a.id);
     m.value = a.value;
     m.dispatch("change");
+    etats.push(Object.assign(etat(), { empeche: false }));
+    return;
+  }
+  // Defilement d'un diagramme de sequence (#1079) : position puis evenement.
+  if (a.type === "defilement") {
+    const c = parAttribut("data-conteneur-sequence", String(a.diagramme));
+    c.scrollTop = a.valeur;
+    c.dispatch("scroll");
     etats.push(Object.assign(etat(), { empeche: false }));
     return;
   }

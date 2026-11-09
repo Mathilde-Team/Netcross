@@ -13,6 +13,15 @@ que pour un contexte spécifique, pas systématiquement.
 
 ## État courant
 
+- **Traceroute Paris, issue #1065 (09/11/2026)** : backend optionnel
+  Scamper, TCP/UDP/ICMP, source et ports conservés, TTL croissant,
+  espacement natif borné à au plus 10 sondes/s et arrêt au silence
+  persistant configurable. Aucun shell, sudo, setcap, repli de source
+  ou appel automatique CLI/API (#1068 reste distinct). Tests unitaires
+  purs et job réseau dédié à quatre essais obligatoires, sans route
+  extérieure ni skip. Voir `docs/mesures-actives.md` et la session 79 ;
+  les résultats réseau ne sont acquis qu'après exécution verte du job.
+
 - **Échantillons UDP, issue #1029 (09/11/2026)** : appariement DNS par
   transaction, nom et extrémités, avec rejet des collisions et échanges
   incomplets ; RTP/RTCP uniques et bidirectionnels, séparés d'au plus
