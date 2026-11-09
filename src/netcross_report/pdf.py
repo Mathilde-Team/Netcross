@@ -24,6 +24,7 @@ from reportlab.platypus import (
 )
 
 from netcross_core.dechiffrement import lignes as lignes_dechiffrement
+from netcross_core.i18n import _
 from netcross_core.logging_config import get_logger, summarize
 from netcross_report.charts import (
     DIFF_SEVERITY_SCHEME,
@@ -1135,6 +1136,16 @@ def generate_pdf(
             info_rows += [(k, v) for k, v in meta.items() if k not in seen_keys]
         story.append(_kv_table(info_rows, styles))
         story.append(PageBreak())
+
+        if getattr(r, "active_confirmation", None):
+            from netcross_report.active_confirmation import lignes_confirmation
+
+            story.append(Paragraph(_("Confirmation active"), styles["H1b"]))
+            story.extend(
+                Paragraph(_xml_escape(ligne), styles["BodyText"])
+                for ligne in lignes_confirmation(r.active_confirmation)
+            )
+            story.append(PageBreak())
 
         # -- par ou commencer (triage) --
         story.append(Paragraph("Par ou commencer", styles["H1b"]))

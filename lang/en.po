@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: netcross\n"
 "Report-Msgid-Bugs-To: https://github.com/MathildeDec/Netcross/issues\n"
-"POT-Creation-Date: 2026-11-09 18:51+0000\n"
+"POT-Creation-Date: 2026-11-09 19:56+0000\n"
 "PO-Revision-Date: 2026-09-23 07:01+0000\n"
 "Last-Translator: Netcross\n"
 "Language-Team: none\n"
@@ -16,6 +16,76 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/cross_capture_analyzer_cli.py
+msgid ""
+"--confirm-active/--active-dry-run incompatibles avec --redact : cibles "
+"anonymisées"
+msgstr ""
+"--confirm-active/--active-dry-run are incompatible with --redact: anonymised "
+"targets"
+
+#: src/cross_capture_analyzer_cli.py
+msgid ""
+"Affiche les commandes de confirmation active sans aucune émission, même avec "
+"--confirm-active."
+msgstr ""
+"Show active confirmation commands without sending any probes, even with --"
+"confirm-active."
+
+#: src/cross_capture_analyzer_cli.py
+msgid ""
+"Autorise explicitement les sondes actives vers les flux prouvés des constats "
+"(8 mesures maximum)."
+msgstr ""
+"Explicitly allow active probes for flows supported by finding evidence (up "
+"to 8 measurements)."
+
+#: src/cross_capture_analyzer_cli.py src/netcross_report/html_report.py
+#: src/netcross_report/markdown_report.py src/netcross_report/pdf.py
+msgid "Confirmation active"
+msgstr "Active confirmation"
+
+#: src/netcross_api/app.py
+msgid "Autorise explicitement les sondes actives (8 mesures maximum)"
+msgstr "Explicitly allow active probes (up to 8 measurements)"
+
+#: src/netcross_api/app.py
+msgid ""
+"Confirmation active désactivée sur le serveur (NETCROSS_API_ACTIVE=1 requis)."
+msgstr ""
+"Active confirmation is disabled on the server (NETCROSS_API_ACTIVE=1 "
+"required)."
+
+#: src/netcross_api/app.py
+msgid "Simulation des commandes sans émission ; prioritaire sur confirm_active"
+msgstr ""
+"Simulate commands without sending probes; takes precedence over "
+"confirm_active"
+
+#: src/netcross_api/app.py
+msgid "confirm_active/active_dry_run incompatibles avec redact"
+msgstr "confirm_active/active_dry_run are incompatible with redact"
+
+#: src/netcross_core/active/confirmation.py
+msgid ""
+"Divergence possible : aucune perte active observée. Cette mesure "
+"postérieure, vers un réflecteur, ne réfute pas les pertes de la capture."
+msgstr ""
+"Possible divergence: no loss observed during active measurement. This later "
+"measurement towards a reflector does not refute loss in the capture."
+
+#: src/netcross_core/active/confirmation.py
+msgid ""
+"Indéterminée : une mesure active postérieure ne prouve ni la cause ni l'état "
+"historique du segment. Les RTT ne sont pas des latences aller simple."
+msgstr ""
+"Undetermined: a later active measurement proves neither the cause nor the "
+"historical state of the segment. RTTs are not one-way delays."
+
+#: src/netcross_core/active/confirmation.py
+msgid "cible TWAMP unicast littérale requise"
+msgstr "A literal unicast TWAMP target is required"
 
 #: src/netcross_gtk4/run_outcome.py
 msgid "Analyse terminee."
@@ -134,6 +204,57 @@ msgstr "{v:.1f} KB"
 #, python-brace-format
 msgid "{v:.1f} Mo"
 msgstr "{v:.1f} MB"
+
+#: src/netcross_report/active_confirmation.py
+msgid "Activation explicite."
+msgstr "Explicit activation."
+
+#: src/netcross_report/active_confirmation.py
+msgid "Commande : "
+msgstr "Command: "
+
+#: src/netcross_report/active_confirmation.py
+#, python-brace-format
+msgid "Constat non sondable {regle} / {segment} : {raison}."
+msgstr "Finding cannot be probed {regle} / {segment}: {raison}."
+
+#: src/netcross_report/active_confirmation.py
+msgid "Erreur : "
+msgstr "Error: "
+
+#: src/netcross_report/active_confirmation.py
+#, python-brace-format
+msgid "Mesures supplémentaires non exécutées (budget) : {nombre}."
+msgstr "Additional measurements not executed (budget): {nombre}."
+
+#: src/netcross_report/active_confirmation.py
+#, python-brace-format
+msgid "RTT et pertes TWAMP : {statistiques}"
+msgstr "TWAMP RTTs and loss: {statistiques}"
+
+#: src/netcross_report/active_confirmation.py
+msgid "Simulation sans émission."
+msgstr "Simulation without sending probes."
+
+#: src/netcross_report/active_confirmation.py
+#, python-brace-format
+msgid ""
+"TTL {ttl} : {reponses}, non-réponse={taux} % (un silence ICMP ne prouve pas "
+"une perte réseau)."
+msgstr ""
+"TTL {ttl}: {reponses}, no response={taux} % (ICMP silence does not prove "
+"network loss)."
+
+#: src/netcross_report/active_confirmation.py
+msgid ""
+"confirmation active incompatible avec redact : les cibles ont été anonymisées"
+msgstr ""
+"Active confirmation is incompatible with redact: targets have been anonymised"
+
+#: src/netcross_report/active_confirmation.py
+#, python-brace-format
+msgid "{segments} / {regles} : {type} : {statut}"
+msgstr "{segments} / {regles}: {type}: {statut}"
 
 #: src/netcross_report/html_report.py
 msgid ","
