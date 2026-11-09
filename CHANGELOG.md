@@ -24,13 +24,14 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   Voir docs/seconde-passe.md. Restent hors de cette passe : `clock_sync`,
   `detect_microbursts`, l'équivalence complète du rapport et le basculement du défaut
   vers `--streaming` (décision humaine, voir l'issue).
-- Débordement sur disque des flux longs (#1024, chantier pipeline en flux #995) : `--spill-seuil N`
-  borne en mémoire les structures de l'état par flux qui grandissent avec le nombre total de
-  conversations vues (résumé TCP par clé du détecteur de coupure, coupures déjà comptées) ; au-delà
-  du seuil, les entrées les moins récentes sont déportées dans une base SQLite temporaire, supprimée
-  en fin d'analyse, et retrouvées (promues) à la lecture — résultats identiques avec ou sans
-  débordement (mesure 10⁶ paquets : ~650 Mo en RAM contre ~10 Mo avec seuil 5 000). Voir
-  docs/debordement-flux.md.
+- Historique TCP privé sur disque (#1023, intégration du débordement #1024) :
+  `--spill-seuil N` configure un cache LRU facultatif de N résumés ; à zéro comme sans option,
+  l'historique exact reste sur disque au lieu de grandir sans limite en RAM.
+  Les échéances sont indépendantes par protocole, la file d'expiration et les traces récentes
+  sont bornées, et les constats NAT restent équivalents au batch à seuil TCP identique.
+  La base temporaire est supprimée en fin d'analyse. Le test RSS sur 10⁶ paquets à un point
+  conserve son plafond de 250 Mio ; les tests multi-points vérifient séparément l'historique
+  et les réouvertures après éviction. Voir docs/debordement-flux.md et docs/etat-flux.md.
 - État par flux avec expiration (#1023, chantier pipeline en flux #995) : `--flow-timeouts` (délais par
   protocole à la Zeek, format `TCP=3600,UDP=60,ICMP=60,AUTRE=60`) configure la table d'état de flux de
   `--streaming` — un flux inactif depuis son délai libère son état (mémoire bornée par les flux actifs),
