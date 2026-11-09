@@ -32,6 +32,11 @@ esperluette, le texte réextrait du vrai PDF et le JavaScript exécuté
 dans Node. Des tests inspectent aussi les valeurs réellement tracées,
 les transits des preuves et les bornes de validité, dont l'égalité.
 
+La première CI a révélé l'absence de Node.js dans le conteneur GTK4,
+qui exécute pourtant toute la suite. Ce prérequis est désormais installé
+et sa version vérifiée ; le job refuse aussi les sauts « node absent ».
+Le nouveau test JavaScript reste exécuté, sans ajout d'exclusion.
+
 Les résultats chiffrés des suites et de la couverture sont conservés dans
 les journaux et la PR, plutôt que figés ici avant leur exécution. La
 CI du dernier commit, les validations requises et la livraison dans main
