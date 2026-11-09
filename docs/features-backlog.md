@@ -21,6 +21,16 @@ toute divergence avec le README reflète l'état effectif du code.
 
 ### Outillage qualité (lint / format / architecture)
 
+Échantillons UDP d'horloge (#1029, session 78) : collecte isolée dans
+`netcross_core.clock_samples`. DNS : identifiant, nom normalisé et
+extrémités, refus des échanges incomplets et collisions ; rapprochement
+NAT uniquement avec les empreintes des deux messages. RTP/RTCP :
+datagrammes uniques aux deux points et deux sens de la même connexion,
+proximité ≤ 1 s à chaque point. Aucun offset depuis un seul sens ;
+symétrie des transits supposée, non prouvée. Sources collectées exposées
+dans la méthode et le JSON, sans prétendre que toutes passent le filtre.
+Voir [l'estimation d'horloge](estimation-horloge.md).
+
 Détection des microrafales (#1135, session 76) : `analyse` appelle
 automatiquement `netcross_core.microburst` ; les résultats par point
 alimentent le texte, le JSON et les constats `Microrafales` (règle
