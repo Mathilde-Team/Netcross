@@ -766,6 +766,23 @@ def build_findings(r) -> list[Finding]:
             )
         )
 
+    findings.extend(
+        Finding(
+            "a_surveiller",
+            "RTP/Voix",
+            segment["segment"],
+            f"Dégradation de transport RTP/SRTP ({segment['label']}) : "
+            f"{segment['loss_pct']:.2f} % de visibilité perdue, "
+            f"gigue ajoutée {segment['added_jitter_ms']:.2f} ms, "
+            f"note indicative {segment['transport_quality']:.1f}/100. "
+            "Pertes de capture à exclure ; contenu et qualité perçue non mesurés."
+            + (" Sens média non confirmé par les horloges." if not segment["direction_confirmed"] else ""),
+            sample_size=segment["sample_count"],
+        )
+        for segment in getattr(r, "rtp_segments", ())
+        if segment["degraded"]
+    )
+
     # -- decomposition reseau / serveur --
     if r.server_think_time:
         overall = [t for turns in r.server_think_time.values() for t in turns]

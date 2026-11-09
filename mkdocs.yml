@@ -94,6 +94,7 @@ nav:
       - Échelle SIP multi-points: echelle-sip.md
       - Constats filtrables et preuves: preuves-cliquables.md
       - Appariement RTP entre points: appariement-rtp.md
+      - Transport RTP par segment: rtp-segments.md
   - Architecture:
       - Diagramme de classes: class-diagram.md
       - Internationalisation: i18n.md
