@@ -73,6 +73,7 @@ from netcross_core.dashboard import (  # noqa: E402
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates  # noqa: E402
 from netcross_core.logging_config import DEBUG_FLAG, enable_debug, get_logger, is_debug_enabled, summarize  # noqa: E402
 from netcross_gtk4 import capture_list, row_labels  # noqa: E402
+from netcross_gtk4 import incidents_panel as netcross_gtk4_incidents_panel  # noqa: E402
 from netcross_gtk4.advanced_options import (  # noqa: E402
     MAX_PACKETS_MAX,
     SAMPLE_MAX,
@@ -791,9 +792,10 @@ class MainWindow(Gtk.ApplicationWindow):
         self._build_config_page()
         self._build_work_page()
         self._build_results_page()
+        self._build_incidents_page()
 
         self.stack.set_visible_child_name("config")
-        logger.debug("MainWindow: fenêtre prête (3 pages construites)")
+        logger.debug("MainWindow: fenêtre prête (4 pages construites)")
 
     def open_history(self):
         """Fenetre « Historique des runs » (base et etiquette de la configuration)."""
@@ -2078,6 +2080,241 @@ class MainWindow(Gtk.ApplicationWindow):
 
         self.stack.add_titled(page, "results", "Resultats")
         logger.debug("MainWindow._build_results_page: fin")
+
+    # ================= onglet Incidents (issue #1095) =================
+
+    def _build_incidents_page(self):
+        """Onglet « Incidents » : réglages du gel (#1087/#1093) et liste
+        des incidents archivés (#1090), avec lancement de l'analyse de la
+        fenêtre gelée (#1091). Mêmes réglages et même fichier que l'API
+        (``~/.netcross/gel_config.json``) : ce qui est saisi ici vaut pour
+        les deux surfaces."""
+        logger.debug("_build_incidents_page: construction de la page Incidents")
+        outer_scroller = _visible_scroller()
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        page.set_margin_top(16)
+        page.set_margin_bottom(16)
+        page.set_margin_start(16)
+        page.set_margin_end(16)
+        outer_scroller.set_child(page)
+
+        # -- réglages du gel --
+        cadre_reglages = Gtk.Frame(label="Réglages du gel (enregistrement rétroactif)")
+        reglages = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        reglages.set_margin_top(8)
+        reglages.set_margin_bottom(8)
+        reglages.set_margin_start(8)
+        reglages.set_margin_end(8)
+        ligne_durees = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        ligne_durees.append(Gtk.Label(label="Secondes avant l'alarme :", halign=Gtk.Align.START))
+        self.gel_seconds_before_spin = Gtk.SpinButton.new_with_range(1, 3600, 5)
+        ligne_durees.append(self.gel_seconds_before_spin)
+        ligne_durees.append(Gtk.Label(label="Secondes après :", halign=Gtk.Align.START))
+        self.gel_seconds_after_spin = Gtk.SpinButton.new_with_range(1, 3600, 5)
+        ligne_durees.append(self.gel_seconds_after_spin)
+        ligne_durees.append(Gtk.Label(label="Délai min entre gels (s) :", halign=Gtk.Align.START))
+        self.gel_min_delay_spin = Gtk.SpinButton.new_with_range(1, 3600, 5)
+        ligne_durees.append(self.gel_min_delay_spin)
+        reglages.append(ligne_durees)
+        ligne_severite = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        ligne_severite.append(Gtk.Label(label="Sévérité minimale :", halign=Gtk.Align.START))
+        self.gel_severity_dropdown = Gtk.DropDown.new_from_strings(netcross_gtk4_incidents_panel.SEVERITES_MENU)
+        ligne_severite.append(self.gel_severity_dropdown)
+        ligne_severite.append(Gtk.Label(label="Quota d'archives (octets, 0 = illimité) :", halign=Gtk.Align.START))
+        self.gel_quota_spin = Gtk.SpinButton.new_with_range(0, 10_000_000_000, 100_000_000)
+        ligne_severite.append(self.gel_quota_spin)
+        reglages.append(ligne_severite)
+        ligne_archives = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        ligne_archives.append(Gtk.Label(label="Répertoire d'archives :", halign=Gtk.Align.START))
+        self.gel_archives_entry = Gtk.Entry(hexpand=True)
+        self.gel_archives_entry.set_tooltip_text(
+            "Là où les gels écrivent leurs archives et où l'onglet cherche "
+            "les incidents (manifeste.json de chaque gel)."
+        )
+        ligne_archives.append(self.gel_archives_entry)
+        reglages.append(ligne_archives)
+        bouton_reglages = Gtk.Button(label="Enregistrer les réglages")
+        bouton_reglages.set_tooltip_text(
+            "Valide et écrit le fichier de réglages partagé avec l'API (~/.netcross/gel_config.json)."
+        )
+        bouton_reglages.connect("clicked", self._on_gel_save)
+        reglages.append(bouton_reglages)
+        cadre_reglages.set_child(reglages)
+        page.append(cadre_reglages)
+
+        # -- liste des incidents archivés --
+        cadre_incidents = Gtk.Frame(label="Incidents archivés")
+        incidents_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        incidents_box.set_margin_top(8)
+        incidents_box.set_margin_bottom(8)
+        incidents_box.set_margin_start(8)
+        incidents_box.set_margin_end(8)
+        boutons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        bouton_refresh = Gtk.Button(label="Rafraîchir")
+        bouton_refresh.connect("clicked", lambda _b: self._refresh_incidents())
+        boutons.append(bouton_refresh)
+        incidents_box.append(boutons)
+        self.incidents_list = Gtk.ListBox()
+        self.incidents_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        incidents_box.append(self.incidents_list)
+        cadre_incidents.set_child(incidents_box)
+        page.append(cadre_incidents)
+        outer_scroller.set_vexpand(True)
+
+        self.stack.add_titled(outer_scroller, "incidents", "Incidents")
+        self._charge_reglages_gel()
+        self._refresh_incidents()
+        logger.debug("MainWindow._build_incidents_page: fin")
+
+    def _charge_reglages_gel(self):
+        """Remplit les champs de réglages depuis le fichier partagé
+        (défauts si absent). Un fichier invalide est signalé au journal,
+        pas silencieusement ignoré."""
+        logger.debug("_charge_reglages_gel: entrée")
+        try:
+            reglages = netcross_gtk4_incidents_panel.lire_reglages_partages()
+        except ValueError as exc:
+            logger.debug("_charge_reglages_gel: si ValueError -> valeurs par défaut")
+            self._log(f"Réglages du gel illisibles : {exc} (valeurs par défaut affichées)")
+            reglages = dict(netcross_gtk4_incidents_panel.REGLAGES_DEFAUT)
+        self.gel_seconds_before_spin.set_value(float(reglages["seconds_before"]))
+        self.gel_seconds_after_spin.set_value(float(reglages["seconds_after"]))
+        self.gel_min_delay_spin.set_value(float(reglages["min_delay_between_gels"]))
+        self.gel_quota_spin.set_value(float(reglages["max_octets_archives"] or 0))
+        self.gel_archives_entry.set_text(str(reglages["archives_dir"]))
+        severites = netcross_gtk4_incidents_panel.SEVERITES_MENU
+        severite = str(reglages["min_severity"])
+        self.gel_severity_dropdown.set_selected(severites.index(severite) if severite in severites else 0)
+        logger.debug("_charge_reglages_gel: fin")
+
+    def _on_gel_save(self, _btn):
+        """Enregistre les réglages saisis (validation du panneau, mêmes
+        règles que l'API). Un refus est affiché immédiatement : mieux vaut
+        un message au clic qu'un gel mal réglé à la prochaine alarme."""
+        logger.debug("_on_gel_save: entrée")
+        severites = netcross_gtk4_incidents_panel.SEVERITES_MENU
+        try:
+            valides = netcross_gtk4_incidents_panel.reglages_depuis_saisie(
+                seconds_before=self.gel_seconds_before_spin.get_text(),
+                seconds_after=self.gel_seconds_after_spin.get_text(),
+                min_severity=severites[self.gel_severity_dropdown.get_selected()],
+                min_delay_between_gels=self.gel_min_delay_spin.get_text(),
+                max_octets=self.gel_quota_spin.get_text(),
+                archives_dir=self.gel_archives_entry.get_text(),
+            )
+            netcross_gtk4_incidents_panel.ecrire_reglages_partages(valides)
+        except ValueError as exc:
+            self._log(f"Réglages refusés : {exc}")
+            logger.debug("_on_gel_save: si ValueError -> retour")
+            return
+        except OSError as exc:
+            self._log(f"Écriture des réglages impossible : {exc}")
+            logger.debug("_on_gel_save: si OSError -> retour")
+            return
+        self._log("Réglages du gel enregistrés.")
+        self._refresh_incidents()
+        logger.debug("_on_gel_save: fin")
+
+    def _refresh_incidents(self):
+        """Recharge la liste des incidents archivés (manifestes des gels)
+        depuis le répertoire des réglages. Rapide : lecture de manifestes
+        JSON, pas d'analyse."""
+        logger.debug("_refresh_incidents: entrée")
+        for ligne in list(self.incidents_list):
+            self.incidents_list.remove(ligne)
+        try:
+            reglages = netcross_gtk4_incidents_panel.lire_reglages_partages()
+        except ValueError as exc:
+            self._log(f"Réglages du gel illisibles : {exc}")
+            logger.debug("_refresh_incidents: si ValueError -> retour")
+            return
+        incidents = netcross_gtk4_incidents_panel.lister_incidents_depuis_reglages(reglages)
+        if not incidents:
+            self.incidents_list.append(Gtk.Label(label="Aucun incident archivé pour l'instant."))
+            logger.debug("_refresh_incidents: retour (liste vide)")
+            return
+        for incident in incidents:
+            ligne = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            etiquette = Gtk.Label(
+                label=netcross_gtk4_incidents_panel.texte_incident(incident),
+                halign=Gtk.Align.START,
+                hexpand=True,
+            )
+            ligne.append(etiquette)
+            bouton = Gtk.Button(label="Analyser")
+            bouton.set_tooltip_text(
+                "Analyse multi-points de la fenêtre gelée et range le rapport "
+                "(JSON, et HTML) avec les segments, puis notifie."
+            )
+            nom = str(incident.get("incident") or "")
+            bouton.connect("clicked", lambda _b, i=nom: self._on_analyser_incident(i))
+            ligne.append(bouton)
+            self.incidents_list.append(ligne)
+        logger.debug("_refresh_incidents: fin")
+
+    def _on_analyser_incident(self, incident: str):
+        """Lance l'analyse d'un incident dans un thread (la fenêtre reste
+        utilisable), journalise le résultat et rafraîchit la liste : les
+        rapports apparaissent comme « rapport JSON (+ HTML) »."""
+        logger.debug("_on_analyser_incident: entrée (incident={})", incident)
+        threading.Thread(target=self._analyser_incident_worker, args=(incident,), daemon=True).start()
+        logger.debug("_on_analyser_incident: fin")
+
+    def _analyser_incident_worker(self, incident: str):
+        """Version « thread de fond » de l'analyse : mêmes injections que
+        l'API (score/level et HTML viennent de netcross_report), résultats
+        journalisés via GLib.idle_add."""
+        logger.debug("_analyser_incident_worker: entrée (incident={})", incident)
+        GLib.idle_add(self._log, f"[{incident}] analyse de la fenêtre gelée...")
+        try:
+            from netcross_core.config import load_config
+            from netcross_core.incident_analysis import analyser_incident
+            from netcross_core.retro_capture import ManifesteIncident
+            from netcross_report.html_report import generate_html_report
+            from netcross_report.security_report import build_security_report
+
+            reglages = netcross_gtk4_incidents_panel.lire_reglages_partages()
+            manifeste_chemin = os.path.join(
+                os.path.expanduser(str(reglages["archives_dir"])),
+                incident,
+                "incident",
+                "manifeste.json",
+            )
+            with open(manifeste_chemin, encoding="utf-8") as fic:
+                manifeste = ManifesteIncident.depuis_json(fic.read())
+
+            def evaluateur(rapport):
+                logger.debug("evaluateur: entrée")
+                tableau = build_security_report(rapport).dashboard
+                logger.debug("evaluateur: retour (score, niveau)")
+                return tableau.score, tableau.level
+
+            def generateur_html(rapport, dossier):
+                logger.debug("generateur_html: entrée")
+                chemin = generate_html_report(
+                    rapport, os.path.join(dossier, "rapport.html"), title=f"Incident {incident}"
+                )
+                logger.debug("generateur_html: retour chemin")
+                return chemin
+
+            resultat = analyser_incident(
+                manifeste,
+                evaluateur=evaluateur,
+                generateur_html=generateur_html,
+                seuil_notification="elevee",
+                cfg_notification=load_config().notify,
+            )
+            GLib.idle_add(
+                self._log,
+                f"[{incident}] rapport : {resultat.chemin_rapport}"
+                + (f" et {resultat.chemin_html}" if resultat.chemin_html else "")
+                + f" (score {resultat.score}, niveau {resultat.level or '?'})",
+            )
+            GLib.idle_add(self._refresh_incidents)
+        except Exception as exc:  # noqa: BLE001 -- thread de fond : l'erreur va au journal
+            logger.exception("analyse de l'incident {} en échec", incident)
+            GLib.idle_add(self._log, f"[{incident}] ERREUR : {exc}")
+        logger.debug("_analyser_incident_worker: fin")
 
     # ================= lancement de l'analyse =================
 

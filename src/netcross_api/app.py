@@ -3319,3 +3319,9 @@ _annotations_routes.register(app, _verify_api_key, _completed_entry, lambda: sto
 from netcross_api import bpf_routes as _bpf_routes  # noqa: E402
 
 _bpf_routes.register(app, _verify_api_key)
+
+# Issue #1095 : gel rétroactif et incidents archivés (réglages partagés avec
+# la GUI, fichier fixé par NETCROSS_API_GEL_CONFIG)
+from netcross_api import incident_routes as _incident_routes  # noqa: E402
+
+_incident_routes.register(app, _verify_api_key)
