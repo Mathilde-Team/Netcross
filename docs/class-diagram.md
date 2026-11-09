@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-249 modules · 357 classes · 874 fonctions publiques de module.
+250 modules · 358 classes · 875 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -47,7 +47,7 @@ flowchart TD
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"58 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"26 imports"| pcap_parser
+    netcross_core -->|"27 imports"| pcap_parser
     netcross_probe -->|"3 imports"| pcap_parser
 ```
 
@@ -672,6 +672,7 @@ classDiagram
 | `netcross_core.gel_settings` | réglages du gel rétroactif et inventaire des incidents archivés (issue #1095, chantier #1001). |
 | `netcross_core.i18n` | internationalisation par GNU gettext (issue #299). |
 | `netcross_core.incident_analysis` | netcross_core.incident_analysis — analyse multi-points de la fenêtre gelée (issue #1091, chantier #1001 : enregistrement rétroactif déclenché par alarme). |
+| `netcross_core.incident_chain` | netcross_core.incident_chain — orchestration production de la chaîne d'incident (issue #1001 : enregistrement rétroactif déclenché par alarme). |
 | `netcross_core.link_speed` | Vitesse de lien et resolution d'horodatage par point (issue #1132). |
 | `netcross_core.live_diff` | Capture en continu + diff en direct (Job 33, issue #33). |
 | `netcross_core.live_report` | issue #274 : export / rapport temps reel du mode ``--live``. |
@@ -1523,6 +1524,16 @@ classDiagram
     class mod_netcross_core_incident_analysis["netcross_core.incident_analysis"] {
         <<module>>
         +analyser_incident(manifeste, dossier_incident, parseur, scanner, evaluateur, generateur_html, seuil_notification, notificateur, cfg_notification) RapportIncident
+    }
+
+    %% ===== netcross_core.incident_chain =====
+    class ChaineIncidents {
+        +on_alarm(event, ts_courant) GelReport?
+        +attendre_termine(timeout) bool
+    }
+    class mod_netcross_core_incident_chain["netcross_core.incident_chain"] {
+        <<module>>
+        +chaine_incidents_depuis_reglages(reglages, points, injectables) ChaineIncidents
     }
 
     %% ===== netcross_core.link_speed =====

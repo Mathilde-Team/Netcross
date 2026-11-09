@@ -43,6 +43,7 @@ from typing import Callable
 
 from netcross_core.alarms import AlarmEngine, AlarmEvent, AlarmSignal
 from netcross_core.baseline_diff import DiffFinding, diff_reports
+from netcross_core.incident_chain import ChaineIncidents
 from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import Pkt, Report
 from netcross_core.retro_capture import GelManager
@@ -136,7 +137,7 @@ class LiveDiffEngine:
         on_alarm: Callable[[object], None] | None = None,
         alarm_engine: AlarmEngine | None = None,
         ring_buffer: CaptureRingBuffer | None = None,
-        gel: GelManager | None = None,
+        gel: GelManager | ChaineIncidents | None = None,
     ):
         logger.debug(
             "LiveDiffEngine.__init__: baseline_report={} config={} on_alarm={} alarm_engine={} ring_buffer={} gel={}",
@@ -153,7 +154,10 @@ class LiveDiffEngine:
         self.alarm_engine = alarm_engine or AlarmEngine([])
         self.ring_buffer = ring_buffer
         # Gel rétroactif (issue #1087) : branché sur AlarmEngine —
-        # déclenché pour chaque NOUVELLE alarme « raised ».
+        # déclenché pour chaque NOUVELLE alarme « raised ». Peut être un
+        # GelManager nu (gel seul) ou une ChaineIncidents (issue #1001 :
+        # gel → attente de fenêtre → archivage → analyse → notification,
+        # en arrière-plan). Dans les deux cas le moteur n'est pas bloqué.
         self.gel = gel
         self.state = LiveDiffState()
         self._thread: threading.Thread | None = None
@@ -319,10 +323,16 @@ class LiveDiffEngine:
         # la protection des fichiers du tampon. Uniquement les nouveaux
         # événements (le retour de feed()) — pas engine.events, qui
         # accumule tout l'historique et renotifierait les anciennes
-        # alarmes à chaque cycle.
+        # alarmes à chaque cycle. Une ChaineIncidents (issue #1001)
+        # reçoit en plus l'horodatage du dernier paquet : l'attente de
+        # fin de fenêtre se calcule depuis lui, pas depuis l'horloge
+        # murale au moment de l'appel.
         if self.gel is not None:
             for event in nouveaux_evenements:
-                self.gel.on_alarm(event)
+                if isinstance(self.gel, ChaineIncidents):
+                    self.gel.on_alarm(event, ts_courant=pkts[-1].ts if pkts else None)
+                else:
+                    self.gel.on_alarm(event)
 
         # Notification des nouvelles alarmes
         if self.on_alarm is not None:
