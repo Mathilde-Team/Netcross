@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-230 modules · 331 classes · 837 fonctions publiques de module.
+233 modules · 332 classes · 852 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -36,13 +36,13 @@ flowchart TD
     CLI -->|"8 imports"| netcross_ai
     CLI -->|"60 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
-    netcross_gtk4 -->|"32 imports"| netcross_report
+    netcross_gtk4 -->|"34 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
-    netcross_gtk4 -->|"115 imports"| netcross_core
+    netcross_gtk4 -->|"120 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
-    netcross_api -->|"21 imports"| netcross_report
+    netcross_api -->|"23 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"57 imports"| netcross_core
+    netcross_api -->|"62 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"51 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
@@ -557,6 +557,7 @@ classDiagram
 | `netcross_core.flow_view` | vue enrichie d'un flux (FlowView), sixieme objet de contrat de la Session 0 (Job 9/issue #6, section 6.4 et 6.14 de FEATURES.md). |
 | `netcross_core.forensic` | index de correlation bidirectionnel evenement ↔ flow ↔ paquet (Job 8/issue #5, §6.3 et §6.14 de FEATURES.md). |
 | `netcross_core.forensic_search` | moteur de recherche analytique post-capture transversal (Job 17 / issue #16, section 6.13 de FEATURES.md). |
+| `netcross_core.gel_settings` | réglages du gel rétroactif et inventaire des incidents archivés (issue #1095, chantier #1001). |
 | `netcross_core.i18n` | internationalisation par GNU gettext (issue #299). |
 | `netcross_core.incident_analysis` | netcross_core.incident_analysis — analyse multi-points de la fenêtre gelée (issue #1091, chantier #1001 : enregistrement rétroactif déclenché par alarme). |
 | `netcross_core.link_speed` | Vitesse de lien et resolution d'horodatage par point (issue #1132). |
@@ -1338,6 +1339,17 @@ classDiagram
     }
     class ForensicSearchIndex {
         +search(query) list~ForensicSearchResult~
+    }
+
+    %% ===== netcross_core.gel_settings =====
+    class mod_netcross_core_gel_settings["netcross_core.gel_settings"] {
+        <<module>>
+        +valider_reglages(demande) dict~str, Any~
+        +lire_reglages(chemin) dict~str, Any~
+        +ecrire_reglages(reglages, chemin) dict~str, Any~
+        +vers_gel_config(reglages) tuple~GelConfig, str~
+        +lister_incidents(archives_dir) list~dict~str, Any~~
+        +detail_incident(archives_dir, incident) dict~str, Any~?
     }
 
     %% ===== netcross_core.i18n =====
@@ -4706,6 +4718,7 @@ classDiagram
 | `netcross_api.batches` | lots de captures de l'API (issue #872). |
 | `netcross_api.bpf_routes` | bibliothèque de filtres BPF enregistrés (issue #906), équivalent API de ``--bpf-library NOM`` et des boutons « Filtres… » / « Enregistrer » de la GUI. |
 | `netcross_api.history_routes` | historique SQLite des runs (issue #874). |
+| `netcross_api.incident_routes` | gel rétroactif et incidents archivés (issue #1095, chantier #1001) : configurer le gel, consulter les incidents, lancer leur analyse. |
 | `netcross_api.live_routes` | capture en direct sur des interfaces du serveur, puis analyse (issue #902), équivalent API de ``--live`` et de la case « Capture en direct » de la GUI. |
 | `netcross_api.lua_doc_routes` | documentation hors ligne de l'API Lua Wireshark (issue #873), équivalent de ``netcross-lua-doc --json``. |
 | `netcross_api.models` | modèles Pydantic pour les requêtes/réponses API (issue #209). |
@@ -4858,6 +4871,22 @@ classDiagram
         +require_history_db() str
         +record_comparison(findings, baseline_report, current_report, label, redact) dict~str, Any~
         +record_analysis(report, findings, tls_findings, quic_findings, label, redact) dict~str, Any~
+        +register(app, verify) None
+    }
+
+    %% ===== netcross_api.incident_routes =====
+    class GelConfigBody {
+        <<BaseModel>>
+        +float? seconds_before
+        +float? seconds_after
+        +str? min_severity
+        +float? min_delay_between_gels
+        +int? max_octets_archives
+        +str? archives_dir
+    }
+    class mod_netcross_api_incident_routes["netcross_api.incident_routes"] {
+        <<module>>
+        +gel_config_path() Path?
         +register(app, verify) None
     }
 
@@ -5054,6 +5083,7 @@ classDiagram
 | `netcross_gtk4.forensic_panel` | panneau GTK « Recherche forensic » de la page Resultats (issue #675). |
 | `netcross_gtk4.forensic_view` | recherche forensic de la GUI (issue #675). |
 | `netcross_gtk4.history_window` | fenetre « Historique des runs » (issue #874) : consultation d'une base ``--history-db`` sans relancer d'analyse, avec les filtres de ``netcross-history`` (``--run-type``, ``--label``, ``--limit``). |
+| `netcross_gtk4.incidents_panel` | Décisions de l'onglet « Incidents » (issue #1095, chantier #1001), sorties de ``netcross_gtk4/app.py``. |
 | `netcross_gtk4.live_capture_points` | points de capture en direct de la GUI (Job 48, issue #168) : une ligne du panneau de capture live peut porter PLUSIEURS interfaces d'une meme machine ("eth0, eth1"), chacune devenant son propre point… |
 | `netcross_gtk4.live_report_session` | rapport HTML rafraichi en continu pendant une capture en direct de la GUI (issue #676). |
 | `netcross_gtk4.lua_doc_view` | logique sans GTK de la fenetre « Documentation Lua » (issue #873), equivalent de ``netcross-lua-doc``. |
@@ -5491,6 +5521,18 @@ classDiagram
         <<Gtk.Window>>
         +selected_run_type() str?
         +show_history() str
+    }
+
+    %% ===== netcross_gtk4.incidents_panel =====
+    class mod_netcross_gtk4_incidents_panel["netcross_gtk4.incidents_panel"] {
+        <<module>>
+        +lire_reglages_partages(chemin) dict~str, Any~
+        +ecrire_reglages_partages(reglages, chemin) dict~str, Any~
+        +lister_incidents_depuis_reglages(reglages) list~dict~str, Any~~
+        +formater_taille(octets) str
+        +texte_etat_rapport(rapport_json, rapport_html) str
+        +texte_incident(incident) str
+        +reglages_depuis_saisie(seconds_before, seconds_after, min_severity, min_delay_between_gels, max_octets, archives_dir) dict~str, Any~
     }
 
     %% ===== netcross_gtk4.live_capture_points =====

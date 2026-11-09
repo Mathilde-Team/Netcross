@@ -3162,6 +3162,146 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /gel/config:
+    get:
+      tags:
+      - gel
+      summary: ' Get Gel Config'
+      operationId: _get_gel_config_gel_config_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response  Get Gel Config Gel Config Get
+        '500':
+          description: Échec de l'analyse (segments illisibles, tshark absent...)
+      security:
+      - APIKeyHeader: []
+    put:
+      tags:
+      - gel
+      summary: ' Put Gel Config'
+      operationId: _put_gel_config_gel_config_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GelConfigBody'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response  Put Gel Config Gel Config Put
+        '422':
+          description: Réglages invalides (clé inconnue, type, borne, sévérité)
+        '500':
+          description: Échec de l'analyse (segments illisibles, tshark absent...)
+      security:
+      - APIKeyHeader: []
+  /incidents:
+    get:
+      tags:
+      - incidents
+      summary: ' Get Incidents'
+      description: 'Inventaire des incidents archivés, depuis le répertoire des
+
+        réglages (``archives_dir``) : le réglage configure la consultation.'
+      operationId: _get_incidents_incidents_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response  Get Incidents Incidents Get
+      security:
+      - APIKeyHeader: []
+  /incidents/{incident}:
+    get:
+      tags:
+      - incidents
+      summary: ' Get Incident'
+      operationId: _get_incident_incidents__incident__get
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: incident
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Incident
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response  Get Incident Incidents  Incident  Get
+        '404':
+          description: Incident inconnu (pas de manifeste à ce nom)
+        '500':
+          description: Échec de l'analyse (segments illisibles, tshark absent...)
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /incidents/{incident}/analyse:
+    post:
+      tags:
+      - incidents
+      summary: ' Post Analyse'
+      description: 'Lance l''analyse de la fenêtre gelée (issue #1091) et range le
+
+        rapport avec les segments. Les injections netcross_report (score,
+
+        HTML) sont câblées ici : l''API est au-dessus des deux couches.'
+      operationId: _post_analyse_incidents__incident__analyse_post
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: incident
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Incident
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                title: Response  Post Analyse Incidents  Incident  Analyse Post
+        '404':
+          description: Incident inconnu (pas de manifeste à ce nom)
+        '409':
+          description: Archive altérée (empreintes non conformes) ou indécodable
+        '500':
+          description: Échec de l'analyse (segments illisibles, tshark absent...)
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
     AnalysisAccepted:
@@ -4213,6 +4353,60 @@ components:
       - detail
       title: ErrorResponse
       description: Réponse d'erreur standard.
+    GelConfigBody:
+      properties:
+        seconds_before:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+          title: Seconds Before
+          description: Secondes conservées AVANT l'alarme
+        seconds_after:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+          title: Seconds After
+          description: Secondes conservées APRÈS l'alarme
+        min_severity:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Min Severity
+          description: Sévérité minimale qui déclenche le gel (anomalie, a_surveiller,
+            info)
+        min_delay_between_gels:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: 'null'
+          title: Min Delay Between Gels
+          description: Délai minimal (s) entre deux gels
+        max_octets_archives:
+          anyOf:
+          - type: integer
+            exclusiveMinimum: 0.0
+          - type: 'null'
+          title: Max Octets Archives
+          description: Quota d'archives (octets) ; null = illimité
+        archives_dir:
+          anyOf:
+          - type: string
+            minLength: 1
+          - type: 'null'
+          title: Archives Dir
+          description: Répertoire où les gels écrivent leurs archives
+      additionalProperties: false
+      type: object
+      title: GelConfigBody
+      description: 'Corps de ``PUT /gel/config`` : champs TOUS optionnels (les
+
+        absents gardent leur valeur courante), validés par le cœur. Les clés
+
+        inconnues sont REFUSÉES (422) : une faute de frappe ne doit pas passer
+
+        en silence, le réglage visé resterait inchangé.'
     HTTPValidationError:
       properties:
         detail:
