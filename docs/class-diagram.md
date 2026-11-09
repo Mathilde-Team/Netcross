@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-239 modules · 341 classes · 864 fonctions publiques de module.
+240 modules · 342 classes · 865 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -34,7 +34,7 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"27 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"62 imports"| netcross_core
+    CLI -->|"63 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"34 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
@@ -583,6 +583,7 @@ classDiagram
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
+| `netcross_core.seconde_passe` | seconde passe ciblée du mode en flux (issue #1025, sous-issue 6/6 du chantier #995 : pipeline en flux à empreinte mémoire bornée). |
 | `netcross_core.sip_ladder` | diagramme d'echelle SIP multi-points (issue #1125, sous-issue 4/6 du chantier VoIP #1004). |
 | `netcross_core.spill` | debordement sur disque (SQLite) des structures de l'etat par flux (issue #1024, sous-issue 5/6 du chantier #995). |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
@@ -2200,6 +2201,17 @@ classDiagram
         +match_rtp_streams(all_packets, points, window_seconds) list~dict~
     }
 
+    %% ===== netcross_core.seconde_passe =====
+    class SecondePasse {
+        +feed(pk) None
+        +finish() None
+        +to_dict() dict
+    }
+    class mod_netcross_core_seconde_passe["netcross_core.seconde_passe"] {
+        <<module>>
+        +run_seconde_passe(sources, points, nat_tolerant, nat_window_ms, exclude_duplicates, spill_seuil) SecondePasse
+    }
+
     %% ===== netcross_core.sip_ladder =====
     class mod_netcross_core_sip_ladder["netcross_core.sip_ladder"] {
         <<module>>
@@ -2214,12 +2226,15 @@ classDiagram
         +inserer(nom, lignes) None
         +lire(nom, cle) str?
         +supprimer(nom, cle) None
+        +iterer(nom)
         +close() None
     }
     class SpillDict {
         <<__slots__, Generic[K, V]>>
         +get(cle) V?
         +put(cle, valeur) None
+        +items()
+        +values()
         +close() None
     }
     class SpillSet {
