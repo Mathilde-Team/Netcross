@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-242 modules · 344 classes · 866 fonctions publiques de module.
+243 modules · 346 classes · 868 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -40,9 +40,9 @@ flowchart TD
     netcross_gtk4 -->|"4 imports"| netcross_ai
     netcross_gtk4 -->|"120 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
-    netcross_api -->|"24 imports"| netcross_report
+    netcross_api -->|"25 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"63 imports"| netcross_core
+    netcross_api -->|"67 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"58 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
@@ -4514,6 +4514,7 @@ classDiagram
         +series_upper_bound(n_points, n_segments) int
         +segment_label(a, b) str
         +collect_samples(r, run, findings, max_points, max_segments) list~Sample~
+        +collect_live_samples(snapshot, run) list~Sample~
         +render_prometheus_text(samples, comment) str
         +render_openmetrics(samples) str
         +write_prom_file(texte, path) str
@@ -4866,6 +4867,7 @@ classDiagram
 | `netcross_api.incident_routes` | gel rétroactif et incidents archivés (issue #1095, chantier #1001) : configurer le gel, consulter les incidents, lancer leur analyse. |
 | `netcross_api.live_routes` | capture en direct sur des interfaces du serveur, puis analyse (issue #902), équivalent API de ``--live`` et de la case « Capture en direct » de la GUI. |
 | `netcross_api.lua_doc_routes` | documentation hors ligne de l'API Lua Wireshark (issue #873), équivalent de ``netcross-lua-doc --json``. |
+| `netcross_api.metrics_routes` | Dernier relevé publié, borné et exposé sous l'authentification de l'API. |
 | `netcross_api.models` | modèles Pydantic pour les requêtes/réponses API (issue #209). |
 | `netcross_api.store` | analyses de l'API : statut, document JSON, persistance. |
 | `netcross_api.tools_routes` | manipulation de captures (issues #868, #869, #870, #886, #887), équivalents des modes utilitaires de la CLI : |
@@ -5093,6 +5095,21 @@ classDiagram
         +get_lua_class(name) dict~str, Any~
         +search_lua_doc(q, limit, full) dict~str, Any~
         +register(app, verify) None
+    }
+
+    %% ===== netcross_api.metrics_routes =====
+    class LatestMetrics {
+        +replace(samples, redactor) None
+        +samples() tuple~Sample, ...~
+        +report(entry, run) None
+    }
+    class MetricsReportWriter {
+        <<LiveReportWriter>>
+        +publish(snapshot, journal) None
+    }
+    class mod_netcross_api_metrics_routes["netcross_api.metrics_routes"] {
+        <<module>>
+        +register(app, verify, latest) None
     }
 
     %% ===== netcross_api.models =====
