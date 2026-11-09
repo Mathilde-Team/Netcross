@@ -9,6 +9,7 @@ import csv
 import statistics
 from collections import Counter, defaultdict
 
+from netcross_core.causality import format_microburst_correlation
 from netcross_core.dechiffrement import lignes as lignes_dechiffrement
 from netcross_core.forensic import annotations_by_tag
 from netcross_core.logging_config import get_logger, summarize
@@ -272,6 +273,11 @@ def print_report(r: Report):
         print("\n-- Microrafales (indices à confirmer, fenêtres de détection) --")
         for event in bursts:
             print(f"  {format_microburst(event)}")
+
+    if r.microburst_correlations:
+        print("\n-- Microrafales et impacts aval (association temporelle) --")
+        for correlation in r.microburst_correlations:
+            print(f"  {format_microburst_correlation(correlation)}")
 
     couverture = lignes_dechiffrement(r)
     if couverture:

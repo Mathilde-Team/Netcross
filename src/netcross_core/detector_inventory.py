@@ -121,6 +121,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         "la latence par segment est corrigée au temps de chaque paquet",
     ),
     Detecteur(
+        "microburst_causality",
+        PHASE,
+        SECONDE_PASSE,
+        "épisodes de rafale et impacts localisés, dix preuves maximum par épisode et segment",
+        "50 ms après la fin de l'épisode par défaut, configurable",
+        ("microburst_correlations",),
+        "paquets communs encadrants ; horloge corrigée et incertitude pour les retransmissions aval",
+    ),
+    Detecteur(
         "pmtud",
         PHASE,
         FENETRE_BORNEE,
