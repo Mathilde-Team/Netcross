@@ -151,7 +151,7 @@ from netcross_core import (
 )
 from netcross_core.capture_tools import split_label_dir
 from netcross_core.discovery import load_baseline_hosts
-from netcross_core.flow_state import parse_flow_timeouts, run_flow_table
+from netcross_core.flow_state import FlowTable, parse_flow_timeouts
 from netcross_core.flow_timeline import build_flow_timelines
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
 from netcross_core.i18n import _
@@ -168,7 +168,12 @@ from netcross_core.stats import EXPORT_FORMATS as STATS_EXPORT_FORMATS
 from netcross_core.stats import GROUP_BY as STATS_GROUP_BY
 from netcross_core.stats import SORT_BY as STATS_SORT_BY
 from netcross_core.stats import explore_stats, render_stats, stats_format_for
-from netcross_core.streaming import DEFAULT_WINDOW_SECONDS, correlate_streaming, sources_by_point
+from netcross_core.streaming import (
+    DEFAULT_WINDOW_SECONDS,
+    correlate_streaming,
+    merge_points,
+    sources_by_point,
+)
 from netcross_core.support import (
     SCOPES as SUPPORT_SCOPES,
 )
@@ -1357,17 +1362,32 @@ def _run_streaming(args, all_packets, points_order, r) -> None:
         exclude_duplicates=args.exclude_duplicates,
     )
     print("\n" + "\n".join(resultat.summary_lines()))
-    # etat par flux (#1023) : memes sources fusionnees, delais par protocole
+    # etat par flux (#1023) puis seconde passe ciblée (#1025) : memes
+    # sources fusionnées, alimentés ensemble en une seule passe k-voies
+    from netcross_core.seconde_passe import SecondePasse
+
     points = list(points_order) if points_order else sorted(sources)
-    table = run_flow_table(
-        sources.values(),
+    table = FlowTable(
         points,
         timeouts=parse_flow_timeouts(getattr(args, "flow_timeouts", None)),
         spill_seuil=getattr(args, "spill_seuil", None),
     )
+    passe = SecondePasse(
+        points,
+        nat_tolerant=args.nat_tolerant,
+        nat_window_ms=args.nat_window_ms,
+        exclude_duplicates=args.exclude_duplicates,
+        spill_seuil=getattr(args, "spill_seuil", None),
+    )
+    for pk in merge_points(sources_by_point(all_packets).values()):
+        table.feed(pk)
+        passe.feed(pk)
+    table.finish()
+    passe.finish()
     print("\n".join(table.summary_lines()))
     doc = resultat.to_dict()
     doc["flow_state"] = table.to_dict()
+    doc["seconde_passe"] = passe.to_dict()
     r.streaming = doc
     logger.debug("_run_streaming: retour None")
 
@@ -1907,9 +1927,9 @@ def main():
         default=None,
         metavar="N",
         help="Seuil de debordement sur disque de l'etat par flux de --streaming (issue #1024) : "
-        "au-dela de N entrees en memoire, les moins recentes sont deportees dans une base SQLite "
-        "temporaire, supprimee en fin d'analyse (resultats identiques). Defaut : sans limite "
-        "(tout en RAM). Voir docs/debordement-flux.md.",
+        "au plus N resumes TCP sont gardes dans un cache LRU. L'historique exact reste sur disque "
+        "temporaire prive, supprime en fin d'analyse (resultats identiques). Defaut : pas de cache "
+        "Python, jamais tout l'historique en RAM. Voir docs/debordement-flux.md.",
     )
     ap.add_argument(
         "--detect-duplicates",
