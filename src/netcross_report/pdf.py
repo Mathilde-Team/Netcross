@@ -465,15 +465,15 @@ def _path_table(metrics, styles):
         # Issue #996 : un segment dont l'incertitude d'horloge depasse la
         # latence mesuree est non mesurable (tiret cadratin, convention du
         # tableau) -- mieux vaut ne rien affirmer qu'affirmer faux.
-        non_mesurable = (
-            seg.clock_ci_ms is not None and seg.delay_avg_ms is not None and seg.clock_ci_ms > abs(seg.delay_avg_ms)
-        )
+        non_mesurable = not seg.latency_measurable
         horloge = "\u2014"
         if seg.clock_offset_ms is not None:
             horloge = (
                 f"{seg.clock_offset_ms:+.2f}ms / {seg.clock_drift_ppm:+.1f}ppm "
                 f"(IC95% \u00b1{seg.clock_ci_ms:.2f}ms, n={seg.clock_samples})"
             )
+            if seg.clock_method:
+                horloge += f"<br/>Methode : {_xml_escape(seg.clock_method)}"
             if non_mesurable:
                 horloge += " \u2192 non mesurable"
         data.append(

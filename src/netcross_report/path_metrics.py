@@ -38,6 +38,7 @@ le reste de `netcross_report` hors `pdf`/`charts`.
 Couche : `netcross_report` peut importer `netcross_core`, jamais l'inverse.
 """
 
+import math
 import statistics
 from dataclasses import dataclass
 
@@ -45,6 +46,18 @@ from netcross_core.baseline_profile import build_baseline_profile
 from netcross_core.logging_config import get_logger, summarize
 
 logger = get_logger(__name__)
+
+
+def latency_is_measurable(delay_ms: float | None, clock_ci_ms: float | None) -> bool:
+    """Refuse une latence dominée par l'incertitude, sans altérer la mesure brute."""
+    logger.debug("latency_is_measurable: délai={} IC={}", delay_ms, clock_ci_ms)
+    measurable = (
+        delay_ms is not None
+        and math.isfinite(delay_ms)
+        and (clock_ci_ms is None or (math.isfinite(clock_ci_ms) and 0 <= clock_ci_ms <= abs(delay_ms)))
+    )
+    logger.debug("latency_is_measurable: retour {}", measurable)
+    return measurable
 
 
 @dataclass
@@ -100,6 +113,12 @@ class SegmentMetrics:
         degradations."""
         logger.debug("SegmentMetrics.measured: retour self.samples > 0 or self.loss_count > 0 or bool(s…")
         return self.samples > 0 or self.loss_count > 0 or bool(self.dscp_changes or self.frag_new)
+
+    @property
+    def latency_measurable(self) -> bool:
+        """La validité de la latence ne préjuge pas des pertes ni du débit."""
+        logger.debug("SegmentMetrics.latency_measurable: évaluation")
+        return latency_is_measurable(self.delay_avg_ms, self.clock_ci_ms)
 
 
 def _topological_points(report) -> list[str]:
@@ -230,7 +249,7 @@ def rank_path_segments(metrics) -> list[SegmentMetrics]:
         (seg for seg in metrics if seg.measured),
         key=lambda seg: (
             -(seg.loss_pct or 0.0),
-            -(seg.delay_p95_ms or 0.0),
+            -(seg.delay_p95_ms or 0.0) if seg.latency_measurable else 0.0,
             -(seg.jitter_ms or 0.0),
             seg.label,
         ),
@@ -257,8 +276,10 @@ def degradation_summary(metrics) -> str:
     details = []
     if pire.loss_pct is not None and pire.loss_count:
         details.append(f"{pire.loss_count} paquet(s) perdu(s) ({pire.loss_pct:.1f}%)")
-    if pire.delay_p95_ms is not None:
+    if pire.delay_p95_ms is not None and pire.latency_measurable:
         details.append(f"delai P95 {pire.delay_p95_ms:.1f} ms")
+    elif pire.delay_avg_ms is not None:
+        details.append("latence non mesurable (incertitude d'horloge)")
     if pire.jitter_ms:
         details.append(f"gigue {pire.jitter_ms:.1f} ms")
     if not details:

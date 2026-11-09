@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: netcross\n"
 "Report-Msgid-Bugs-To: https://github.com/MathildeDec/Netcross/issues\n"
-"POT-Creation-Date: 2026-11-09 18:25+0000\n"
+"POT-Creation-Date: 2026-11-09 18:51+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -229,6 +229,18 @@ msgid "Derive d'horloge"
 msgstr ""
 
 #: src/netcross_report/html_report.py
+msgid "IC95% (horloge)"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Echantillons d'horloge"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Methode d'horloge"
+msgstr ""
+
+#: src/netcross_report/html_report.py
 msgid "Synthese"
 msgstr ""
 
@@ -312,6 +324,18 @@ msgstr ""
 
 #: src/netcross_report/html_report.py
 msgid "non mesurable"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "latence non mesurable"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "incertitude d'horloge superieure a la latence ou invalide"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "IC95%"
 msgstr ""
 
 #: src/netcross_report/html_report.py

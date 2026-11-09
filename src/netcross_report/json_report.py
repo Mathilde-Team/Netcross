@@ -227,6 +227,7 @@ def _path_segment_dict(m) -> dict:
     d = dataclasses.asdict(m)
     d["segment"] = m.label
     d["measured"] = m.measured
+    d["latency_measurable"] = m.latency_measurable
     logger.debug("_path_segment_dict: retour dict")
     return d
 
