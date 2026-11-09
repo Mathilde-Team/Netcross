@@ -170,6 +170,20 @@ def test_pdftotext_requis_avant_les_mesures_pr_et_base():
     subprocess.run(["bash", "-n"], input=script, text=True, check=True, capture_output=True)
 
 
+def test_tshark_requis_avant_les_mesures_pr_et_base():
+    workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/pr-coverage.yml").read_text(encoding="utf-8"))
+    etapes = workflow["jobs"]["commentaire-couverture"]["steps"]
+    outils = [i for i, e in enumerate(etapes) if "apt-get install -y -qq tshark" in e.get("run", "")]
+    assert len(outils) == 1
+    mesures = [i for i, e in enumerate(etapes) if "uv run pytest --cov" in e.get("run", "")]
+    assert len(mesures) == 2 and all(outils[0] < i for i in mesures)
+    script = etapes[outils[0]]["run"]
+    assert "command -v tshark" in script
+    assert "tshark --version" in script
+    assert "DEBIAN_FRONTEND=noninteractive" in script
+    subprocess.run(["bash", "-n"], input=script, text=True, check=True, capture_output=True)
+
+
 def _arguments_main(tmp_path):
     pr = _ecrire_rapport(tmp_path, TOTAUX_REFERENCE, "pr.json")
     base = _ecrire_rapport(tmp_path, TOTAUX_REFERENCE, "base.json")

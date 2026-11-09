@@ -467,6 +467,12 @@ def analyse(
         from netcross_core.rtp_match import match_rtp_streams
 
         r.rtp_matches = match_rtp_streams(all_packets, points if points_order else None)
+    with _phase("rtp_segments"):
+        from netcross_core.rtp_segments import analyse_rtp_segments
+
+        r.rtp_segments = analyse_rtp_segments(
+            all_packets, r.rtp_matches, r.clock_offset_estimate, ordered=points_order, clock_rate=rtp_clock_rate
+        )
     with _phase("response_time"):
         _analyse_response_time(r, flows, all_packets, points, points_order)
     with _phase("dhcp"):

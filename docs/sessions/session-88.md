@@ -16,3 +16,11 @@ Les tests de gardes ne font aucun appel réseau ni installation réelle.
 La construction Docker locale n'est pas revendiquée ; sa validation réelle
 reste obligatoire en CI, comme la suite globale et la livraison jusqu'à main.
 L'économie de temps attendue n'est pas présentée comme une mesure.
+
+Après intégration de `dev` au commit `d6c7148` (qualité RTP/SRTP #1123),
+la suite complète sous Xvfb donne 7 425 tests réussis, 1 ignoré existant,
+111 avertissements, une couverture lignes/branches combinée de 98,08 %
+et un code de sortie nul. Les hooks, mypy, MkDocs strict et actionlint
+avec ShellCheck restent verts. La construction et le téléchargement de
+l'image restent à vérifier par les workflows, sans revendiquer un gain
+chronométré ni modifier les autorisations du compte local.
