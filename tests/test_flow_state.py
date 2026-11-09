@@ -289,10 +289,28 @@ def test_eviction_des_cles_recentement_fermees(monkeypatch):
     monkeypatch.setattr(fs, "_SEEN_CAP", 2)
     table = FlowTable(["CLIENT"], timeouts={"TCP": 1.0, "UDP": 1.0, "ICMP": 1.0, "AUTRE": 1.0})
     for i in range(4):
-        table.feed(make_pkt(point="CLIENT", ts=i * 10.0, src=f"10.0.{i}.1", dst="192.0.2.9", sport=10000 + i, dport=443))
+        table.feed(
+            make_pkt(
+                point="CLIENT",
+                ts=i * 10.0,
+                src=f"10.0.{i}.1",
+                dst="192.0.2.9",
+                sport=10000 + i,
+                dport=443,
+            )
+        )
     # les clés les plus anciennes sont oubliées : la réouverture n'est
     # comptée que pour la clé encore mémorisée
-    table.feed(make_pkt(point="CLIENT", ts=100.0, src="10.0.3.1", dst="192.0.2.9", sport=10003, dport=443))
+    table.feed(
+        make_pkt(
+            point="CLIENT",
+            ts=100.0,
+            src="10.0.3.1",
+            dst="192.0.2.9",
+            sport=10003,
+            dport=443,
+        )
+    )
     assert table.reopened["TCP"] == 1
 
 
@@ -300,12 +318,9 @@ def test_coupure_sur_trois_points_un_seul_segment():
     points = ["CLIENT", "ROUTEUR", "SERVEUR"]
     paquets = []
     for t in (0.0, 1.0):
-        for point in points:
-            paquets.append(make_pkt(point=point, ts=t, **CONN))
+        paquets.extend(make_pkt(point=point, ts=t, **CONN) for point in points)
     # réveil en CLIENT et ROUTEUR, jamais en SERVEUR : coupure (ROUTEUR, SERVEUR)
-    for t in (101.0, 102.0):
-        paquets.append(make_pkt(point="CLIENT", ts=t, **CONN))
-        paquets.append(make_pkt(point="ROUTEUR", ts=t, **CONN))
+    paquets.extend(make_pkt(point=point, ts=t, **CONN) for t in (101.0, 102.0) for point in ("CLIENT", "ROUTEUR"))
     paquets.sort(key=lambda pk: pk.ts)
     table = _flux(paquets, order=points)
     assert table.nat_cutoffs[("ROUTEUR", "SERVEUR")] == 1
@@ -327,9 +342,9 @@ def test_lignes_resume_sans_reouverture_ni_coupure():
     table.feed(make_pkt(point="A", ts=100.0, src="10.0.0.2", dst="192.0.2.10", sport=40001, dport=443))
     table.finish()
     lignes = table.summary_lines()
-    assert any("expiration(s) d'inactivité" in l for l in lignes)
-    assert not any("réouverture" in l for l in lignes)
-    assert not any("COUPURE" in l for l in lignes)
+    assert any("expiration(s) d'inactivité" in ligne for ligne in lignes)
+    assert not any("réouverture" in ligne for ligne in lignes)
+    assert not any("COUPURE" in ligne for ligne in lignes)
 
 
 def test_lignes_resume_avec_reouverture_sans_coupure():
@@ -339,5 +354,5 @@ def test_lignes_resume_avec_reouverture_sans_coupure():
     table.feed(make_pkt(point="A", ts=100.5, src="10.0.0.1", dst="192.0.2.10", sport=40000, dport=443))
     table.finish()
     lignes = table.summary_lines()
-    assert any("réouverture(s) après expiration" in l for l in lignes)
-    assert not any("COUPURE" in l for l in lignes)
+    assert any("réouverture(s) après expiration" in ligne for ligne in lignes)
+    assert not any("COUPURE" in ligne for ligne in lignes)

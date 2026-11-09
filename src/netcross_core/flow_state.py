@@ -194,7 +194,7 @@ class FlowTable:
         etat = self._open.get(key)
         timeout = self.timeouts.get(pk.proto, self.timeouts.get("AUTRE", 60.0))
         precedent_ts = etat.last_ts_point.get(pk.point) if etat is not None else None
-        if precedent_ts is not None and pk.ts - precedent_ts >= timeout:
+        if etat is not None and precedent_ts is not None and pk.ts - precedent_ts >= timeout:
             # silence au point courant au moins egal au delai : l'etat
             # precedent se ferme (raison expiration), un nouvel
             # enregistrement s'ouvre -- meme regle que le plus grand
