@@ -74,6 +74,14 @@ fin de la capture, pour la latence par segment comme pour le délai RTP.
 
 ## Lire l'incertitude dans le rapport
 
+Après correction d'horloge, la latence par segment est un temps de
+transit positif : un paquet retour traverse les points dans l'ordre
+inverse, mais son délai ne doit pas annuler celui d'un paquet aller dans
+la moyenne. La même convention s'applique au délai RTP corrigé.
+Sans estimation ni décalage imposé, les deltas signés restent disponibles
+pour diagnostiquer les horloges ; l'incertitude et le caractère mesurable
+du segment restent contrôlés séparément.
+
 Chaque rapport (texte, PDF, JSON, HTML) affiche par paire de points :
 décalage, dérive, intervalles de confiance à 95 %, nombre d'échantillons
 et méthode. La méthode indique les sources collectées avant le filtre ;
