@@ -107,6 +107,7 @@ def run_diff_pipeline(
         logger.debug("run_diff_pipeline._log: fin")
 
     from netcross_core.analysis import analyse
+    from netcross_core.link_speed import resolve_link_speeds
     from netcross_core.redact import AddressRedactor
     from netcross_gtk4.analysis_pipeline import load_packets
 
@@ -127,13 +128,16 @@ def run_diff_pipeline(
         options.nat_tolerant,
         options.rtp_rate,
         idle_timeout_seconds=options.idle_timeout_seconds,
+        link_speeds=resolve_link_speeds(baseline_captures),
     )
 
     # 2. Courant
+    current_link_speeds: dict[str, dict] = {}
     if current_packets is None:
         points_order_current = None if options.auto_topology else capture_list.ordre_des_points(current_captures)
         _log("=== CHARGEMENT DU RUN COURANT ===")
         current_packets = load_packets(current_captures, options.parallel, on_progress)
+        current_link_speeds = resolve_link_speeds(current_captures)
     else:
         if options.auto_topology:
             points_order_current = None
@@ -154,6 +158,7 @@ def run_diff_pipeline(
         options.nat_tolerant,
         options.rtp_rate,
         idle_timeout_seconds=options.idle_timeout_seconds,
+        link_speeds=current_link_speeds,
     )
 
     # 3. Comparaison

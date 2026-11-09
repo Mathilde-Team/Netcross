@@ -33,6 +33,7 @@ from netcross_core.dechiffrement import compter_sessions
 from netcross_core.extract.carver import detect_extracted_files
 from netcross_core.forensic import detect_sequence_gaps, validate_checksums
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.microburst import detect_microbursts
 from netcross_core.models import Pkt, Report
 from netcross_core.parsing import compute_mos
 from netcross_core.security.exfiltration import detect_exfiltration
@@ -84,6 +85,7 @@ def analyse(
     exclude_duplicates=False,
     duplicate_counts=None,
     clock_offsets=None,
+    link_speeds=None,
 ):
     # Job 41/issue #161 : exclude_duplicates (defaut False -> comportement
     # historique inchange) retire de `flows` ET de `all_packets` les paquets
@@ -135,6 +137,7 @@ def analyse(
         rtp_clock_rate=rtp_clock_rate,
     )
     r.duplicates_excluded = exclude_duplicates
+    r.link_speeds = link_speeds or {}
     for pair, count in (duplicate_counts or {}).items():
         r.duplicate_count[pair] = count
     # Commentaires de paquets pcapng (Job 39/issue #159) -- pre-formates
@@ -149,6 +152,8 @@ def analyse(
     r.dechiffrement = compter_sessions(all_packets)
     with _phase("compute_throughput"):
         r.throughput = compute_throughput(all_packets, bucket_seconds)
+    with _phase("detect_microbursts"):
+        r.microbursts = detect_microbursts(all_packets, r.link_speeds)
     r.topn_timeseries = {dim: compute_topn_series(all_packets, bucket_seconds, dim, topn) for dim in TOPN_DIMENSIONS}
     r.topology_edges = topo_edges
     r.topology_ambiguous = topo_ambiguous

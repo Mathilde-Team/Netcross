@@ -22,6 +22,14 @@ que pour un contexte spécifique, pas systématiquement.
 
 ## État courant
 
+- **Microrafales, issue #1135 (09/11/2026)** : détection automatique par
+  point dans `analyse`, fenêtres glissantes 100 µs/1 ms/10 ms respectant
+  la résolution. Pic ≥ 4 fois la médiane des tranches non vides et,
+  si vitesse connue, occupation ≥ 80 %. Texte, JSON et constats câblés ;
+  seuil relatif explicitement signalé sans vitesse. Classification
+  `seconde_passe` et limites documentées, mesures brutes dans
+  `benchmarks/microrafales-1135-*.json`. Voir la session 76.
+
 - **Guide des clés TLS, issue #1049 (09/11/2026)** :
   `docs/guide/cles-tls.md` décrit navigateur, curl, agent Java
   extract-tls-secrets 5.0.0, contexte Python, association par point et

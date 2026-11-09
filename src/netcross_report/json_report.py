@@ -373,6 +373,8 @@ def build_json_report_document(
         "path_metrics": [_path_segment_dict(m) for m in build_path_metrics(r)],
         "meta": dict(meta) if meta else {},
         "findings": [_finding_dict(f) for f in findings],
+        "microbursts": r.microbursts,
+        "link_speeds": r.link_speeds,
         "triage": [_segment_score_dict(s) for s in ranked],
         # health_score/health_label : voir netcross_report.triage --
         # derives de "triage" ci-dessus (jamais un calcul independant), la
