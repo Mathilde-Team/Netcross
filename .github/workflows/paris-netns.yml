@@ -34,7 +34,8 @@ jobs:
             git ca-certificates curl python3 iproute2 iptables \
             scamper=20211212-1.2build2
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          scamper -v
+          # Ce paquet renvoie 255 avec « -v », même pour une version valide.
+          test "$(dpkg-query -W -f='${Version}' scamper)" = 20211212-1.2build2
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
