@@ -159,13 +159,13 @@ class SpillDict(Generic[K, V]):
         self._mem: OrderedDict[str, V] = OrderedDict()
         self._nom = nom
         self._en_attente: list[tuple[str, str]] = []
+        self._backend: SpillBackend | None = None
         if self._seuil > 0:
             self._own = backend is None
             self._backend = backend if backend is not None else SpillBackend()
             self._backend.table(nom)
         else:
             self._own = False
-            self._backend = None
         logger.debug("SpillDict.__init__: fin")
 
     def get(self, cle: K) -> V | None:
@@ -271,13 +271,13 @@ class SpillSet(Generic[K]):
         self._mem: set[str] = set()
         self._nom = nom
         self._en_attente: list[tuple[str, str]] = []
+        self._backend: SpillBackend | None = None
         if self._seuil > 0:
             self._own = backend is None
             self._backend = backend if backend is not None else SpillBackend()
             self._backend.table(nom)
         else:
             self._own = False
-            self._backend = None
         logger.debug("SpillSet.__init__: fin")
 
     def add(self, cle: K) -> None:

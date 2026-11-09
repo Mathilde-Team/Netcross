@@ -191,10 +191,9 @@ class FlowTable:
         # avec le nombre total de conversations vues ; au-delà du seuil,
         # les moins récentes partent dans une base SQLite temporaire.
         self.spill_seuil = max(0, int(spill_seuil)) if spill_seuil else 0
+        self._spill_backend: SpillBackend | None = None
         if self.spill_seuil > 0:
             self._spill_backend = SpillBackend()
-        else:
-            self._spill_backend = None
         self._open: OrderedDict[tuple, _EtatFlux] = OrderedDict()
         self._now = float("-inf")
         # compteurs
