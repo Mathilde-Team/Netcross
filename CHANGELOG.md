@@ -8,6 +8,13 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Qualité de transport RTP/SRTP par segment (#1123) : pertes supplémentaires
+  entre paquets communs, gigue RFC 3550, délai corrigé avec incertitude d'horloge
+  et note indicative de transport, avec constat localisé. Réutilise l'appariement
+  NAT/SBC ; les pertes déjà présentes et les bords de capture ne sont pas recomptés.
+  Sans ordre du chemin, aucun segment n'est inventé ; sans horloge exploitable,
+  aucun délai physique n'est affirmé. Le contenu SRTP et la qualité perçue ne
+  sont pas analysés. Voir docs/rtp-segments.md.
 - Seconde passe ciblée en flux (#1025, sous-issue 6/6 du chantier pipeline en flux #995) :
   la topologie est désormais déduite en mode `--streaming` comme en batch — un enregistrement
   compact par (flux, point) (horodatage et TTL du premier paquet) est collecté au fil de l'eau
