@@ -89,6 +89,39 @@ netcross --capture LAN=lan.pcap --capture WAN=wan.pcap \
 Les tests valident les deux sorties avec les parseurs de référence de
 `prometheus_client` (dépendance de développement), faute de `promtool` en CI.
 
+## Route API en direct
+
+`GET /metrics` utilise exactement l'authentification habituelle : l'en-tête
+`X-API-Key` si `NETCROSS_API_TOKEN` est configuré, aucun jeton de consultation
+HTML ne le remplace. Sans clé configurée, la lecture suit le même mode
+ouvert que les autres routes ; le démarrage d'une capture conserve ses
+restrictions propres.
+
+Le format par défaut est Prometheus 0.0.4 ; `?format=openmetrics` fournit
+OpenMetrics 1.0 avec `# EOF` et son Content-Type spécifique. Avant tout
+relevé, la réponse est vide et valide ; elle n'invente aucune mesure à zéro.
+
+Pendant une capture avec `live_report`, chaque tick remplace les séries
+du précédent : paquets et retransmissions cumulés par point, étiquette
+`run` égale à `capture_id`. Les flux, pertes, délais, santé et constats
+ne sont pas disponibles dans cet agrégateur direct et ne sont donc pas
+inventés. À l'analyse finale simple réussie d'une capture directe, avec ou sans
+`live_report`, le catalogue complet provient du vrai rapport ; `run`
+devient alors `analysis_id`. Une comparaison directe conserve ses compteurs
+de capture, puisqu'elle produit une différence et non ce rapport simple.
+
+La collecte ne lance ni capture, ni dissection, ni analyse, ni nouveau
+tick. Un seul tuple immuable de séries est gardé par processus, avec la
+borne habituelle de points et segments ; pas de cumul des runs.
+Le dernier relevé reste consultable jusqu'au suivant ou au redémarrage,
+même si l'écriture du rapport direct sur disque échoue ; la réponse est
+marquée `Cache-Control: no-store`.
+
+Avec `options.redact=true`, les adresses IP/MAC des étiquettes sont
+pseudonymisées avant publication. Les tables de pseudonymes des métriques
+directes et finales sont propres à leurs identifiants de run ; aucune
+identité commune avec la table des paquets n'est revendiquée.
+
 ## Limites
 
 - Le catalogue ne couvre que les grandeurs disponibles dans le rapport. Les
