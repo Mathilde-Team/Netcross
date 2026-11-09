@@ -22,5 +22,10 @@ et les décodent avec TShark : pertes uniquement sur le dernier segment,
 absence de perte, puis les deux cas après anonymisation. Ils passent et
 vérifient la restitution JSON et la localisation du constat, sans substituer
 ces quatre essais à une nouvelle suite complète sur l'arbre final intégré.
-La synchronisation de dev, la CI et la livraison jusqu'à main restent
-nécessaires avant toute clôture.
+Après fusion de #1113, la synchronisation normale de dev conserve les deux
+entrées du changelog et régénère le diagramme. La suite complète finale inclut
+les quatre PCAP : 7 354 réussites, un saut préexistant, 111 avertissements,
+232,36 secondes, couverture combinée 98,08 %, code de sortie nul.
+Les hooks, mypy et MkDocs strict passent sur cet arbre intégré.
+La CI du dernier head et la livraison jusqu'à main restent nécessaires
+avant toute clôture.

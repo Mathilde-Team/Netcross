@@ -15,6 +15,11 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   Sans ordre du chemin, aucun segment n'est inventé ; sans horloge exploitable,
   aucun délai physique n'est affirmé. Le contenu SRTP et la qualité perçue ne
   sont pas analysés. Voir docs/rtp-segments.md.
+- Route `/metrics` en direct (#1113) : authentification commune à l'API,
+  formats Prometheus/OpenMetrics, dernier relevé remplacé atomiquement et
+  compteurs directs sans métriques non mesurées. L'analyse finale d'une
+  capture directe expose le catalogue complet ; cardinalité bornée et
+  anonymisation des étiquettes avec `redact`.
 - Seconde passe ciblée en flux (#1025, sous-issue 6/6 du chantier pipeline en flux #995) :
   la topologie est désormais déduite en mode `--streaming` comme en batch — un enregistrement
   compact par (flux, point) (horodatage et TTL du premier paquet) est collecté au fil de l'eau
