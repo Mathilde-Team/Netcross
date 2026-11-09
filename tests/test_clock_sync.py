@@ -103,6 +103,74 @@ def test_le_filtre_ecarte_les_echanges_files():
     assert abs(estimation.decalage_ms - 10.0) < 1.0
 
 
+@pytest.mark.parametrize(("decalage", "derive"), [(37.0, 0.0), (0.0, 15.0), (37.0, 15.0)])
+@pytest.mark.parametrize("n", [60, 800])
+@pytest.mark.parametrize("repartition", ["minima", "groupee", "aleatoire"])
+@pytest.mark.parametrize("amplitude", [-500.0, 500.0])
+def test_dix_pourcent_aberrants_ne_sont_pas_amplifies_par_les_minima(decalage, derive, n, repartition, amplitude):
+    from netcross_core.clock_sync import _filtre_delais_minimaux
+
+    propres = [
+        EchantillonHorloge(t=i * 60.0, decalage_ms=decalage + derive * i * 0.06, delai_ms=10.0) for i in range(n)
+    ]
+    nombre = n // 10
+    if repartition == "minima":
+        cibles = [propres.index(e) for e in _filtre_delais_minimaux(propres)]
+        cibles = (cibles + [i for i in range(n) if i not in cibles])[:nombre]
+    elif repartition == "groupee":
+        cibles = list(range(nombre))
+    else:
+        cibles = random.Random(1027).sample(range(n), nombre)
+    contamines = [
+        EchantillonHorloge(
+            t=e.t,
+            decalage_ms=e.decalage_ms + (amplitude if i in cibles else 0.0),
+            delai_ms=1.0 if i in cibles else e.delai_ms,
+        )
+        for i, e in enumerate(propres)
+    ]
+    assert len(cibles) == nombre
+    estimation = estimer_decalage(contamines)
+    assert abs(estimation.decalage_ms - decalage) < 1.0
+    assert abs(estimation.derive_ppm - derive) < 2.0
+    assert estimation.n_echantillons == n
+
+
+@pytest.mark.parametrize("seed", range(20))
+@pytest.mark.parametrize("amplitude", [-500.0, -20.0, -5.0, -2.0, 2.0, 5.0, 20.0, 500.0])
+def test_propriete_aberrants_avec_bruit_et_files_asymetriques(seed, amplitude):
+    propres = _jeu_syntheque(n=100, seed=seed)
+    cibles = set(random.Random(seed + 1027).sample(range(100), 10))
+    contamines = [
+        EchantillonHorloge(
+            t=e.t,
+            decalage_ms=e.decalage_ms + (amplitude if i in cibles else 0.0),
+            delai_ms=1.0 if i in cibles else e.delai_ms,
+        )
+        for i, e in enumerate(propres)
+    ]
+    reference = estimer_decalage(propres)
+    estimation = estimer_decalage(contamines)
+    assert abs(estimation.decalage_ms - reference.decalage_ms) < 1.0
+    assert abs(estimation.derive_ppm - reference.derive_ppm) < 2.0
+
+
+def test_rejet_preliminaire_sans_etendue_temporelle():
+    echantillons = [
+        EchantillonHorloge(t=100.0, decalage_ms=537.0 if i < 2 else 37.0, delai_ms=1.0 if i < 2 else 10.0)
+        for i in range(20)
+    ]
+    estimation = estimer_decalage(echantillons)
+    assert estimation.decalage_ms == 37.0
+    assert estimation.derive_ppm == 0.0
+    assert "Siegel" in estimation.methode
+
+
+def test_petit_effectif_ne_revendique_pas_un_rejet_non_applique():
+    estimation = estimer_decalage([EchantillonHorloge(t=100.0, decalage_ms=37.0, delai_ms=10.0)])
+    assert "MAD" not in estimation.methode
+
+
 def test_estimation_sans_echantillon():
     """Aucun echantillon : pas d'estimation, pas d'exception."""
     assert estimer_decalage([]) is None
