@@ -104,6 +104,7 @@ nav:
       - Couverture de la GUI: quality/gui-app-coverage.md
       - Jeux synthétiques multi-points: quality/jeux-synthetiques.md
       - Banc de performance: quality/banc-performance.md
+      - Campagne de performance: performance.md
       - Tests réels (banque de pcap): quality/tests-reels.md
   - Référence:
       - Roadmap: archived/roadmap.md

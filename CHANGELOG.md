@@ -8,6 +8,12 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Campagne de performance multi-cœurs documentée (#1018, banc de performance #994) :
+  `docs/performance.md` présente les mesures du pipeline complet (`tshark` inclus) sur les jeux
+  synthétiques — tables jeux × degré de parallélisme (2 à 10 points, 10⁴ à 10⁶ paquets par point,
+  parallélisme 1 à 8), débits de 798 à 3 929 paquets/s, pics RSS ~2,4 à 3,1 Kio/paquet (2 points ×
+  10⁶ paquets : 4,8 Gio), avec la description de la machine de mesure et les commandes de
+  reproduction. Le lien README « Limites connues » renvoie désormais à cette page.
 - `--redact-scope adresses|noms|tout` (#1153, chantier #1007) : `--redact` anonymise désormais aussi, par défaut, les
   noms DNS (`dns_qry_name`), la cible HTTP (`http_uri` : hôte pseudonymisé, chemin `/res-N`), le SAN (joker conservé),
   le sujet et l'émetteur des certificats TLS (`CN=dn-N`), le Call-ID (`call-N@example.invalid`), le User-Agent et le
