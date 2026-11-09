@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-227 modules · 330 classes · 833 fonctions publiques de module.
+228 modules · 331 classes · 834 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -556,6 +556,7 @@ classDiagram
 | `netcross_core.forensic` | index de correlation bidirectionnel evenement ↔ flow ↔ paquet (Job 8/issue #5, §6.3 et §6.14 de FEATURES.md). |
 | `netcross_core.forensic_search` | moteur de recherche analytique post-capture transversal (Job 17 / issue #16, section 6.13 de FEATURES.md). |
 | `netcross_core.i18n` | internationalisation par GNU gettext (issue #299). |
+| `netcross_core.incident_analysis` | netcross_core.incident_analysis — analyse multi-points de la fenêtre gelée (issue #1091, chantier #1001 : enregistrement rétroactif déclenché par alarme). |
 | `netcross_core.link_speed` | Vitesse de lien et resolution d'horodatage par point (issue #1132). |
 | `netcross_core.live_diff` | Capture en continu + diff en direct (Job 33, issue #33). |
 | `netcross_core.live_report` | issue #274 : export / rapport temps reel du mode ``--live``. |
@@ -1338,6 +1339,23 @@ classDiagram
         +available_languages(localedir) list~str~
         +ngettext(singular, plural, n) str
         +N_(message) str
+    }
+
+    %% ===== netcross_core.incident_analysis =====
+    class RapportIncident {
+        <<dataclass, frozen>>
+        +str incident
+        +str dossier
+        +str chemin_rapport
+        +str? chemin_html
+        +tuple~str, ...~ points
+        +int score
+        +str? level
+        +tuple~Any, ...~ notifications
+    }
+    class mod_netcross_core_incident_analysis["netcross_core.incident_analysis"] {
+        <<module>>
+        +analyser_incident(manifeste, dossier_incident, parseur, scanner, evaluateur, generateur_html, seuil_notification, notificateur, cfg_notification) RapportIncident
     }
 
     %% ===== netcross_core.link_speed =====
