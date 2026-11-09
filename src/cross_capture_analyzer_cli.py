@@ -155,6 +155,9 @@ from netcross_core.flow_timeline import build_flow_timelines
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
 from netcross_core.profiling import creer_mesures, marquer
+from netcross_core.redact import SCOPE_ALL as REDACT_SCOPE_ALL
+from netcross_core.redact import SCOPES as REDACT_SCOPES
+from netcross_core.redact import scope_label
 from netcross_core.report_text import load_capture_annotations, print_capture_annotations
 from netcross_core.security import close_db, connect_cve_db
 from netcross_core.security import findings as security_findings
@@ -163,6 +166,7 @@ from netcross_core.stats import EXPORT_FORMATS as STATS_EXPORT_FORMATS
 from netcross_core.stats import GROUP_BY as STATS_GROUP_BY
 from netcross_core.stats import SORT_BY as STATS_SORT_BY
 from netcross_core.stats import explore_stats, render_stats, stats_format_for
+from netcross_core.streaming import DEFAULT_WINDOW_SECONDS, correlate_streaming, sources_by_point
 from netcross_core.support import (
     SCOPES as SUPPORT_SCOPES,
 )
@@ -1336,6 +1340,23 @@ def _check_extraction_args(args) -> tuple[str, ...]:
     return kinds
 
 
+def _run_streaming(args, all_packets, points_order, r) -> None:
+    """--streaming (issue #1022) : correlation en flux, affichee et posee
+    sur ``r.streaming`` pour --json-report."""
+    logger.debug("_run_streaming: entrée")
+    resultat = correlate_streaming(
+        sources_by_point(all_packets),
+        points_order,
+        window_seconds=args.streaming_window,
+        nat_tolerant=args.nat_tolerant,
+        nat_window_ms=args.nat_window_ms,
+        exclude_duplicates=args.exclude_duplicates,
+    )
+    print("\n" + "\n".join(resultat.summary_lines()))
+    r.streaming = resultat.to_dict()
+    logger.debug("_run_streaming: retour None")
+
+
 def _write_metrics_files(args, r, findings, redactor) -> None:
     """--prom-file / --openmetrics-file (issue #1112) : series du catalogue
     (#1110), etiquettes anonymisees avec --redact."""
@@ -1343,7 +1364,7 @@ def _write_metrics_files(args, r, findings, redactor) -> None:
     samples = collect_samples(r, args.metrics_run, findings=findings)
     if redactor is not None:
         samples = redact_samples(samples, redactor)
-    commentaire = "adresses IP/MAC anonymisees (--redact)" if redactor is not None else None
+    commentaire = scope_label(redactor.scope) if redactor is not None else None
     if args.prom_file:
         write_prom_file(render_prometheus_text(samples, comment=commentaire), args.prom_file)
         print(f"\nMetriques Prometheus ({len(samples)} serie(s)) ecrites dans {args.prom_file}")
@@ -1829,6 +1850,22 @@ def main():
         default=200,
         help="Largeur de la fenetre temporelle (ms) pour le mode --nat-tolerant "
         "(defaut: 200ms, a elargir si la latence WAN est plus grande)",
+    )
+    ap.add_argument(
+        "--streaming",
+        action="store_true",
+        help="Correle aussi les points en flux (issue #1022) : fusion k voies des points tries par temps, "
+        "fenetre glissante, memoire proportionnelle a la fenetre. Compteurs dans le rapport texte et la cle "
+        "`streaming` de --json-report ; toute troncature (paquet arrive apres la fermeture de son groupe) y "
+        "est signalee. Voir docs/correlation-en-flux.md.",
+    )
+    ap.add_argument(
+        "--streaming-window",
+        type=float,
+        default=DEFAULT_WINDOW_SECONDS,
+        metavar="SECONDES",
+        help=f"Largeur de la fenetre de --streaming (defaut : {DEFAULT_WINDOW_SECONDS:g} s) : au moins le "
+        "transit le plus long entre deux points, plus le delai de retransmission a rattacher.",
     )
     ap.add_argument(
         "--detect-duplicates",
@@ -2340,7 +2377,7 @@ def main():
         "et MAC (OUI localement administre) avant l'analyse -- mapping "
         "coherent sur tout le run, pour partager un rapport ou une capture "
         "sans exposer l'adressage reel (support vendeur, ticket externe). "
-        "Ne couvre que les adresses (pas les noms DNS/HTTP/SAN TLS/SIP, voir "
+        "Couvre aussi les noms DNS/HTTP/SAN TLS/SIP selon --redact-scope (voir "
         "netcross_core.redact). Mutuellement exclusif avec --tls/--quic/"
         "--client-group, qui relisent des fichiers ou des IP fournies "
         "independamment de cette redaction.",
@@ -2354,6 +2391,15 @@ def main():
         "FICHIER vaut pour tous les points, NOM=FICHIER pour un seul point "
         "(prioritaire). Repetable. Refuse avec --redact. Sans cette option, "
         "comportement inchange (issue #1040).",
+    )
+    ap.add_argument(
+        "--redact-scope",
+        choices=REDACT_SCOPES,
+        default=None,
+        help="Avec --redact : portee de l'anonymisation. adresses = IP/MAC seules ; "
+        "noms = noms DNS (dns_qry_name), cible HTTP (http_uri), SAN/sujet/emetteur "
+        "des certificats TLS, Call-ID/User-Agent/Server SIP ; tout = les deux "
+        "(defaut). Issue #1153.",
     )
     ap.add_argument(
         "--redact-map",
@@ -3019,6 +3065,10 @@ def main():
     if args.redact_map and not args.redact:
         print("--redact-map necessite --redact.", file=sys.stderr)
         sys.exit(1)
+    if args.redact_scope and not args.redact:
+        print("--redact-scope necessite --redact.", file=sys.stderr)
+        sys.exit(1)
+    args.redact_scope = args.redact_scope or REDACT_SCOPE_ALL
     extract_kinds = _check_extraction_args(args)
     _check_live_report_args(args)
     _check_dashboard_args(args)
@@ -3243,8 +3293,11 @@ def main():
 
     redactor = None
     if args.redact:
-        redactor = redact_packets(all_packets)
-        print(f"\n{len(redactor)} adresse(s) anonymisee(s) (IP/MAC) avant analyse.")
+        redactor = redact_packets(all_packets, args.redact_scope)
+        print(
+            f"\n{len(redactor)} adresse(s) (IP/MAC) et {len(redactor.names)} nom(s) anonymise(s) "
+            f"avant analyse (--redact-scope {args.redact_scope})."
+        )
         if args.redact_map:
             write_redaction_map_csv(redactor, args.redact_map)
             print(
@@ -3322,6 +3375,8 @@ def main():
     if truncation_note:
         r.truncated = True
         r.truncation_note = truncation_note
+    if args.streaming:
+        _run_streaming(args, all_packets, points_order, r)
     marquer(mesures, "rapport")
     print_report(r)
     # Issue #910 : annotations des sidecars (GUI ou `netcross annotations`)
@@ -3393,7 +3448,7 @@ def main():
                 generate_security_html(
                     security_report_obj,
                     args.security_html,
-                    meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if args.redact else None,
+                    meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
                 )
                 print(f"Rapport de securite HTML ecrit dans {args.security_html}")
             if args.siem_export:
@@ -3626,7 +3681,7 @@ def main():
             quic_findings=quic_findings,
             session_objects=session_objects,
             sequence_views=sequence_views,
-            meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if args.redact else None,
+            meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
         )
         print(f"Rapport PDF ecrit dans {args.pdf_report}")
 
@@ -3643,7 +3698,7 @@ def main():
             session_objects=session_objects,
             rule_engine_findings=rule_engine_findings,
             names=names,
-            meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if args.redact else None,
+            meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
         )
         print(f"Rapport Markdown ecrit dans {args.md_report}")
 
@@ -3673,7 +3728,7 @@ def main():
             tls_findings=tls_findings,
             quic_findings=quic_findings,
             rule_engine_findings=rule_engine_findings,
-            meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if args.redact else None,
+            meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
             names=names,
             **session_objects.json_kwargs(),
         )
@@ -3707,7 +3762,7 @@ def main():
                 findings=findings,
                 tls_findings=tls_findings,
                 quic_findings=quic_findings,
-                meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if args.redact else None,
+                meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
                 label=args.history_label,
             )
             label_txt = f" (etiquette: {args.history_label})" if args.history_label else ""
@@ -3735,7 +3790,7 @@ def main():
             log_lines=[
                 f"captures analysees : {len(args.capture or [])}",
                 f"interfaces live : {len(args.live or [])}",
-                f"anonymisation des adresses (--redact) : {'oui' if args.redact else 'non'}",
+                f"anonymisation (--redact) : {args.redact_scope if args.redact else 'non'}",
             ],
             scrubber=scrubber,
         )

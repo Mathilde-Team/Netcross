@@ -277,6 +277,7 @@ def build_json_report_document(
     rule_engine_findings=None,
     names=None,
     security_report=None,
+    packet_flows=None,
 ) -> dict:
     """
     Document de ``--json-report``, sans l'ecrire : servi tel quel par
@@ -309,6 +310,12 @@ def build_json_report_document(
     que des ExpertEvent de source "netcross", issus de Finding/
     DiffFinding deja diagnostiques) : cle JSON de premier niveau
     distincte, meme convention d'absence que les autres objets Session 0.
+
+    packet_flows (issue #1077) : correlation brute de ``correlate()`` (cle
+    de paquet -> {point: [Pkt]}), a ne pas confondre avec ``flows``
+    ci-dessus. Si fournie, la cle ``evidence_frames`` decrit chaque preuve
+    des constats vue a chaque point (``netcross_report.evidence_frames``) ;
+    absente sinon.
     """
     logger.debug(
         "build_json_report_document: r={} title={} meta={} findings={} tls_findings={} "
@@ -392,6 +399,9 @@ def build_json_report_document(
     }
     # Issue #1043 : couverture du dechiffrement TLS/QUIC par point -- cle
     # absente si aucun point n'a de cle ni de session dechiffree.
+    # Correlation en flux (#1022) : posee par la CLI avec --streaming.
+    if getattr(r, "streaming", None):
+        doc["streaming"] = r.streaming
     decryption = document_json(r)
     if decryption:
         doc["decryption"] = {"by_point": decryption}
@@ -430,9 +440,15 @@ def build_json_report_document(
         {"point": e.point, "frame_number": e.frame_number, "protocol": e.protocol, "checksum": e.checksum}
         for e in (getattr(r, "checksum_errors", None) or [])
     ]
+    # #1121 : jambes d'un meme flux RTP a plusieurs points (NAT/SBC).
+    if getattr(r, "rtp_matches", None):
+        doc["rtp_matches"] = list(r.rtp_matches)
     if getattr(r, "voip_calls", None):
         doc["voip_calls"] = list(r.voip_calls)
         doc["voip_quality_distribution"] = dict(r.voip_quality_distribution)
+    # Echelle SIP multi-points (issue #1125), omise sans SIP.
+    if getattr(r, "sip_ladders", None):
+        doc["sip_ladders"] = list(r.sip_ladders)
     if tls_findings is not None:
         doc["tls_findings"] = [_finding_dict(f) for f in tls_findings]
     if quic_findings is not None:
@@ -470,6 +486,12 @@ def build_json_report_document(
             for rule_id, rule_list in rule_engine_findings.items()
             if rule_list  # omet les regles sans Finding (liste vide)
         }
+    if packet_flows is not None:
+        from netcross_report.evidence_frames import build_evidence_frames
+
+        doc["evidence_frames"] = build_evidence_frames(
+            doc["findings"], packet_flows, list(r.points), getattr(r, "clock_offset_estimate", None)
+        )
 
     logger.debug("build_json_report_document: retour doc={}", summarize(doc, "doc"))
     return doc

@@ -200,6 +200,10 @@ class Pkt:
     # message SIP (issue #1120), reportes depuis RawPacket.sip_sdp_media ;
     # tuple vide hors SIP avec SDP. Consommes par voip.build_calls.
     sip_sdp_media: tuple[tuple[str, int], ...] = ()
+    # Premier Via et Contact d'un message SIP (issue #1125), reportes depuis
+    # RawPacket ; None hors SIP. Consommes par sip_ladder.
+    sip_via: str | None = None
+    sip_contact: str | None = None
     # Metadonnees radio 802.11 par trame (issue #1142), reportees depuis
     # RawPacket.radio ; None hors capture 802.11.
     radio: RadioInfo | None = None
@@ -547,6 +551,9 @@ class Report:
     encap_frag_correlated: dict[tuple[str, str], int] = field(default_factory=lambda: defaultdict(int))
     # -- RTP (voix/visio) --
     rtp_streams: list[dict] = field(default_factory=list)
+    # Flux RTP apparies entre points malgre NAT/SBC (#1121), voir
+    # netcross_core.rtp_match.match_rtp_streams.
+    rtp_matches: list[dict] = field(default_factory=list)
     # -- VoIP orientee appel (Job 24 / §6.12) --
     voip_calls: list[dict] = field(default_factory=list)
     voip_quality_distribution: dict[str, int] = field(default_factory=lambda: defaultdict(int))
@@ -564,6 +571,9 @@ class Report:
     sip_missing: dict[tuple[str, str], list[str]] = field(default_factory=lambda: defaultdict(list))
     sip_setup_duration_ms: list[float] = field(default_factory=list)
     sip_failed_calls: list[str] = field(default_factory=list)
+    # Diagramme d'echelle SIP multi-points (issue #1125) : une entree par
+    # appel, voir netcross_core.sip_ladder.build_sip_ladders.
+    sip_ladders: list[dict] = field(default_factory=list)
     # -- DNS (voir _analyse_dns) --
     dns_query_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     dns_response_count: dict[str, int] = field(default_factory=lambda: defaultdict(int))
@@ -622,6 +632,10 @@ class Report:
     # capture) : plus grave qu'un simple echec, voir le constat de l'issue.
     truncated: bool = False
     truncation_note: str = ""
+    # Correlation en flux (#1022) : forme JSON de
+    # `netcross_core.streaming.StreamingResult`, posee par la CLI avec
+    # --streaming ; vide sinon (cle `streaming` absente de --json-report).
+    streaming: dict = field(default_factory=dict)
     # -- objets applicatifs HTTP (Job 25), metadonnees uniquement
     http_objects: list[dict] = field(default_factory=list)
     # -- fichiers extraits (SCENARIO-4, issue #150) : métadonnées des fichiers

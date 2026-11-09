@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-222 modules · 321 classes · 812 fonctions publiques de module.
+227 modules · 330 classes · 833 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -34,17 +34,17 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"26 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"55 imports"| netcross_core
+    CLI -->|"60 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"32 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
-    netcross_gtk4 -->|"112 imports"| netcross_core
+    netcross_gtk4 -->|"113 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
     netcross_api -->|"21 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"55 imports"| netcross_core
+    netcross_api -->|"56 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"48 imports"| netcross_core
+    netcross_report -->|"49 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"25 imports"| pcap_parser
 ```
@@ -283,6 +283,7 @@ classDiagram
         +ring_inventory(directory, prefix, reader) list~RingFile~
         +select_ring_files(inventory, start, end, include_unknown) list~RingFile~
         +merge_captures(paths, output_path, dedup) None
+        +cut_capture_window(path, output_path, start, end) None
         +replay_capture(path, interface, speed, loop) None
         +replay_command(path, interface, speed, loop) list~str~
         +start_replay(path, interface, speed, loop) subprocess.Popen
@@ -433,6 +434,8 @@ classDiagram
         +int? tcp_len
         +tuple~str, ...~ dns_answers
         +tuple~tuple~str, int~, ...~ sip_sdp_media
+        +str? sip_via
+        +str? sip_contact
         +RadioInfo? radio
         +str? comment
         +str? ip_checksum
@@ -460,6 +463,7 @@ classDiagram
         +extract_dhcp(layers) dict?
         +extract_sip(layers, payload) dict?
         +extract_sdp_media(payload) tuple~tuple~str, int~, ...~
+        +extract_sip_route_headers(payload) tuple~str?, str?~
         +extract_dns(layers) dict?
         +extract_http(layers) dict?
         +extract_tls_certificate(layers) dict?
@@ -559,6 +563,7 @@ classDiagram
 | `netcross_core.lua_dissectors` | catalogue des dissecteurs Wireshark écrits en Lua, dans la banque Lua (issue #917). |
 | `netcross_core.lua_doc` | banque SQLite locale de l'API Lua Wireshark (issue #387, rattachee a #331). |
 | `netcross_core.models` | structures de donnees partagees : un paquet normalise (Pkt) et le resultat d'analyse consolide (Report). |
+| `netcross_core.multiscale` | Debit crete multi-echelle en fenetre glissante (issue #1133). |
 | `netcross_core.naming` | table locale de correspondance adresse/MAC -> nom logique, type, contexte (Job 18 / issue #16-bis, section 6.15 de FEATURES.md). |
 | `netcross_core.packet_limits` | ``--max-packets`` et ``--sample`` (issue #283), partages par la CLI et la GUI (issue #672). |
 | `netcross_core.parsing` | adaptateur entre pcap_parser (decodage via tshark -T ek) et le modele Pkt de netcross_core. |
@@ -568,7 +573,10 @@ classDiagram
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
+| `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
+| `netcross_core.sip_ladder` | diagramme d'echelle SIP multi-points (issue #1125, sous-issue 4/6 du chantier VoIP #1004). |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
+| `netcross_core.streaming` | correlation des points en flux, par fenetre glissante (issue #1022, sous-issue 3/6 du chantier #995). |
 | `netcross_core.tls_diagnostics` | extrait l'etat des handshakes TLS (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de capture et localise le segment ou un handshake qui reussissait en amont se met a echouer. |
 | `netcross_core.tls_keylog` | Fichiers de clés TLS (SSLKEYLOGFILE) par point de capture (issue #1040, chantier #997). |
 | `netcross_core.voip` | Analyse VoIP orientee appel, association SIP/RTP par SDP. |
@@ -1668,6 +1676,8 @@ classDiagram
         +int? tcp_len
         +tuple~str, ...~ dns_answers
         +tuple~tuple~str, int~, ...~ sip_sdp_media
+        +str? sip_via
+        +str? sip_contact
         +RadioInfo? radio
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -1795,6 +1805,7 @@ classDiagram
         +dict~tuple~str, str~, list~str~~ encap_change_examples
         +dict~tuple~str, str~, int~ encap_frag_correlated
         +list~dict~ rtp_streams
+        +list~dict~ rtp_matches
         +list~dict~ voip_calls
         +dict~str, int~ voip_quality_distribution
         +dict~str, list~float~~ server_think_time
@@ -1808,6 +1819,7 @@ classDiagram
         +dict~tuple~str, str~, list~str~~ sip_missing
         +list~float~ sip_setup_duration_ms
         +list~str~ sip_failed_calls
+        +list~dict~ sip_ladders
         +dict~str, int~ dns_query_count
         +dict~str, int~ dns_response_count
         +dict~str, int~ dns_nxdomain_count
@@ -1831,6 +1843,7 @@ classDiagram
         +bool duplicates_excluded
         +bool truncated
         +str truncation_note
+        +dict streaming
         +list~dict~ http_objects
         +list~dict~ extracted_files
         +list~dict~ application_transactions
@@ -1873,6 +1886,24 @@ classDiagram
         +str name
         +str expression
         +str description
+    }
+
+    %% ===== netcross_core.multiscale =====
+    class ScaleTooFineError {
+        <<ValueError>>
+    }
+    class SlidingWindowPeak {
+        +update(ts_ns, length) None
+    }
+    class MultiScaleRates {
+        +update(ts, length) None
+        +results() list~dict~
+    }
+    class mod_netcross_core_multiscale["netcross_core.multiscale"] {
+        <<module>>
+        +format_scale(seconds) str
+        +check_scale(scale, ts_resolution, point) None
+        +multiscale_peaks(packets_by_point, link_speeds, scales) dict~str, dict~
     }
 
     %% ===== netcross_core.naming =====
@@ -1994,7 +2025,8 @@ classDiagram
     }
     class mod_netcross_core_redact["netcross_core.redact"] {
         <<module>>
-        +redact_packets(packets) AddressRedactor
+        +scope_label(scope) str
+        +redact_packets(packets, scope) AddressRedactor
         +redaction_map_csv(entries) str
         +write_redaction_map_csv(redactor, path) None
     }
@@ -2018,6 +2050,7 @@ classDiagram
         +float seconds_after
         +str min_severity
         +float min_delay_between_gels
+        +int? max_octets_archives
     }
     class PointDeGel {
         <<dataclass, frozen>>
@@ -2032,10 +2065,67 @@ classDiagram
         +float end
         +Mapping~str, Sequence~str~~ files
         +str message
+        +Mapping~str, tuple~float, float~~ fenetres
+        +str dossier
+        +float? horodatage_alarme
+        +tuple~str, ...~ quota_supprimes
         +str? ignored_reason
     }
     class GelManager {
         +on_alarm(event) GelReport?
+    }
+    class FichierIncident {
+        <<dataclass, frozen>>
+        +str point
+        +str source
+        +str segment
+        +str empreinte
+    }
+    class ManifesteIncident {
+        <<dataclass, frozen>>
+        +str incident
+        +Mapping~str, object~ alarme
+        +tuple~float, float~ fenetre
+        +tuple~FichierIncident, ...~ fichiers
+        +vers_json() str
+        +depuis_json(texte)$ ManifesteIncident
+    }
+    class mod_netcross_core_retro_capture["netcross_core.retro_capture"] {
+        <<module>>
+        +empreinte_sha256(chemin) str
+        +archiver_incident(rapport, decoupeur) ManifesteIncident
+        +verifier_manifeste(manifeste) list~str~
+        +appliquer_quota(archives_dir, quota_octets, conserver) tuple~str, ...~
+    }
+
+    %% ===== netcross_core.rtp_match =====
+    class _Leg {
+        <<dataclass>>
+        +str point
+        +str src
+        +int? sport
+        +str dst
+        +int? dport
+        +int? ssrc
+        +float first_ts
+        +float last_ts
+        +int packets
+        +list~tuple~int, int~~ pairs
+        +list~float~ arrivals
+        +sample() set~tuple~int, int~~
+        +around(ts, window) list~tuple~int, int~~
+        +endpoint() tuple
+        +to_dict(seq_offset, ts_offset) dict
+    }
+    class mod_netcross_core_rtp_match["netcross_core.rtp_match"] {
+        <<module>>
+        +match_rtp_streams(all_packets, points, window_seconds) list~dict~
+    }
+
+    %% ===== netcross_core.sip_ladder =====
+    class mod_netcross_core_sip_ladder["netcross_core.sip_ladder"] {
+        <<module>>
+        +build_sip_ladders(all_packets, points, max_calls) list~dict~
     }
 
     %% ===== netcross_core.stats =====
@@ -2070,6 +2160,43 @@ classDiagram
         +explore_stats(flows, report, findings, group_by, sort_by, top_n) list~StatRow~
         +stats_format_for(path, fmt) str
         +render_stats(rows, fmt) str
+    }
+
+    %% ===== netcross_core.streaming =====
+    class StreamingResult {
+        <<dataclass>>
+        +float window_seconds
+        +list~str~ points
+        +Counter packet_count
+        +Counter seen_count
+        +Counter retrans
+        +Counter dup_ack
+        +Counter loss_count
+        +Counter off_path_count
+        +dict latency_sum_ms
+        +Counter latency_n
+        +int groups
+        +int out_of_order
+        +int late_packets
+        +int open_at_end
+        +int peak_open_groups
+        +truncated() bool
+        +mean_latency_ms(a, b) float?
+        +to_dict() dict
+        +summary_lines() list~str~
+    }
+    class _Group {
+        <<__slots__>>
+    }
+    class StreamingCorrelator {
+        +feed(pk) None
+        +finish() StreamingResult
+    }
+    class mod_netcross_core_streaming["netcross_core.streaming"] {
+        <<module>>
+        +merge_points(sources) Iterator~Pkt~
+        +correlate_streaming(sources, points_order, window_seconds, nat_tolerant, nat_window_ms, exclude_duplicates) StreamingResult
+        +sources_by_point(all_packets) dict~str, list~Pkt~~
     }
 
     %% ===== netcross_core.tls_diagnostics =====
@@ -2168,6 +2295,7 @@ classDiagram
     Pkt --> Banner : service_banners
     Report --> ChecksumError : checksum_errors
     Report --> SequenceGap : sequence_gaps
+    ManifesteIncident --> FichierIncident : fichiers
 ```
 
 ## `netcross_core.active`
@@ -3925,6 +4053,7 @@ classDiagram
 | `netcross_report.batch_runner` | Moteur du mode lot (issues #277, #872), commun à la CLI (``cross_capture_batch_cli.py``), à l'API (``POST /batches``) et à la GUI. |
 | `netcross_report.charts` | graphiques matplotlib exportes en PNG pour le PDF. |
 | `netcross_report.comm_map` | cartographie des communications observees (Job 15/issue #15, FEATURES.md section 6.6). |
+| `netcross_report.evidence_frames` | Preuves cliquables du rapport HTML : trame de preuve vue a chaque point (issue #1077, sous-issue 3/6 du chantier #1000). |
 | `netcross_report.expert_events` | construit les vues `ExpertEvent`/ `Diagnosis` (Session 36, cinquieme et sixieme objets de contrat de la Session 0, FEATURES.md section 13.3) a partir d'une liste de `Finding`/ `DiffFinding` deja… |
 | `netcross_report.history` | persiste un resume de chaque run (analyse ou diff) dans une base SQLite locale, pour observer une tendance dans le temps (score de sante, nombre de constats par severite) sur des runs successifs --… |
 | `netcross_report.html_report` | rapport HTML autonome alimente par le JSON du rapport (issue #1073, sous-issue 1/6 du chantier #1000). |
@@ -4049,6 +4178,16 @@ classDiagram
         +write_comm_map(path, cmap) str
     }
 
+    %% ===== netcross_report.evidence_frames =====
+    class mod_netcross_report_evidence_frames["netcross_report.evidence_frames"] {
+        <<module>>
+        +finding_protocol(category) str
+        +evidence_ref(point, frame_number) str
+        +evidence_anchor(point, frame_number) str
+        +capture_point(point) str
+        +build_evidence_frames(findings, packet_flows, points, clock_offsets, context, limit) list~dict~
+    }
+
     %% ===== netcross_report.expert_events =====
     class mod_netcross_report_expert_events["netcross_report.expert_events"] {
         <<module>>
@@ -4092,7 +4231,7 @@ classDiagram
     %% ===== netcross_report.json_report =====
     class mod_netcross_report_json_report["netcross_report.json_report"] {
         <<module>>
-        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report) dict
+        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows) dict
         +generate_json_report(r, output_path, title, kwargs) str
         +generate_json_diff(findings, baseline, current, output_path, title, meta, tls_findings_baseline, tls_findings_current, quic_findings_baseline, quic_findings_current, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, names) str
     }
@@ -4232,6 +4371,7 @@ classDiagram
     class mod_netcross_report_pdf["netcross_report.pdf"] {
         <<module>>
         +path_section_story(metrics, styles, chart_path)
+        +sip_ladder_section_story(ladders, styles)
         +sequence_section_story(views, styles, chart_paths)
         +expert_section_story(session_objects, styles, top_n)
         +security_section_story(security_report, styles)

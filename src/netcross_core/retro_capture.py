@@ -34,16 +34,19 @@ point avant la sélection des fichiers.
 
 from __future__ import annotations
 
+import hashlib
 import itertools
+import json
 import os
+import re
 import shutil
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 from netcross_core.alarms import AlarmEvent
 from netcross_core.logging_config import get_logger, summarize
-from pcap_parser.capture import RingFile, select_ring_files
+from pcap_parser.capture import RingFile, cut_capture_window, select_ring_files
 
 logger = get_logger(__name__)
 
@@ -79,12 +82,20 @@ class GelConfig:
 
     min_delay_between_gels : délai minimal entre deux gels
     (anti-flapping : une salve d'alarmes voisines ne produit qu'un gel).
+
+    max_octets_archives : quota disque TOTAL du répertoire d'archives
+    (issue #1093). None = pas de quota (comportement inchangé). À chaque
+    gel, les archives les plus anciennes sont supprimées tant que le
+    total dépasse le quota — jamais l'archive du gel COURANT. La taille
+    compte les liens durs à leur taille pleine (comptage conservateur :
+    un fichier protégé et son original dans le tampon pèsent deux fois).
     """
 
     seconds_before: float = 60.0
     seconds_after: float = 30.0
     min_severity: str = "anomalie"
     min_delay_between_gels: float = 30.0
+    max_octets_archives: int | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +126,21 @@ class GelReport:
     répertoire d'archives — des liens durs vers les originaux, ou des
     copies). Vide si aucun fichier ne couvrait la fenêtre.
 
+    fenetres : par point, la fenêtre gelée TRANSLATÉE vers l'horloge du
+    point ((début, fin)) — c'est elle que la découpe editcap de
+    l'archivage d'incident (issue #1090) doit utiliser.
+
+    dossier : répertoire d'archives du gel (``<archives>/gel-<N>``) —
+    les fichiers protégés vivent dans ``<dossier>/<point>/``.
+
+    horodatage_alarme : horodatage de l'AlarmEvent à l'origine du gel
+    (en horloge d'analyse) — reporté dans le manifeste d'incident
+    (#1090). None si absent (GelReport fabriqué à la main).
+
+    quota_supprimes : archives de gel supprimées par le quota disque
+    (#1093) au moment de CE gel (les plus anciennes d'abord) — la
+    suppression est aussi mentionnée dans le journal (logger.warning).
+
     ignored_reason : None si le gel a bien été déclenché ; sinon la
     raison du refus (sévérité trop faible, délai minimal, alarme non
     « raised »).
@@ -126,6 +152,10 @@ class GelReport:
     end: float
     files: Mapping[str, Sequence[str]]
     message: str
+    fenetres: Mapping[str, tuple[float, float]] = field(default_factory=dict)
+    dossier: str = ""
+    horodatage_alarme: float | None = None
+    quota_supprimes: tuple[str, ...] = ()
     ignored_reason: str | None = None
 
 
@@ -211,8 +241,14 @@ class GelManager:
         )
 
         fichiers: dict[str, list[str]] = {}
+        fenetres: dict[str, tuple[float, float]] = {}
         for point, def_point in self._points.items():
             fichiers[point] = self._geler_point(numero, point, def_point, start, end)
+            # Fenêtre TRANSLATÉE vers l'horloge du point — c'est elle que
+            # la découpe editcap de l'archivage d'incident (#1090) doit
+            # utiliser, pas [start, end] qui est en horloge d'analyse.
+            offset = def_point.offset_vers_point
+            fenetres[point] = (start + offset, end + offset)
 
         total = sum(len(f) for f in fichiers.values())
         dossier = os.path.join(self._archives_dir, f"gel-{numero}")
@@ -221,6 +257,14 @@ class GelManager:
             f"({dossier}, fenêtre [{start:.0f}, {end:.0f}])"
         )
         logger.info("{}", message)
+
+        # Quota disque (issue #1093) : l'archive du gel COURANT compte
+        # dans le total (elle vient d'être écrite) mais n'est jamais
+        # supprimée — on évince les gels plus anciens.
+        supprimes: tuple[str, ...] = ()
+        if self._config.max_octets_archives is not None:
+            supprimes = appliquer_quota(self._archives_dir, self._config.max_octets_archives, conserver=dossier)
+
         logger.debug("GelManager._geler: retour GelReport")
         return GelReport(
             rule_id=event.rule_id,
@@ -229,6 +273,10 @@ class GelManager:
             end=end,
             files=fichiers,
             message=message,
+            fenetres=fenetres,
+            dossier=dossier,
+            horodatage_alarme=event.timestamp,
+            quota_supprimes=supprimes,
         )
 
     def _geler_point(
@@ -297,3 +345,280 @@ class GelManager:
             return False
         logger.debug("GelManager._proteger_fichier: copie posée, retour True")
         return True
+
+
+# -- Archivage d'incident (issue #1090) ----------------------------------------
+
+
+@dataclass(frozen=True)
+class FichierIncident:
+    """Un fichier de l'archive d'incident, avec sa chaîne de preuve.
+
+    source : fichier PROTÉGÉ du gel (lien dur vers le tampon) d'où le
+    segment est découpé.
+
+    segment : découpe editcap [début, fin] de la source, écrite dans
+    ``<dossier du gel>/incident/<point>/``.
+
+    empreinte : SHA-256 du segment — vérifiable a posteriori par
+    verifier_manifeste().
+    """
+
+    point: str
+    source: str
+    segment: str
+    empreinte: str
+
+
+@dataclass(frozen=True)
+class ManifesteIncident:
+    """Manifeste d'un incident archivé (issue #1090) : l'alarme, l'horodatage,
+    les points, les fichiers et leurs empreintes SHA-256 — la chaîne de
+    preuve de l'archive. Sérialisable en JSON (vers_json/depuis_json)."""
+
+    incident: str
+    alarme: Mapping[str, object]
+    fenetre: tuple[float, float]
+    fichiers: tuple[FichierIncident, ...]
+
+    def vers_json(self) -> str:
+        """Sérialise le manifeste en JSON (indenté, trié) — le fichier
+        ``manifeste.json`` de l'archive d'incident."""
+        logger.debug("ManifesteIncident.vers_json: entrée")
+        charge = {
+            "incident": self.incident,
+            "alarme": dict(self.alarme),
+            "fenetre": {"debut": self.fenetre[0], "fin": self.fenetre[1]},
+            "fichiers": [
+                {
+                    "point": f.point,
+                    "source": f.source,
+                    "segment": f.segment,
+                    "empreinte": f.empreinte,
+                }
+                for f in self.fichiers
+            ],
+        }
+        logger.debug("ManifesteIncident.vers_json: retour json.dumps(…)")
+        return json.dumps(charge, indent=2, sort_keys=True, ensure_ascii=False)
+
+    @classmethod
+    def depuis_json(cls, texte: str) -> ManifesteIncident:
+        """Reconstruit un manifeste depuis son JSON (réciproque de
+        vers_json). Lève KeyError/ValueError si un champ manque."""
+        logger.debug("ManifesteIncident.depuis_json: entrée")
+        charge = json.loads(texte)
+        manifeste = cls(
+            incident=charge["incident"],
+            alarme=dict(charge["alarme"]),
+            fenetre=(charge["fenetre"]["debut"], charge["fenetre"]["fin"]),
+            fichiers=tuple(
+                FichierIncident(
+                    point=f["point"],
+                    source=f["source"],
+                    segment=f["segment"],
+                    empreinte=f["empreinte"],
+                )
+                for f in charge["fichiers"]
+            ),
+        )
+        logger.debug("ManifesteIncident.depuis_json: retour ManifesteIncident")
+        return manifeste
+
+
+def empreinte_sha256(chemin: str) -> str:
+    """SHA-256 hexadécimal (64 caractères) du contenu d'un fichier, lu
+    par blocs (les captures peuvent être volumineuses)."""
+    logger.debug("empreinte_sha256: entrée ({})", chemin)
+    hachage = hashlib.sha256()
+    with open(chemin, "rb") as fic:
+        for bloc in iter(lambda: fic.read(65536), b""):
+            hachage.update(bloc)
+    logger.debug("empreinte_sha256: retour hexdigest")
+    return hachage.hexdigest()
+
+
+def archiver_incident(
+    rapport: GelReport,
+    *,
+    decoupeur: Callable[[str, str, float, float], None] = cut_capture_window,
+) -> ManifesteIncident:
+    """Archive exactement la fenêtre d'un incident à partir des fichiers
+    PROTÉGÉS par le gel : découpe editcap précise ([début, fin] en
+    horloge du point — rapport.fenetres), puis manifeste avec les
+    empreintes SHA-256 (issue #1090).
+
+    ``decoupeur`` : fonction de découpe (défaut pcap_parser.capture.
+    cut_capture_window, enveloppe editcap -A/-B), injectable pour les
+    tests. Écrit les segments dans ``<dossier du gel>/incident/<point>/``
+    et le manifeste dans ``<dossier du gel>/incident/manifeste.json``.
+
+    L'archive vit DANS le répertoire du gel : les segments comme le
+    manifeste sont au même endroit que les fichiers protégés — un seul
+    répertoire à sauvegarder par incident.
+    """
+    logger.debug("archiver_incident: entrée ({})", summarize(rapport, "rapport"))
+    if not rapport.dossier:
+        logger.debug("archiver_incident: si not rapport.dossier -> levée ValueError")
+        raise ValueError(
+            "archiver_incident : le GelReport ne porte pas de répertoire d'archives "
+            "(dossier vide) — le gel doit venir de GelManager.on_alarm()"
+        )
+
+    fichiers_incident: list[FichierIncident] = []
+    for point, proteges in rapport.files.items():
+        fenetre_point = rapport.fenetres.get(point)
+        if fenetre_point is None:
+            # Point sans fenêtre connue (cas défensif) : fenêtre d'analyse.
+            logger.warning("archiver_incident: point {} sans fenêtre, repli horloge d'analyse", point)
+            fenetre_point = (rapport.start, rapport.end)
+        for protege in proteges:
+            segment = os.path.join(rapport.dossier, "incident", point, os.path.basename(protege))
+            dossier_segment = os.path.dirname(segment)
+            if dossier_segment:
+                os.makedirs(dossier_segment, exist_ok=True)
+            decoupeur(protege, segment, fenetre_point[0], fenetre_point[1])
+            fichiers_incident.append(
+                FichierIncident(
+                    point=point,
+                    source=protege,
+                    segment=segment,
+                    empreinte=empreinte_sha256(segment),
+                )
+            )
+
+    manifeste = ManifesteIncident(
+        incident=os.path.basename(rapport.dossier),
+        alarme={
+            "rule_id": rapport.rule_id,
+            "segment": rapport.segment,
+            "timestamp": rapport.horodatage_alarme
+            if rapport.horodatage_alarme is not None
+            else rapport.start + (rapport.end - rapport.start) / 2,
+        },
+        fenetre=(rapport.start, rapport.end),
+        fichiers=tuple(fichiers_incident),
+    )
+    chemin_manifeste = os.path.join(rapport.dossier, "incident", "manifeste.json")
+    os.makedirs(os.path.dirname(chemin_manifeste), exist_ok=True)
+    with open(chemin_manifeste, "w", encoding="utf-8") as fic:
+        fic.write(manifeste.vers_json())
+    logger.info(
+        "Incident {} archivé : {} segment(s), manifeste {}",
+        manifeste.incident,
+        len(fichiers_incident),
+        chemin_manifeste,
+    )
+    logger.debug("archiver_incident: retour ManifesteIncident")
+    return manifeste
+
+
+def verifier_manifeste(manifeste: ManifesteIncident) -> list[str]:
+    """Vérifie les empreintes SHA-256 des segments d'un manifeste
+    d'incident. Renvvoie la liste des segments NON conformes (empreinte
+    différente ou fichier absent) — vide = chaîne de preuve intacte."""
+    logger.debug("verifier_manifeste: entrée ({})", manifeste.incident)
+    non_conformes: list[str] = []
+    for f in manifeste.fichiers:
+        if not os.path.exists(f.segment):
+            logger.warning("verifier_manifeste: segment absent {}", f.segment)
+            non_conformes.append(f.segment)
+            continue
+        if empreinte_sha256(f.segment) != f.empreinte:
+            logger.warning("verifier_manifeste: empreinte divergente {}", f.segment)
+            non_conformes.append(f.segment)
+    logger.debug("verifier_manifeste: retour {} non conforme(s)", len(non_conformes))
+    return non_conformes
+
+
+# -- Quota disque des archives (issue #1093) ------------------------------------
+
+_GEL_RE = re.compile(r"gel-(\d+)$")
+
+
+def _taille_fichier(chemin: str) -> int:
+    """Taille d'un fichier (sans suivre les liens symboliques), 0 s'il
+    disparaît pendant le parcours (rotation du tampon, quota
+    concurrent...) — il ne pèse plus, on l'ignore sans échouer."""
+    logger.debug("_taille_fichier: entrée ({})", chemin)
+    try:
+        taille = os.lstat(chemin).st_size
+    except OSError:
+        logger.debug("_taille_fichier: fichier parti pendant le parcours, retour 0")
+        return 0
+    logger.debug("_taille_fichier: retour {}", taille)
+    return taille
+
+
+def _taille_octets(dossier: str) -> int:
+    """Taille totale (octets) d'un répertoire, sans suivre les liens
+    symboliques. Les liens durs comptent à leur taille pleine — comptage
+    CONSERVATEUR : un fichier protégé par le gel et son original dans le
+    tampon (même inode) pèsent deux fois, on préfère évincer trop tôt que
+    saturer le disque."""
+    logger.debug("_taille_octets: entrée ({})", dossier)
+    total = 0
+    for racine, _sous_rep, noms in os.walk(dossier):
+        for nom in noms:
+            total += _taille_fichier(os.path.join(racine, nom))
+    logger.debug("_taille_octets: retour {}", total)
+    return total
+
+
+def appliquer_quota(archives_dir: str, quota_octets: int, conserver: str | None = None) -> tuple[str, ...]:
+    """Évince les archives de gel les plus ANCIENNES tant que le total du
+    répertoire d'archives dépasse le quota (issue #1093) — jamais
+    ``conserver`` (l'archive du gel courant), jamais d'échec silencieux :
+    chaque suppression est mentionnée dans le journal (logger.warning)
+    et renvoyée.
+
+    Renvvoie les répertoires supprimés (les plus anciens d'abord). Si le
+    quota reste dépassé après éviction (gel courant trop gros seul), un
+    avertissement le mentionne — on ne supprime JAMAIS l'archive de
+    l'incident qui vient d'être gélée."""
+    logger.debug("appliquer_quota: entrée ({}, quota={})", archives_dir, quota_octets)
+    if not os.path.isdir(archives_dir):
+        logger.debug("appliquer_quota: si répertoire absent -> retour tuple vide")
+        return ()
+
+    # Gels triés par numéro croissant = ordre chronologique de création.
+    gels_avec_numero: list[tuple[int, str]] = []
+    for nom in os.listdir(archives_dir):
+        correspondance = _GEL_RE.fullmatch(nom)
+        if correspondance is not None:
+            gels_avec_numero.append((int(correspondance.group(1)), os.path.join(archives_dir, nom)))
+    gels_avec_numero.sort()
+    gels = [chemin for _numero, chemin in gels_avec_numero]
+    if not gels:
+        logger.debug("appliquer_quota: si aucun gel -> retour tuple vide")
+        return ()
+
+    supprimes: list[str] = []
+    total = sum(_taille_octets(gel) for gel in gels)
+    for gel in gels:
+        if total <= quota_octets:
+            logger.debug("appliquer_quota: total {} <= quota -> arrêt", total)
+            break
+        if conserver is not None and os.path.abspath(gel) == os.path.abspath(conserver):
+            # L'archive courante n'est JAMAIS évincée, même trop grosse.
+            logger.warning(
+                "Quota archives ({} octets) dépassé de {} — l'archive courante {} est conservée",
+                quota_octets,
+                total - quota_octets,
+                gel,
+            )
+            break
+        taille_gel = _taille_octets(gel)
+        shutil.rmtree(gel)
+        total -= taille_gel
+        logger.warning(
+            "Quota archives ({} octets) : archive {} supprimée ({} octets libérés, total {})",
+            quota_octets,
+            gel,
+            taille_gel,
+            total,
+        )
+        supprimes.append(gel)
+
+    logger.debug("appliquer_quota: retour {} suppression(s)", len(supprimes))
+    return tuple(supprimes)

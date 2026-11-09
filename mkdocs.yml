@@ -72,6 +72,7 @@ nav:
       - API des sondes distribuées: probe-api.md
   - Analyses:
       - Estimation d'horloge: estimation-horloge.md
+      - Débit crête multi-échelle: fenetres-multi-echelles.md
       - Rapport de sécurité: security-report.md
       - Export SIEM (CEF, LEEF, STIX): siem-export.md
       - Journaux Zeek conn.log: zeek-export.md
@@ -86,12 +87,16 @@ nav:
       - Module IA local: module-ia.md
       - Rule engine: architecture-rule-engine.md
       - Mesures actives: mesures-actives.md
+      - Échelle SIP multi-points: echelle-sip.md
+      - Constats filtrables et preuves: preuves-cliquables.md
+      - Appariement RTP entre points: appariement-rtp.md
   - Architecture:
       - Diagramme de classes: class-diagram.md
       - Internationalisation: i18n.md
       - Journalisation et mode debug: journalisation.md
       - Non-fuite des secrets de déchiffrement: non-fuite-secrets.md
       - Empreinte de paquet: empreinte-paquet.md
+      - Corrélation en flux: correlation-en-flux.md
       - Décisions d'architecture: adr/netflow-sflow-architecture.md
       - Qualité: quality/anonymization-plan.md
       - Couverture de la GUI: quality/gui-app-coverage.md

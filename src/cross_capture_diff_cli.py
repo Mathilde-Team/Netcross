@@ -92,6 +92,7 @@ from netcross_core import (
 )
 from netcross_core.baseline_diff import diff_reports, print_diff_report, write_diff_csv
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
+from netcross_core.redact import SCOPE_ALL, scope_label
 from netcross_core.tls_keylog import (
     TlsKeylogError,
     options_lecture,
@@ -798,7 +799,7 @@ def main():
             tls_findings_current=tls_findings_current,
             quic_findings_baseline=quic_findings_baseline,
             quic_findings_current=quic_findings_current,
-            meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if args.redact else None,
+            meta={"Anonymisation": scope_label(SCOPE_ALL)} if args.redact else None,
         )
         print(f"Rapport PDF ecrit dans {args.pdf_report}")
 
@@ -835,7 +836,7 @@ def main():
             diagnoses=diagnoses,
             compliance=compliance,
             wireshark_expert_events=wireshark_expert_events,
-            meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if args.redact else None,
+            meta={"Anonymisation": scope_label(SCOPE_ALL)} if args.redact else None,
         )
         print(f"Rapport JSON ecrit dans {args.json_report}")
 
@@ -851,7 +852,7 @@ def main():
                 baseline_report,
                 current_report,
                 args.history_db,
-                meta={"Anonymisation": "adresses IP/MAC anonymisees (--redact)"} if args.redact else None,
+                meta={"Anonymisation": scope_label(SCOPE_ALL)} if args.redact else None,
                 label=args.history_label,
             )
             label_txt = f" (etiquette: {args.history_label})" if args.history_label else ""

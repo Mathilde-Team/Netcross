@@ -8,6 +8,34 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- `--redact-scope adresses|noms|tout` (#1153, chantier #1007) : `--redact` anonymise désormais aussi, par défaut, les
+  noms DNS (`dns_qry_name`), la cible HTTP (`http_uri` : hôte pseudonymisé, chemin `/res-N`), le SAN (joker conservé),
+  le sujet et l'émetteur des certificats TLS (`CN=dn-N`), le Call-ID (`call-N@example.invalid`), le User-Agent et le
+  Server SIP (`agent-N`), avec la table de noms commune (#1151), ainsi que les IP du SAN. Les pseudonymes restent
+  stables pendant le run (dialogues SIP, certificats auto-signés). `--redact-map` exporte ces tables ; la GUI, l'API et
+  `cross_capture_diff_cli.py` appliquent la portée « tout ». `--redact-scope adresses` rend le comportement antérieur.
+- Constats filtrables et preuves cliquables du rapport HTML (#1077) : filtres par sévérité, segment et protocole avec
+  compteur, et pour chaque preuve un diagramme centré sur la trame (voisines de la même conversation, même trame aux
+  autres points, transit corrigé du décalage d'horloge), avec ancre `#preuve-<point>-<trame>` et équivalent sans
+  JavaScript. Clé `evidence_frames` du JSON quand `packet_flows` est fourni. Voir docs/preuves-cliquables.md.
+- Débit crête multi-échelle en fenêtre glissante (#1133, chantier microrafales #1005) : `netcross_core.multiscale`
+  cherche, pour chaque point et chaque échelle (100 µs, 1 ms, 10 ms par défaut), la fenêtre la plus chargée en octets.
+  Le calcul est exact, incrémental (paquet par paquet, compatible avec `--streaming`) et à mémoire bornée par la
+  fenêtre. Une échelle plus fine que la résolution d'horodatage du point (`if_tsresol`) ou que 1 µs est refusée
+  explicitement, avec la raison. Voir docs/fenetres-multi-echelles.md.
+- Échelle SIP multi-points (#1125) : pour chaque appel, une ligne par message SIP et une colonne par point de capture,
+  dans le PDF, le rapport HTML (avec ou sans JavaScript) et le JSON (`sip_ladders`). Un message perdu entre deux
+  points (« ABSENT »), retransmis ou réécrit (SDP, premier Via, Contact modifiés par un ALG ou un SBC) est mis en
+  évidence ; les `100 Trying`, produits à chaque saut, ne sont jamais déclarés perdus. Les en-têtes Via et Contact
+  sont désormais extraits, et `--redact` anonymise leurs adresses. Voir docs/echelle-sip.md.
+- Appariement des flux RTP entre points (#1121) : le même flux est reconnu à plusieurs points malgré un NAT ou un SBC
+  (ports, adresses, SSRC, séquence et horodatage RTP réécrits), par SSRC puis par couples (séquence, horodatage RTP)
+  avec décalage constant. Clé `rtp_matches` de `--json-report` : jambes par point, méthode, `nat_rewritten`, pertes
+  entre jambes. Voir docs/appariement-rtp.md.
+- Corrélation en flux (#1022) : `--streaming` fusionne les points en k voies par temps (`heapq.merge`) et ferme
+  chaque groupe après `--streaming-window` secondes ; la mémoire suit la fenêtre, pas le nombre de paquets. Paquets
+  désordonnés rattachés dans la fenêtre, troncature (paquet arrivé après la fermeture de son groupe) signalée dans
+  le rapport texte et la clé `streaming` de `--json-report`. Voir docs/correlation-en-flux.md.
 - Vue « Chemin » du rapport HTML autonome (#1075) : les points de capture dans l'ordre du chemin, reliés par leurs
   segments. Le survol, le focus clavier ou le clic sur un segment affichent son détail (délai, P50/P95/P99, gigue,
   pertes, débit, sauts, horloge). Les flèches, Début et Fin passent d'un segment à l'autre. Un segment sans mesure est

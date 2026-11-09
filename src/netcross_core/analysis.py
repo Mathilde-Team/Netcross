@@ -449,12 +449,21 @@ def analyse(
         _analyse_tcp_options(r, flows, pairs, nat_tolerant, points_order)
     with _phase("rtp"):
         _analyse_rtp(r, all_packets, points, points_order, rtp_clock_rate)
+    with _phase("rtp_match"):
+        # #1121 : meme flux RTP reconnu d'un point a l'autre malgre un NAT/SBC
+        from netcross_core.rtp_match import match_rtp_streams
+
+        r.rtp_matches = match_rtp_streams(all_packets, points if points_order else None)
     with _phase("response_time"):
         _analyse_response_time(r, flows, all_packets, points, points_order)
     with _phase("dhcp"):
         _analyse_dhcp(r, all_packets, points, points_order)
     with _phase("sip"):
         _analyse_sip(r, all_packets, points, points_order)
+    from netcross_core.sip_ladder import build_sip_ladders
+
+    with _phase("sip_ladder"):
+        r.sip_ladders = build_sip_ladders(all_packets, points if points_order else None)
     from netcross_core.voip import build_calls
 
     with _phase("build_calls"):
