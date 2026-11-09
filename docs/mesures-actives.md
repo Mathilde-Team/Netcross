@@ -1,8 +1,9 @@
 # Mesures actives
 
 Chantier #999. Le paquet `netcross_core.active` confirme un diagnostic passif par une mesure active ciblée.
-Il est **désactivé par défaut** : l'analyse d'une capture n'émet jamais rien sur le réseau. Le branchement dans le CLI
-et l'API, avec accord explicite de l'utilisateur, relève de #1068.
+Il est **désactivé par défaut** : l'analyse d'une capture n'émet rien sans accord explicite.
+Le [raccordement CLI/API](confirmation-active.md) de #1068 propose une simulation prioritaire sans émission,
+puis une activation volontaire ; le serveur API exige aussi son propre verrou d'autorisation.
 
 ## Planificateur (#1063)
 
@@ -16,8 +17,8 @@ binaire optionnel **Scamper**, sans shell, résolution DNS, changement de source
 élévation de privilège ou émission à l'import. `mesurer_proposition(proposition)`
 accepte une proposition Paris du planificateur. Ces deux appels émettent réellement :
 l'appelant doit obtenir l'autorisation et les exécuter au point source du flux.
-Ils ne sont pas appelés automatiquement par la CLI ou l'API ; ce raccordement
-et l'accord utilisateur restent le périmètre de #1068.
+Ils ne sont pas appelés par défaut par la CLI ou l'API ; seul le raccordement
+explicitement activé de #1068 peut les lancer, jamais l'ouverture d'un rapport.
 
 ### Flux et budget
 
