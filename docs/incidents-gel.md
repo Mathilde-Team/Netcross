@@ -53,6 +53,46 @@ ne se déclenchera pas à la prochaine alarme.
    canaux configurés (même configuration que les notifications
    d'analyse).
 
+## L'orchestration automatique (#1001)
+
+Les étapes 1 à 4 ci-dessus existaient comme briques séparées ; elles
+sont désormais enchaînées automatiquement par
+`netcross_core.incident_chain.ChaineIncidents` :
+
+```python
+from netcross_core.incident_chain import chaine_incidents_depuis_reglages
+from netcross_core.gel_settings import lire_reglages
+from netcross_core.live_diff import LiveDiffEngine
+from netcross_core.retro_capture import PointDeGel
+
+reglages = lire_reglages()
+points = {"LAN": PointDeGel(inventory=...), "WAN": PointDeGel(inventory=...)}
+chaine = chaine_incidents_depuis_reglages(reglages, points, ...)
+engine = LiveDiffEngine(..., gel=chaine)  # au lieu d'un GelManager nu
+```
+
+À chaque alarme levée par le moteur live :
+
+1. **gel** immédiat des fichiers du tampon (comme avant) ;
+2. **attente effective de la fenêtre** : la moitié « après » de la
+   fenêtre n'est pas encore capturée au moment de l'alarme — le
+   traitement attend (en arrière-plan, calculé depuis l'horodatage du
+   dernier paquet vu, jamais depuis une horloge figée) que la fenêtre
+   soit révolue avant de découper. Les liens durs protègent les
+   fichiers pendant cette attente, la rotation du tampon incluse ;
+3. **archivage signé** puis **analyse multi-points** et
+   **notification** — sans rien relancer à la main.
+
+Le traitement d'un incident tourne dans un thread dédié : le moteur
+live n'est jamais bloqué, et un échec à une étape (journalisé)
+n'interrompt ni le moteur ni les autres incidents. Les réglages
+partagés ci-dessus
+(sévérité minimale, fenêtre, quota, répertoire d'archives) pilotent la
+chaîne entière ; les dépendances montantes (score de sécurité, rendu
+HTML) restent injectées par l'appelant, comme pour l'analyse manuelle.
+Le bouton « Analyser » de la GUI et la route `POST .../analyse`
+restent disponibles pour relancer l'analyse d'un incident archivé.
+
 ## Dans la GUI
 
 Onglet « **Incidents** » :
