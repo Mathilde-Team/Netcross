@@ -111,6 +111,7 @@ def _to_pkt(label: str, raw: RawPacket) -> Pkt:
         rtp_seq=raw.rtp_seq,
         rtp_ts=raw.rtp_ts,
         rtp_ssrc=raw.rtp_ssrc,
+        rtcp_hash=raw.rtcp_hash,
         encap_tags=raw.encap_tags,
         dhcp_xid=raw.dhcp_xid,
         dhcp_msg_type=raw.dhcp_msg_type,

@@ -52,7 +52,7 @@ actif, non réglable.
 | Fenêtre temporelle du débit | oui | `--bucket-ms` | `bucket_ms` (#330, #841) |
 | Cadence RTP | oui | `--rtp-clock-rate` | `rtp_clock_rate` (#330, #841) |
 | Vitesse de lien (repli si `if_speed` absent) | non | `--link-speed` | non (#1132) |
-| Décalage d'horloge entre points (estimation TCP/DNS, correction automatique des délais) | non | `--clock-offset` (décalage manuel imposé, désactive l'estimation de la paire) | non |
+| Décalage d'horloge entre points (estimation TCP/DNS/RTP/RTCP bidirectionnel, correction automatique des délais) | non | `--clock-offset` (décalage manuel imposé, désactive l'estimation de la paire) | non |
 | Seuil de coupure NAT/pare-feu silencieuse | oui (« Coupure silencieuse (s) », 0 = défaut 60 s) | `--idle-timeout-seconds` | `idle_timeout_seconds` (#330, #841) |
 | Limiter ou échantillonner les paquets | oui (« Paquets max. », « Echantillonnage 1/N » en analyse simple, troncature annoncée dans le rapport ; issue #672) | `--max-packets`, `--sample` | `max_packets`, `sample` (issue #672) |
 | Noms logiques des hôtes | oui (« Table des noms... », exports CSV détaillé et JSON) | `--names` | `names` (fichier joint, issue #672) |

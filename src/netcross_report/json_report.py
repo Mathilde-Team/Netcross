@@ -362,6 +362,7 @@ def build_json_report_document(
                 "samples": est.n_echantillons,
                 "kept": est.n_conserves,
                 "method": est.methode,
+                "sources": list(est.sources),
                 "forced": est.manuel,
             }
             for (a, b), est in r.clock_offset_estimate.items()
