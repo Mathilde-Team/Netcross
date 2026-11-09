@@ -22,12 +22,12 @@ Expiration, deux mécanismes complémentaires :
   fermés, pour borner la mémoire même sans trafic sur le flux.
 
 Détecteur incrémental branché sur cet état : la coupure NAT/pare-feu
-silencieuse (équivalent flux de ``_analyse_idle_timeout``). Un
-enregistrement TCP vu aux deux points d'un segment, fermé par
-expiration, dont le réveil n'est jamais revu au point aval, compte une
-coupure pour ce segment -- mêmes règles, mêmes compteurs que le mode
-batch (un seul silence retenu par flux et par segment, au moins deux
-paquets en amont pour mesurer un silence).
+silencieuse. Les constats intermédiaires restent provisoires jusqu'à
+``finish()``, qui réconcilie les statistiques globales stockées sur disque
+selon les règles de ``_analyse_idle_timeout``, à seuil TCP identique :
+au moins deux paquets amont au total, le premier plus grand silence,
+une observation aval avant la reprise et aucune après elle. Un seul
+constat par flux et segment, même après plusieurs longues inactivités.
 
 Ce qui n'est jamais silencieux :
 
@@ -38,19 +38,24 @@ Ce qui n'est jamais silencieux :
 Mémoire, bornes assumées et documentées :
 
 - les états ouverts : proportionnels aux flux actifs ;
-- ``_tcp_prev`` (résumé du dernier enregistrement TCP vu à plusieurs
-  points, pour le détecteur de coupure) : proportionnel au nombre de
-  conversations TCP multipoints, comme ``_conversations`` de la
-  corrélation en flux (#1022) ;
+- l'index des expirations est compacté pour rester proportionnel aux
+  flux actifs, y compris lorsqu'un seul flux reçoit beaucoup de paquets ;
+- les résumés TCP et coupures déjà comptées sont sur disque temporaire
+  privé (cache SQLite de 1 Mio), nettoyé en fin de traitement ou à la
+  finalisation ; aucun oubli silencieux de preuve tardive ;
 - ``_seen`` (clés récemment fermées, pour compter ``reopened``) : au
   plus ``_SEEN_CAP`` entrées, la plus ancienne est oubliée.
 """
 
 from __future__ import annotations
 
+import heapq
+import math
 from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Iterable
+from itertools import count
 
+from netcross_core.flow_history import FlowHistory
 from netcross_core.logging_config import get_logger
 from netcross_core.models import Pkt
 
@@ -101,9 +106,9 @@ def parse_flow_timeouts(spec: str | None) -> dict[str, float]:
                 f"protocole inconnu dans --flow-timeouts : {proto!r} "
                 f"(choisir parmi {', '.join(sorted(DEFAULT_FLOW_TIMEOUTS))})"
             )
-        if secondes <= 0:
+        if not math.isfinite(secondes) or secondes <= 0:
             logger.debug("parse_flow_timeouts: délai non positif -> ValueError")
-            raise ValueError(f"délai de flux invalide : {morceau!r} (le délai doit être strictement positif)")
+            raise ValueError(f"délai de flux invalide : {morceau!r} (le délai doit être strictement positif et fini)")
         delais[proto] = secondes
     if not delais:
         logger.debug("parse_flow_timeouts: spécification vide -> ValueError")
@@ -115,15 +120,16 @@ def parse_flow_timeouts(spec: str | None) -> dict[str, float]:
 class _EtatFlux:
     """État ouvert d'un flux : compteurs compacts, sans garder les paquets."""
 
-    __slots__ = ("last_ts", "last_ts_point", "octets", "packets", "start_ts")
+    __slots__ = ("last_ts", "last_ts_point", "octets", "packets", "start_ts", "tcp_stats")
 
-    def __init__(self, start_ts: float) -> None:
+    def __init__(self, start_ts: float, tcp_stats: dict | None = None) -> None:
         logger.debug("_EtatFlux.__init__: entrée")
         self.start_ts = start_ts
         self.last_ts = start_ts
         self.last_ts_point: dict[str, float] = {}
         self.packets: Counter = Counter()
         self.octets: Counter = Counter()
+        self.tcp_stats = tcp_stats if tcp_stats is not None else {}
         logger.debug("_EtatFlux.__init__: fin")
 
 
@@ -144,9 +150,8 @@ class _ResumeTcp:
 class FlowTable:
     """Table des flux actifs : ``feed()`` paquet par paquet, puis ``finish()``.
 
-    La mémoire est bornée par le nombre de flux actifs : un état fermé ne
-    laisse que des compteurs (et, pour TCP, le résumé compact du dernier
-    enregistrement multipoint).
+    La RAM est bornée par les flux actifs et les caches fixes. Les résumés
+    TCP nécessaires aux constats tardifs sont stockés sur disque privé.
     """
 
     def __init__(
@@ -161,7 +166,12 @@ class FlowTable:
         self.points = list(points)
         self.pairs = list(zip(self.points, self.points[1:], strict=False))
         self.timeouts = dict(timeouts) if timeouts else dict(DEFAULT_FLOW_TIMEOUTS)
+        if any(not math.isfinite(delai) or delai <= 0 for delai in self.timeouts.values()):
+            logger.debug("FlowTable.__init__: délai non positif ou non fini -> ValueError")
+            raise ValueError("les délais de flux doivent être strictement positifs et finis")
         self._open: OrderedDict[tuple, _EtatFlux] = OrderedDict()
+        self._expiry: list[tuple[float, int, tuple]] = []
+        self._expiry_seq = count()
         self._now = float("-inf")
         # compteurs
         self.total_records = 0
@@ -174,8 +184,7 @@ class FlowTable:
         self.cutoff_examples: dict[tuple[str, str], list[str]] = defaultdict(list)
         self.examples: list[str] = []
         # memoires bornees, voir docstring du module
-        self._tcp_prev: dict[tuple, _ResumeTcp] = {}
-        self._cutoff_seen: set[tuple[tuple, tuple[str, str]]] = set()
+        self._history: FlowHistory | None = None
         self._seen: OrderedDict[tuple, None] = OrderedDict()
         self._finished = False
         logger.debug("FlowTable.__init__: fin")
@@ -185,6 +194,9 @@ class FlowTable:
     def feed(self, pk: Pkt) -> None:
         """Ajoute un paquet (fusion k voies : ordre de temps croissant)."""
         logger.debug("FlowTable.feed: entrée")
+        if self._finished:
+            logger.debug("FlowTable.feed: table terminée -> ValueError")
+            raise ValueError("la table de flux est déjà terminée")
         if pk.proto in ("ARP", "STP"):
             logger.debug("FlowTable.feed: ARP/STP hors table de flux -> retour")
             return
@@ -203,7 +215,12 @@ class FlowTable:
             self._close(key, etat, "expiration")
             etat = None
         if etat is None:
-            etat = _EtatFlux(pk.ts)
+            statistiques = {}
+            if pk.proto == "TCP" and self._history is not None:
+                precedent = self._history.resume(key)
+                if precedent is not None:
+                    statistiques = precedent["stats"]
+            etat = _EtatFlux(pk.ts, statistiques)
             self._open[key] = etat
             self.peak_active = max(self.peak_active, len(self._open))
             if key in self._seen:
@@ -214,23 +231,60 @@ class FlowTable:
         etat.last_ts_point[pk.point] = pk.ts
         etat.packets[pk.point] += 1
         etat.octets[pk.point] += pk.length
+        if pk.proto == "TCP":
+            self._update_tcp_stats(etat, pk)
+        self._index_expiry(key, etat, timeout)
         logger.debug("FlowTable.feed: retour None")
 
-    def _expire(self) -> None:
-        """Ferme les états silencieux depuis plus de leur délai (tous
-        points confondus), pour borner la mémoire sans trafic sur le flux.
+    def _update_tcp_stats(self, etat: _EtatFlux, pk: Pkt) -> None:
+        """Résumé global par point sur une entrée triée, sans paquets gardés."""
+        logger.debug("FlowTable._update_tcp_stats: entrée")
+        statistique = etat.tcp_stats.get(pk.point)
+        if statistique is None:
+            etat.tcp_stats[pk.point] = {
+                "first": pk.ts,
+                "last": pk.ts,
+                "count": 1,
+                "gap": 0.0,
+                "gap_end": pk.ts,
+            }
+        else:
+            ecart = pk.ts - statistique["last"]
+            # Le batch retient le PREMIER maximum en cas d'égalité.
+            if ecart > statistique["gap"]:
+                statistique["gap"] = ecart
+                statistique["gap_end"] = pk.ts
+            statistique["last"] = pk.ts
+            statistique["count"] += 1
+        logger.debug("FlowTable._update_tcp_stats: fin")
 
-        Les états sont ordonnés par dernière activité (``move_to_end`` à
-        chaque mise à jour) : on s'arrête au premier état encore actif.
-        Un paquet légèrement désordonné peut retarder une expiration, il
-        ne l'empêche jamais -- la fermeture au fil de l'eau (``feed``)
-        reste le mécanisme d'équivalence avec le détecteur batch."""
+    def _index_expiry(self, key: tuple, etat: _EtatFlux, timeout: float) -> None:
+        """Échéances indépendantes des protocoles ; tas paresseux borné."""
+        logger.debug("FlowTable._index_expiry: entrée")
+        heapq.heappush(self._expiry, (etat.last_ts + timeout, next(self._expiry_seq), key))
+        if len(self._expiry) > 2 * len(self._open) + 64:
+            self._expiry = [
+                (
+                    actif.last_ts + self.timeouts.get(cle[0], self.timeouts.get("AUTRE", 60.0)),
+                    next(self._expiry_seq),
+                    cle,
+                )
+                for cle, actif in self._open.items()
+            ]
+            heapq.heapify(self._expiry)
+        logger.debug("FlowTable._index_expiry: fin")
+
+    def _expire(self) -> None:
+        """Ferme chaque échéance atteinte, sans blocage par un délai long."""
         logger.debug("FlowTable._expire: entrée")
-        while self._open:
-            key, etat = next(iter(self._open.items()))
+        while self._expiry and self._expiry[0][0] <= self._now:
+            echeance, _, key = heapq.heappop(self._expiry)
+            etat = self._open.get(key)
+            if etat is None:
+                continue
             timeout = self.timeouts.get(key[0], self.timeouts.get("AUTRE", 60.0))
-            if self._now - etat.last_ts < timeout:
-                break
+            if etat.last_ts + timeout != echeance:
+                continue
             del self._open[key]
             self._close(key, etat, "expiration")
         logger.debug("FlowTable._expire: retour None")
@@ -253,7 +307,14 @@ class FlowTable:
                 f"{sum(etat.packets.values())} paquet(s), {duree:.3f} s, fermeture : {raison})"
             )
         if key[0] == "TCP":
-            precedent = self._tcp_prev.get(key)
+            if self._history is None:
+                self._history = FlowHistory()
+            document = self._history.resume(key)
+            precedent = (
+                _ResumeTcp(frozenset(document["points"]), document["packets"], document["raison"])
+                if document is not None
+                else None
+            )
             if precedent is not None and precedent.raison == "expiration" and len(precedent.points) >= 2:
                 for a, b in self.pairs:
                     if (
@@ -261,16 +322,16 @@ class FlowTable:
                         and b in precedent.points
                         and b not in points
                         and precedent.packets.get(a, 0) >= 2
-                        and (key, (a, b)) not in self._cutoff_seen
+                        and not self._history.coupure_comptee(key, a, b)
                     ):
-                        self._cutoff_seen.add((key, (a, b)))
+                        self._history.compter_coupure(key, a, b)
                         self.nat_cutoffs[(a, b)] += 1
                         if len(self.cutoff_examples[(a, b)]) < 5:
                             self.cutoff_examples[(a, b)].append(
                                 f"{key[1]}:{key[2]} -> {key[3]}:{key[4]} (réveil en {a} "
                                 f"jamais revu en {b} après expiration)"
                             )
-            self._tcp_prev[key] = _ResumeTcp(points, dict(etat.packets), raison)
+            self._history.enregistrer(key, points, dict(etat.packets), raison, etat.tcp_stats)
         self._seen[key] = None
         if len(self._seen) > _SEEN_CAP:
             self._seen.popitem(last=False)
@@ -285,6 +346,10 @@ class FlowTable:
         while self._open:
             key, etat = self._open.popitem(last=False)
             self._close(key, etat, "fin")
+        self._expiry.clear()
+        if self._history is not None:
+            self._reconcile_nat()
+            self._history.close()
         self._finished = True
         logger.debug(
             "FlowTable.finish: retour ({} enregistrement(s), {} expiration(s), {} coupure(s) NAT)",
@@ -292,6 +357,31 @@ class FlowTable:
             self.expired,
             sum(self.nat_cutoffs.values()),
         )
+
+    def _reconcile_nat(self) -> None:
+        """Résultat final équivalent au batch, même après plusieurs silences."""
+        logger.debug("FlowTable._reconcile_nat: entrée")
+        assert self._history is not None
+        self.nat_cutoffs.clear()
+        self.cutoff_examples.clear()
+        timeout = self.timeouts.get("TCP", self.timeouts.get("AUTRE", 60.0))
+        for key, document in self._history.resumes():
+            statistiques = document["stats"]
+            for a, b in self.pairs:
+                amont, aval = statistiques.get(a), statistiques.get(b)
+                if amont is None or aval is None or amont["count"] < 2:
+                    continue
+                if amont["gap"] < timeout:
+                    continue
+                reprise = amont["gap_end"]
+                if aval["first"] >= reprise or aval["last"] >= reprise:
+                    continue
+                self.nat_cutoffs[(a, b)] += 1
+                if len(self.cutoff_examples[(a, b)]) < 5:
+                    self.cutoff_examples[(a, b)].append(
+                        f"{key[1]}:{key[2]} -> {key[3]}:{key[4]} (réveil en {a} jamais revu en {b} après expiration)"
+                    )
+        logger.debug("FlowTable._reconcile_nat: fin")
 
     # -- restitution -----------------------------------------------------------------
 
