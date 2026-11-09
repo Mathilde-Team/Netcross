@@ -765,6 +765,9 @@ class Report:
     # #1135 : événements et échelles refusées par point ; analyse automatique,
     # médiane des tranches non vides et seuil relatif si vitesse inconnue.
     microbursts: dict[str, dict] = field(default_factory=dict)
+    # #1137 : associations temporelles épisode/segment aval, preuves bornées.
+    # Une absence de paquet n'est pas une preuve de congestion physique.
+    microburst_correlations: list[dict] = field(default_factory=list)
     # -- Couverture du dechiffrement TLS/QUIC (issue #1043) -- dechiffrement
     # est rempli par analyse() (netcross_core.dechiffrement.compter_sessions) :
     # point -> {"tls"/"quic": {"sessions", "dechiffrees"}}. points_keylog est

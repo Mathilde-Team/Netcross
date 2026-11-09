@@ -47,10 +47,173 @@ futur, explicitement hors perimetre de ce job -- voir Job 8/9.
 
 from __future__ import annotations
 
+import math
+import os
+from bisect import bisect_left, bisect_right
+
 from netcross_core.expert_model import Diagnosis, ExpertEvent
 from netcross_core.logging_config import get_logger
+from netcross_core.models import Pkt, Report
 
 logger = get_logger(__name__)
+
+
+class MicroburstCorrelator:
+    """Associe des impacts localisés aux épisodes, sans affirmer leur cause physique.
+
+    Les pertes proviennent exclusivement du détecteur existant, après sa garde
+    hors chemin. Les bornes de paquets communs excluent les bords de capture.
+    Les preuves sont limitées à dix par épisode et segment, pas les compteurs.
+    """
+
+    def __init__(self, report: Report, flows, ordered: bool, window_ms: float | None = None):
+        logger.debug("MicroburstCorrelator: entrée ordre={}, points={}", ordered, len(report.points))
+        value = os.environ.get("NETCROSS_MICROBURST_WINDOW_MS", "50") if window_ms is None else window_ms
+        try:
+            self.window_ms = float(value)
+        except (TypeError, ValueError) as exc:
+            logger.error("Fenêtre de corrélation microrafales non numérique")
+            raise ValueError("La fenêtre microrafales doit être un nombre fini strictement positif") from exc
+        if isinstance(value, bool) or not math.isfinite(self.window_ms) or self.window_ms <= 0:
+            logger.error("Fenêtre de corrélation microrafales non positive ou non finie")
+            raise ValueError("La fenêtre microrafales doit être un nombre fini strictement positif")
+        self.report = report
+        self.index: dict[str, tuple[list[float], list[float], list[dict]]] = {}
+        self.records: dict[tuple[str, str, int], dict] = {}
+        self.bounds: dict[tuple[str, str], tuple[float, float]] = {}
+        if ordered:
+            for point, record in report.microbursts.items():
+                events = sorted(record["events"], key=lambda event: event["end"])
+                self.index[point] = (
+                    [event["end"] for event in events],
+                    [event["end"] + self.window_ms / 1000 for event in events],
+                    events,
+                )
+            for a, b in report.pairs:
+                if a not in self.index or not self.index[a][0]:
+                    continue
+                for per_point in flows.values():
+                    if a not in per_point or b not in per_point:
+                        continue
+                    ts = min(packet.ts for packet in per_point[a])
+                    if not math.isfinite(ts):
+                        continue
+                    low, high = self.bounds.get((a, b), (ts, ts))
+                    self.bounds[(a, b)] = (min(low, ts), max(high, ts))
+        logger.debug("MicroburstCorrelator: sortie segments encadrés={}", len(self.bounds))
+
+    def _record(self, a: str, b: str, packet: Pkt, ts: float, kind: str, uncertainty_ms: float = 0):
+        logger.debug("MicroburstCorrelator._record: entrée type={}", kind)
+        bounds = self.bounds.get((a, b))
+        uncertainty = uncertainty_ms / 1000
+        if bounds is None or not math.isfinite(ts) or not bounds[0] < ts - uncertainty <= ts + uncertainty < bounds[1]:
+            logger.debug("MicroburstCorrelator._record: sortie sans encadrement")
+            return
+        ends, deadlines, events = self.index[a]
+        # Tout l'intervalle d'incertitude doit tenir après la fin de l'épisode,
+        # dans la fenêtre configurée. Les bornes temporelles sont inclusives.
+        first = bisect_left(deadlines, ts + uncertainty)
+        last = bisect_right(ends, ts - uncertainty)
+        for i in range(first, last):
+            event = events[i]
+            key = (a, b, i)
+            if key not in self.records:
+                self.records[key] = {
+                    "upstream": a,
+                    "downstream": b,
+                    "burst_start": event["start"],
+                    "burst_end": event["end"],
+                    "window_ms": self.window_ms,
+                    "losses": 0,
+                    "retransmissions": 0,
+                    "association": "temporal",
+                    "physical_cause_proven": False,
+                    "evidence": [],
+                }
+            record = self.records[key]
+            record[kind] += 1
+            if len(record["evidence"]) < 10:
+                record["evidence"].append(
+                    {
+                        "kind": kind,
+                        "point": packet.point,
+                        "frame_number": packet.frame_number,
+                        "ts": packet.ts,
+                        "upstream_ts": ts,
+                        "clock_uncertainty_ms": uncertainty_ms,
+                    }
+                )
+        logger.debug("MicroburstCorrelator._record: sortie épisodes associés={}", last - first)
+
+    def add_loss(self, a: str, b: str, packet: Pkt):
+        """Enregistre un paquet déjà déclaré absent au premier point aval."""
+        logger.debug("MicroburstCorrelator.add_loss: entrée")
+        self._record(a, b, packet, packet.ts, "losses")
+        logger.debug("MicroburstCorrelator.add_loss: sortie")
+
+    def add_retransmissions(self, per_point):
+        """Ne retient que les copies TCP supplémentaires propres au point aval."""
+        logger.debug("MicroburstCorrelator.add_retransmissions: entrée")
+        for a, b in self.bounds:
+            if a not in per_point or b not in per_point:
+                continue
+            estimation = self.report.clock_offset_estimate.get((a, b))
+            if estimation is None:
+                continue
+            upstream = [
+                p for p in per_point[a] if p.proto == "TCP" and p.payload_hash is not None and not p.is_duplicate
+            ]
+            downstream = [
+                p for p in per_point[b] if p.proto == "TCP" and p.payload_hash is not None and not p.is_duplicate
+            ]
+            extra = len(downstream) - len(upstream)
+            if not upstream or extra <= 0:
+                continue
+            retransmissions = sorted(
+                (
+                    p
+                    for p in downstream
+                    if p.is_retransmission or p.is_fast_retransmission or p.is_spurious_retransmission
+                ),
+                key=lambda p: p.ts,
+            )
+            # Inversion exacte du modèle affine B = A + offset(A), avec dérive.
+            slope = 1 + estimation.derive_ppm * 1e-6
+            if not math.isfinite(slope) or slope <= 0:
+                continue
+            for packet in retransmissions[-extra:]:
+                ts = estimation.t0 + (packet.ts - estimation.t0 - estimation.decalage_a(estimation.t0) / 1000) / slope
+                uncertainty = (
+                    estimation.ic_decalage_ms + abs(ts - estimation.t0) * estimation.ic_derive_ppm * 1e-3
+                ) / slope
+                if not math.isfinite(uncertainty) or uncertainty < 0:
+                    continue
+                self._record(a, b, packet, ts, "retransmissions", uncertainty)
+        logger.debug("MicroburstCorrelator.add_retransmissions: sortie")
+
+    def results(self) -> list[dict]:
+        """Restitue les associations dans un ordre déterministe."""
+        logger.debug("MicroburstCorrelator.results: entrée")
+        result = [self.records[key] for key in sorted(self.records)]
+        logger.debug("MicroburstCorrelator.results: sortie associations={}", len(result))
+        return result
+
+
+def format_microburst_correlation(record: dict) -> str:
+    """Texte commun aux constats et au rapport console, sans surinterprétation."""
+    logger.debug("format_microburst_correlation: entrée")
+    a, b = record["upstream"], record["downstream"]
+    text = (
+        f"Après la rafale à {a} terminée à {record['burst_end']:.6f} s : "
+        f"{record['losses']} perte(s) inférée(s) et "
+        f"{record['retransmissions']} retransmission(s) supplémentaire(s) sur {a} -> {b}, "
+        f"dans une fenêtre de {record['window_ms']:g} ms. "
+        "Association temporelle établie, congestion possible mais cause physique non prouvée ; "
+        "vérifier les files et les pertes de capture."
+    )
+    logger.debug("format_microburst_correlation: sortie")
+    return text
+
 
 # -- Patterns de correlation ----------------------------------------------
 #
