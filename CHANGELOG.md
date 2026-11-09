@@ -15,6 +15,14 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   import, lecture des panneaux et exemples d'alertes Prometheus (perte de segment, délai p95,
   santé basse, flux perdus au point). Le test `test_grafana_dashboard.py` vérifie que le JSON
   est valide et que chaque métrique référencée existe dans le catalogue figé.
+- Orchestration automatique de la chaîne d'incident (#1001) : `netcross_core.incident_chain.ChaineIncidents`,
+  branchée sur `LiveDiffEngine(gel=chaine)` à la place du `GelManager` nu, enchaîne à chaque alarme le gel
+  rétroactif (#1087), l'attente effective de la fin de fenêtre (calculée depuis l'horodatage du dernier paquet vu,
+  en arrière-plan — le moteur live n'est jamais bloqué), l'archivage signé (#1090), l'analyse multi-points et la
+  notification (#1091) — sans rien relancer à la main. `chaine_incidents_depuis_reglages()` raccorde les réglages
+  partagés (gel_settings) au moteur live. Un gel sans fichier protégé est signalé sans archiver ; un échec à une
+  étape est journalisé sans interrompre le moteur ni les autres incidents. Voir docs/incidents-gel.md
+  (« L'orchestration automatique »).
 - Qualité de transport RTP/SRTP par segment (#1123) : pertes supplémentaires
   entre paquets communs, gigue RFC 3550, délai corrigé avec incertitude d'horloge
   et note indicative de transport, avec constat localisé. Réutilise l'appariement
