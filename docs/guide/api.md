@@ -10,9 +10,14 @@ dans [API REST](../api-rest.md).
 
 ```bash
 pip install -e ".[api]"
-NETCROSS_API_TOKEN=$(openssl rand -hex 32) \
-  uvicorn netcross_api.app:app --host 127.0.0.1 --port 8000
+export NETCROSS_API_TOKEN="$(openssl rand -hex 32)"
+uvicorn netcross_api.app:app --host 127.0.0.1 --port 8000 &
+serveur_pid=$!
 ```
+
+Le serveur tourne en arrière-plan. Exécutez les appels `curl` ci-dessous
+dans ce même terminal pour réutiliser le jeton exporté. Pour arrêter le
+serveur à la fin, lancez `kill "$serveur_pid"`.
 
 Avec `NETCROSS_API_TOKEN`, chaque requête doit porter l'en-tête
 `X-API-Key` avec ce jeton. Sans ce jeton, l'API est ouverte : réservez ce
