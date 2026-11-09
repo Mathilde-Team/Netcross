@@ -2168,22 +2168,18 @@ _TOPOLOGY_MIN_JACCARD = 0.05
 _TOPOLOGY_MIN_MAJORITY = 0.7
 
 
-def _infer_topology(flows, points):
-    """
-    Deduit l'ordre/la topologie des points de capture sans --order, a partir
-    de deux signaux par paire de points :
-      - le delta de TTL sur les flux vus aux deux points (qui indique le
-        sens de propagation, comme le module de sauts de routeur) ;
-      - le recouvrement de flux (Jaccard) entre les deux points, qui permet
-        de distinguer une vraie relation amont/aval d'un simple manque de
-        preuve, et de detecter les chemins paralleles (deux points en aval
-        du meme point mais qui ne se recoupent pas entre eux).
+def _stats_topologie(flows):
+    """Agregats de topologie par paire de points : flux vus a chaque point
+    (total_flows_at) et, pour chaque paire, votes de TTL entre premiers
+    paquets des flux vus aux deux points (pair_stats).
 
-    Retourne (edges, ambiguous, isolated, branch_points, merge_points).
-    `edges` est deja reduit transitivement : un arc X->Z n'est garde que
-    s'il n'est pas deja explique par un chemin indirect X->...->Z via
-    d'autres arcs deduits (pour n'afficher que les sauts "directs").
+    Seule la passe d'agregation du detecteur -- le min de ts par (flux,
+    point) suffit, le TTL compare est celui du premier paquet. Partagee
+    entre le mode batch (``_infer_topology``) et la seconde passe ciblée
+    en flux (#1025, ``netcross_core.seconde_passe``) : memes agregats,
+    meme deduction, memes resultats.
     """
+    logger.debug("_stats_topologie: entrée ({} flux)", len(flows))
     total_flows_at = defaultdict(int)
     pair_stats = {}
     for per_point in flows.values():
@@ -2212,7 +2208,22 @@ def _infer_topology(flows, points):
                     stats["y_gt_x"] += 1
                 else:
                     stats["eq"] += 1
+    logger.debug("_stats_topologie: retour ({} point(s), {} paire(s))", len(total_flows_at), len(pair_stats))
+    return total_flows_at, pair_stats
 
+
+def _deduire_topologie(total_flows_at, pair_stats, points):
+    """Deduit la topologie des agregats de ``_stats_topologie`` : arcs
+    amont/aval votes par le delta de TTL, reduits transitivement, plus les
+    paires ambiguës (TTL indisponible, identique ou contradictoire) et,
+    en sortie, les points isoles, points de branchement et points de fusion.
+
+    Retourne (edges, ambiguous, isolated, branch_points, merge_points).
+    `edges` est deja reduit transitivement : un arc X->Z n'est garde que
+    s'il n'est pas deja explique par un chemin indirect X->...->Z via
+    d'autres arcs deduits (pour n'afficher que les sauts "directs").
+    """
+    logger.debug("_deduire_topologie: entrée")
     candidate_edges = []
     ambiguous = []
     for (x, y), stats in pair_stats.items():
@@ -2311,6 +2322,29 @@ def _infer_topology(flows, points):
         len(merge_points),
     )
     return direct_edges, ambiguous, isolated, branch_points, merge_points
+
+
+def _infer_topology(flows, points):
+    """
+    Deduit l'ordre/la topologie des points de capture sans --order, a partir
+    de deux signaux par paire de points :
+      - le delta de TTL sur les flux vus aux deux points (qui indique le
+        sens de propagation, comme le module de sauts de routeur) ;
+      - le recouvrement de flux (Jaccard) entre les deux points, qui permet
+        de distinguer une vraie relation amont/aval d'un simple manque de
+        preuve, et de detecter les chemins paralleles (deux points en aval
+        du meme point mais qui ne se recoupent pas entre eux).
+
+    Retourne (edges, ambiguous, isolated, branch_points, merge_points).
+    `edges` est deja reduit transitivement : un arc X->Z n'est garde que
+    s'il n'est pas deja explique par un chemin indirect X->...->Z via
+    d'autres arcs deduits (pour n'afficher que les sauts "directs").
+    """
+    logger.debug("_infer_topology: entrée ({} point(s))", len(points))
+    total_flows_at, pair_stats = _stats_topologie(flows)
+    resultat = _deduire_topologie(total_flows_at, pair_stats, points)
+    logger.debug("_infer_topology: retour")
+    return resultat
 
 
 def _check_order_consistency(points_order, topo_edges):
