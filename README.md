@@ -1100,17 +1100,15 @@ avant un déploiement en production.
   l'interface).
 - **Gestion mémoire des grosses captures** : le pipeline tient
   entièrement en RAM (pas de streaming multi-passes — la corrélation
-  multi-points a besoin d'une vue d'ensemble). Mesuré empiriquement
-  (Session 19, vrai `tshark`) : environ **636 octets par paquet** en
-  régime établi (`RawPacket`/`Pkt`, objets à emplacements fixes —
-  `__slots__` — plutôt que `__dict__`, avec réutilisation du même objet
-  `str` pour les valeurs répétées comme les IP/URI/User-Agent). Pic
-  mémoire réel du process principal mesuré sur un scénario réaliste à 2
-  points de capture, 200 000 paquets chacun : environ **500 Mo** (contre
-  1,3 Go avant cette optimisation, sur le même scénario — voir
-  `docs/sessions/session-19.md` pour le détail de la mesure). Extrapolation
-  approximative : une capture de plusieurs millions de paquets par point
-  se compte encore en Go, pas en dizaines de Mo — dimensionner la
+  multi-points a besoin d'une vue d'ensemble). La campagne de mesure
+  complète (2 à 10 points, 10⁴ à 10⁶ paquets par point, parallélisme 1
+  à 8, débits et pics RSS) est documentée dans
+  [docs/performance.md](docs/performance.md) : en synthèse, environ
+  2,4 à 3,1 Kio de RAM par paquet pour le pipeline complet (`tshark`
+  inclus — le seul pipeline Python descend à ~636 o/paquet, voir
+  `docs/sessions/session-19.md`), soit ~5 Go pour 2 points × 10⁶
+  paquets. Une capture de plusieurs millions de paquets par point se
+  compte donc encore en Go, pas en dizaines de Mo — dimensionner la
   machine d'analyse en conséquence sur de très gros volumes.
 - **Fragmentation IPv6** : détectée via l'en-tête d'extension Fragment
   (`ipv6.fragment`, RFC 8200), câblée dans le même compteur générique que

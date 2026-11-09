@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-229 modules · 331 classes · 836 fonctions publiques de module.
+230 modules · 331 classes · 837 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -437,6 +437,7 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +str? rtcp_hash
         +str? comment
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -539,6 +540,7 @@ classDiagram
 | `netcross_core.capture_tools` | manipulation de fichiers de capture partagee par la CLI, la GUI et l'API (issues #868, #869, #870, #886, #887). |
 | `netcross_core.causality` | moteur de correlation causale (Session 3 de la section 13.3 de FEATURES.md, Job 4/issue #4). |
 | `netcross_core.client_diff` | comparaison "client vs client" : meme capture, memes points, seule la source (l'IP du poste) change. |
+| `netcross_core.clock_samples` | Échantillons d'horloge UDP conservateurs, sans identifiant DNS global. |
 | `netcross_core.clock_sync` | estimation robuste du decalage et de la derive d'horloge entre deux points de capture (issue #996). |
 | `netcross_core.compliance` | evaluateur de conformite, huitieme et neuvieme objets de contrat de la Session 0 (FEATURES.md section 13.3) : `ReferenceProfile`/`ComplianceResult` (netcross_core.expert_model). |
 | `netcross_core.config` | chargement de configuration depuis .netcross.toml (issue #170). |
@@ -814,12 +816,19 @@ classDiagram
         +write_client_diff_csv(result, path) None
     }
 
+    %% ===== netcross_core.clock_samples =====
+    class mod_netcross_core_clock_samples["netcross_core.clock_samples"] {
+        <<module>>
+        +collect_udp_samples(packets, pairs, nat_tolerant) dict
+    }
+
     %% ===== netcross_core.clock_sync =====
     class EchantillonHorloge {
         <<dataclass, frozen>>
         +float t
         +float decalage_ms
         +float delai_ms
+        +str source
     }
     class EstimationHorloge {
         <<dataclass>>
@@ -832,6 +841,7 @@ classDiagram
         +int n_conserves
         +str methode
         +bool manuel
+        +tuple~str, ...~ sources
         +decalage_a(t) float
     }
     class mod_netcross_core_clock_sync["netcross_core.clock_sync"] {
@@ -1705,6 +1715,7 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +str? rtcp_hash
         +str? ip_checksum
         +bool? ip_checksum_bad
         +str? tcp_checksum
