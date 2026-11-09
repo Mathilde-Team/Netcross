@@ -8,6 +8,14 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Orchestration automatique de la chaîne d'incident (#1001) : `netcross_core.incident_chain.ChaineIncidents`,
+  branchée sur `LiveDiffEngine(gel=chaine)` à la place du `GelManager` nu, enchaîne à chaque alarme le gel
+  rétroactif (#1087), l'attente effective de la fin de fenêtre (calculée depuis l'horodatage du dernier paquet vu,
+  en arrière-plan — le moteur live n'est jamais bloqué), l'archivage signé (#1090), l'analyse multi-points et la
+  notification (#1091) — sans rien relancer à la main. `chaine_incidents_depuis_reglages()` raccorde les réglages
+  partagés (gel_settings) au moteur live. Un gel sans fichier protégé est signalé sans archiver ; un échec à une
+  étape est journalisé sans interrompre le moteur ni les autres incidents. Voir docs/incidents-gel.md
+  (« L'orchestration automatique »).
 - Seconde passe ciblée en flux (#1025, sous-issue 6/6 du chantier pipeline en flux #995) :
   la topologie est désormais déduite en mode `--streaming` comme en batch — un enregistrement
   compact par (flux, point) (horodatage et TTL du premier paquet) est collecté au fil de l'eau
