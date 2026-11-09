@@ -1,5 +1,9 @@
 name: CI
 
+permissions:
+  contents: read
+  packages: read
+
 # Issue #463 : concentration des workflows. Anciennement trois workflows
 # parallèles (ci.yml, docs.yml, i18n.yml) se déclenchaient sur les mêmes
 # push/PR vers main/dev. Ils sont fusionnés ici en un seul, réduisant le
@@ -43,17 +47,22 @@ jobs:
     name: Qualité (lint, format, import-linter, tests)
     runs-on: ${{ fromJSON(vars.NETCROSS_RUNS_ON || '{"group":"maison","labels":["self-hosted","linux","docker"]}') }}
     container:
-      image: ubuntu:26.04
+      image: ghcr.io/mathilde-team/netcross-ci:26.04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --privileged
 
     steps:
       - name: Prérequis du conteneur (git, certificats, compilateur)
-        # ubuntu:26.04 est une image minimale : ni git (checkout et diff i18n),
-        # ni certificats, ni gcc (roues pygobject/pycairo compilées localement),
-        # ni python3 (scripts du dépôt), ni sudo (scripts/smoke-test-packages.sh).
+        # Image préconstruite (#968) : apt seulement si un prérequis manque.
         run: |
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential sudo python3 python3-venv
+          if ! dpkg-query -W -f='${db:Status-Status}\n' \
+              git ca-certificates curl build-essential sudo python3 python3-venv 2>/dev/null \
+              | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential sudo python3 python3-venv
+          fi
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout du dépôt
@@ -72,8 +81,12 @@ jobs:
         run: |
           echo "wireshark-common wireshark-common/install-setuid boolean false" \
             | debconf-set-selections
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark poppler-utils gettext nodejs
+          if ! dpkg-query -W -f='${db:Status-Status}\n' \
+              tshark poppler-utils gettext nodejs 2>/dev/null \
+              | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark poppler-utils gettext nodejs
+          fi
           tshark --version 2>&1 | sed -n 1p
           # nodejs : rendu headless du JavaScript du rapport HTML
           # (tests/js/rendu_headless.js, issue #1075).
@@ -235,17 +248,22 @@ jobs:
     name: Tests GTK4 (Xvfb)
     runs-on: ${{ fromJSON(vars.NETCROSS_RUNS_ON || '{"group":"maison","labels":["self-hosted","linux","docker"]}') }}
     container:
-      image: ubuntu:26.04
+      image: ghcr.io/mathilde-team/netcross-ci:26.04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --privileged
 
     steps:
       - name: Prérequis du conteneur (git, certificats, compilateur)
-        # ubuntu:26.04 est une image minimale : ni git (checkout et diff i18n),
-        # ni certificats, ni gcc (roues pygobject/pycairo compilées localement),
-        # ni python3 (scripts du dépôt), ni sudo (scripts/smoke-test-packages.sh).
+        # Image préconstruite (#968) : apt seulement si un prérequis manque.
         run: |
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential sudo python3 python3-venv
+          if ! dpkg-query -W -f='${db:Status-Status}\n' \
+              git ca-certificates curl build-essential sudo python3 python3-venv 2>/dev/null \
+              | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential sudo python3 python3-venv
+          fi
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout du dépôt
@@ -257,10 +275,15 @@ jobs:
         run: |
           echo "wireshark-common wireshark-common/install-setuid boolean false" \
             | debconf-set-selections
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            gir1.2-gtk-4.0 libgirepository-2.0-dev libcairo2-dev pkg-config \
-            xvfb xauth tshark poppler-utils gettext nodejs
+          if ! dpkg-query -W -f='${db:Status-Status}\n' \
+              gir1.2-gtk-4.0 libgirepository-2.0-dev libcairo2-dev pkg-config \
+              xvfb xauth tshark poppler-utils gettext nodejs 2>/dev/null \
+              | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+              gir1.2-gtk-4.0 libgirepository-2.0-dev libcairo2-dev pkg-config \
+              xvfb xauth tshark poppler-utils gettext nodejs
+          fi
           # La suite complète exécute aussi le JavaScript des rapports HTML.
           # Fournir Node ici évite de masquer ces vérifications derrière un saut.
           node --version
@@ -345,14 +368,21 @@ jobs:
     if: always()
     runs-on: ${{ fromJSON(vars.NETCROSS_RUNS_ON || '"ubuntu-latest"') }}
     container:
-      image: ubuntu:26.04
+      image: ghcr.io/mathilde-team/netcross-ci:26.04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --privileged
 
     steps:
       - name: Prérequis du conteneur (git, certificats, python3)
         run: |
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates python3 python3-venv
+          if ! dpkg-query -W -f='${db:Status-Status}\n' \
+              git ca-certificates python3 python3-venv 2>/dev/null \
+              | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates python3 python3-venv
+          fi
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout du dépôt
@@ -472,29 +502,44 @@ jobs:
     name: Paquets (deb installé, rpm vérifié)
     runs-on: ${{ fromJSON(vars.NETCROSS_RUNS_ON || '{"group":"maison","labels":["self-hosted","linux","docker"]}') }}
     container:
-      image: ubuntu:26.04
+      image: ghcr.io/mathilde-team/netcross-ci:26.04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --privileged
 
     steps:
       - name: Prérequis du conteneur (git, certificats, compilateur)
-        # ubuntu:26.04 est une image minimale : ni git (checkout et diff i18n),
-        # ni certificats, ni gcc (roues pygobject/pycairo compilées localement),
-        # ni python3 (scripts du dépôt), ni sudo (scripts/smoke-test-packages.sh).
+        # Image préconstruite (#968) : apt seulement si un prérequis manque.
         run: |
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential sudo python3 python3-venv
+          if ! dpkg-query -W -f='${db:Status-Status}\n' \
+              git ca-certificates curl build-essential sudo python3 python3-venv 2>/dev/null \
+              | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential sudo python3 python3-venv
+          fi
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout du dépôt
         uses: actions/checkout@v7
 
       - name: Outils de construction (debhelper, rpm) et tshark
+        # Le test de fumée installe le .deb avec ses Depends/Recommends.
+        # L'image nettoie les index apt : contrôler aussi ces dépendances.
         run: |
           echo "wireshark-common wireshark-common/install-setuid boolean false" \
             | debconf-set-selections
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            build-essential debhelper dpkg-dev gettext rpm tshark
+          if ! dpkg-query -W -f='${db:Status-Status}\n' \
+              build-essential debhelper dpkg-dev gettext rpm tshark python3 \
+              python3-cryptography python3-loguru python3-reportlab python3-matplotlib \
+              python3-networkx python3-gi gir1.2-gtk-4.0 2>/dev/null \
+              | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+              build-essential debhelper dpkg-dev gettext rpm tshark python3 \
+              python3-cryptography python3-loguru python3-reportlab python3-matplotlib \
+              python3-networkx python3-gi gir1.2-gtk-4.0
+          fi
 
       - name: Construction du .deb
         run: ./build-deb/build.sh
@@ -585,17 +630,22 @@ jobs:
     name: i18n (catalogues à jour)
     runs-on: ${{ fromJSON(vars.NETCROSS_RUNS_ON || '{"group":"maison","labels":["self-hosted","linux","docker"]}') }}
     container:
-      image: ubuntu:26.04
+      image: ghcr.io/mathilde-team/netcross-ci:26.04
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: --privileged
 
     steps:
       - name: Prérequis du conteneur (git, certificats, compilateur)
-        # ubuntu:26.04 est une image minimale : ni git (checkout et diff i18n),
-        # ni certificats, ni gcc (roues pygobject/pycairo compilées localement),
-        # ni python3 (scripts du dépôt), ni sudo (scripts/smoke-test-packages.sh).
+        # Image préconstruite (#968) : apt seulement si un prérequis manque.
         run: |
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential sudo python3 python3-venv
+          if ! dpkg-query -W -f='${db:Status-Status}\n' \
+              git ca-certificates curl build-essential sudo python3 python3-venv 2>/dev/null \
+              | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git ca-certificates curl build-essential sudo python3 python3-venv
+          fi
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout du dépôt (historique complet pour le diff)
@@ -613,8 +663,11 @@ jobs:
 
       - name: Installer gettext
         run: |
-          DEBIAN_FRONTEND=noninteractive apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gettext
+          if ! dpkg-query -W -f='${db:Status-Status}\n' gettext 2>/dev/null \
+              | awk '$0 != "installed" { manque = 1 } END { exit manque }'; then
+            DEBIAN_FRONTEND=noninteractive apt-get update -qq
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gettext
+          fi
 
       - name: Catalogues à jour et valides
         id: sync
