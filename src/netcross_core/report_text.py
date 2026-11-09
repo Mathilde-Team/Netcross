@@ -154,12 +154,12 @@ def _print_multi_point_sections(r: Report):
             print(
                 f"      -> decalage d'horloge estime : {estimation.decalage_a(temps_moyen):+.2f}ms "
                 f"(derive {estimation.derive_ppm:+.1f}ppm, IC95% +-{estimation.ic_decalage_ms:.2f}ms, "
-                f"{estimation.n_echantillons} echantillon(s) TCP/DNS, {estimation.methode}) "
+                f"{estimation.n_echantillons} echantillon(s), {estimation.methode}) "
                 f"=> latence corrigee ~= {corrected:.2f}ms"
             )
 
     if r.clock_offset_estimate:
-        print("\n-- Decalage d'horloge estime entre points (handshakes TCP + couples DNS) --")
+        print("\n-- Decalage d'horloge estime entre points (TCP, DNS, RTP/RTCP bidirectionnels) --")
         print("   Estimation robuste (issue #996) : filtre au delai minimal (RFC 5905)")
         print("   puis regression Theil-Sen -- decalage, derive (ppm) et intervalle de")
         print("   confiance publies par paire. Un decalage important et instable indique")
