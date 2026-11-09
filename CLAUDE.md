@@ -13,6 +13,23 @@ que pour un contexte spécifique, pas systématiquement.
 
 ## État courant
 
+- **Échantillons UDP, issue #1029 (09/11/2026)** : appariement DNS par
+  transaction, nom et extrémités, avec rejet des collisions et échanges
+  incomplets ; RTP/RTCP uniques et bidirectionnels, séparés d'au plus
+  une seconde aux deux points. RTCP natif utilise SHA-256 de la charge
+  utile, sans repli RTP. Les sources collectées sont indiquées dans
+  la méthode et `clock_offsets[].sources` du JSON. Aucun offset depuis
+  un média unidirectionnel ; hypothèse de symétrie explicitée dans
+  `docs/estimation-horloge.md`. Journal : session 78.
+
+- **Microrafales, issue #1135 (09/11/2026)** : détection automatique par
+  point dans `analyse`, fenêtres glissantes 100 µs/1 ms/10 ms respectant
+  la résolution. Pic ≥ 4 fois la médiane des tranches non vides et,
+  si vitesse connue, occupation ≥ 80 %. Texte, JSON et constats câblés ;
+  seuil relatif explicitement signalé sans vitesse. Classification
+  `seconde_passe` et limites documentées, mesures brutes dans
+  `benchmarks/microrafales-1135-*.json`. Voir la session 76.
+
 - **Guide des clés TLS, issue #1049 (09/11/2026)** :
   `docs/guide/cles-tls.md` décrit navigateur, curl, agent Java
   extract-tls-secrets 5.0.0, contexte Python, association par point et

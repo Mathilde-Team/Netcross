@@ -12,6 +12,7 @@ from collections import Counter, defaultdict
 from netcross_core.dechiffrement import lignes as lignes_dechiffrement
 from netcross_core.forensic import annotations_by_tag
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.microburst import format_microburst
 from netcross_core.models import (
     SEQ_GAP_CAPTURE_DROP,
     SEQ_GAP_INDETERMINATE,
@@ -153,12 +154,12 @@ def _print_multi_point_sections(r: Report):
             print(
                 f"      -> decalage d'horloge estime : {estimation.decalage_a(temps_moyen):+.2f}ms "
                 f"(derive {estimation.derive_ppm:+.1f}ppm, IC95% +-{estimation.ic_decalage_ms:.2f}ms, "
-                f"{estimation.n_echantillons} echantillon(s) TCP/DNS, {estimation.methode}) "
+                f"{estimation.n_echantillons} echantillon(s), {estimation.methode}) "
                 f"=> latence corrigee ~= {corrected:.2f}ms"
             )
 
     if r.clock_offset_estimate:
-        print("\n-- Decalage d'horloge estime entre points (handshakes TCP + couples DNS) --")
+        print("\n-- Decalage d'horloge estime entre points (TCP, DNS, RTP/RTCP bidirectionnels) --")
         print("   Estimation robuste (issue #996) : filtre au delai minimal (RFC 5905)")
         print("   puis regression Theil-Sen -- decalage, derive (ppm) et intervalle de")
         print("   confiance publies par paire. Un decalage important et instable indique")
@@ -265,6 +266,12 @@ def print_report(r: Report):
             vitesse = f"{format_speed(speed)} (source : {fiche.get('speed_source')})" if speed else "inconnue"
             tick = f", horodatage au {resolution:g} s" if resolution else ""
             print(f"  {point_label} : {vitesse}{tick}")
+
+    bursts = [event for record in r.microbursts.values() for event in record["events"]]
+    if bursts:
+        print("\n-- Microrafales (indices à confirmer, fenêtres de détection) --")
+        for event in bursts:
+            print(f"  {format_microburst(event)}")
 
     couverture = lignes_dechiffrement(r)
     if couverture:

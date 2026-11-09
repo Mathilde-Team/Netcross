@@ -21,6 +21,7 @@ from netcross_core.application import (
     build_http_transactions,
     classify_transaction,
 )
+from netcross_core.clock_samples import collect_udp_samples
 from netcross_core.clock_sync import (
     EchantillonHorloge,
     analyser_decalages_manuels,
@@ -33,6 +34,7 @@ from netcross_core.dechiffrement import compter_sessions
 from netcross_core.extract.carver import detect_extracted_files
 from netcross_core.forensic import detect_sequence_gaps, validate_checksums
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.microburst import detect_microbursts
 from netcross_core.models import Pkt, Report
 from netcross_core.parsing import compute_mos
 from netcross_core.security.exfiltration import detect_exfiltration
@@ -84,6 +86,7 @@ def analyse(
     exclude_duplicates=False,
     duplicate_counts=None,
     clock_offsets=None,
+    link_speeds=None,
 ):
     # Job 41/issue #161 : exclude_duplicates (defaut False -> comportement
     # historique inchange) retire de `flows` ET de `all_packets` les paquets
@@ -135,6 +138,7 @@ def analyse(
         rtp_clock_rate=rtp_clock_rate,
     )
     r.duplicates_excluded = exclude_duplicates
+    r.link_speeds = link_speeds or {}
     for pair, count in (duplicate_counts or {}).items():
         r.duplicate_count[pair] = count
     # Commentaires de paquets pcapng (Job 39/issue #159) -- pre-formates
@@ -149,6 +153,8 @@ def analyse(
     r.dechiffrement = compter_sessions(all_packets)
     with _phase("compute_throughput"):
         r.throughput = compute_throughput(all_packets, bucket_seconds)
+    with _phase("detect_microbursts"):
+        r.microbursts = detect_microbursts(all_packets, r.link_speeds)
     r.topn_timeseries = {dim: compute_topn_series(all_packets, bucket_seconds, dim, topn) for dim in TOPN_DIMENSIONS}
     r.topology_edges = topo_edges
     r.topology_ambiguous = topo_ambiguous
@@ -1395,16 +1401,18 @@ def _estimer_horloges(
     (issue #996), AVANT le calcul des latences par segment qui utilise
     le resultat pour corriger chaque paquet au temps ou il a ete observe.
 
-    Deux sources d'echantillons, meme formule NTP
+    Trois sources d'echantillons, meme formule NTP
     ``decalage = ((t2-t1)-(t4-t3))/2`` sur un aller-retour complet vu
     des deux cotes :
 
     - handshakes TCP : SYN (t1/t2) et SYN-ACK (t3/t4) tous deux vus aux
       deux points de la paire (reprise du couplage SYN/SYN-ACK par
       ``ack == seq+1`` de _analyse_handshake) ;
-    - couples requete/reponse DNS apparies par ``dns.id`` : requete
-      (t1/t2) et reponse (t3/t4) vus aux deux points -- UDP, donc
-      disponible meme sans aucun handshake TCP (trafic DNS pur).
+    - couples requete/reponse DNS apparies par identifiant, nom et
+      extrémités, avec refus des échanges ambigus ;
+    - datagrammes RTP/RTCP uniques, bidirectionnels et proches dans
+      le temps, observés aux deux points. Un flux unidirectionnel
+      ne sépare pas délai et décalage et ne fournit aucun échantillon.
 
     Chaque echantillon porte aussi le delai aller-retour apparent
     ``(t4-t1)-(t3-t2)``, exploite par le filtre au delai minimal de
@@ -1419,13 +1427,15 @@ def _estimer_horloges(
         r (Report): Rapport en cours de construction ; remplit
             ``clock_offset_samples`` et ``clock_offset_estimate``.
         flows: Flux correles (correlate()).
-        all_packets: Paquets bruts (pour DNS).
+        all_packets: Paquets bruts (pour DNS et RTP/RTCP).
         points: Liste des points.
         pairs: Paires de points a couvrir.
         points_order: Ordre des points (None si non fourni).
         nat_tolerant: Mode --nat-tolerant (correlation lachee : le
-            couplage SYN/SYN-ACK par ack est omis, seuls les echantillons
-            DNS restent).
+            couplage SYN/SYN-ACK par ack est omis ; les échantillons
+            UDP restent. Des extrémités DNS différentes ne sont
+            rapprochées que si nom et empreintes des deux messages
+            concordent).
         clock_offsets: Decalages imposes (dict ou liste brute, voir
             la docstring de analyse()).
     """
@@ -1477,25 +1487,9 @@ def _estimer_horloges(
                     delai_ms = ((t4 - t1) - (t3 - t2)) * 1000.0
                     echantillons[(a, b)].append(EchantillonHorloge(t=t1, decalage_ms=decalage_ms, delai_ms=delai_ms))
 
-    # -- source UDP : couples requete/reponse DNS apparies par dns.id --
-    dns_tx: defaultdict[int, defaultdict[str, list[Pkt]]] = defaultdict(lambda: defaultdict(list))
-    for pk in all_packets:
-        if pk.dns_txn_id is not None:
-            dns_tx[pk.dns_txn_id][pk.point].append(pk)
-    for per_point in dns_tx.values():
-        requetes = {p: [pk for pk in pkts if not pk.dns_is_response] for p, pkts in per_point.items()}
-        reponses = {p: [pk for pk in pkts if pk.dns_is_response] for p, pkts in per_point.items()}
-        for a, b in pairs:
-            if a in requetes and b in requetes and a in reponses and b in reponses:
-                if not requetes[a] or not requetes[b] or not reponses[a] or not reponses[b]:
-                    continue
-                t1 = min(pk.ts for pk in requetes[a])
-                t2 = min(pk.ts for pk in requetes[b])
-                t3 = min(pk.ts for pk in reponses[b])
-                t4 = min(pk.ts for pk in reponses[a])
-                decalage_ms = ((t2 - t1) - (t4 - t3)) / 2 * 1000.0
-                delai_ms = ((t4 - t1) - (t3 - t2)) * 1000.0
-                echantillons[(a, b)].append(EchantillonHorloge(t=t1, decalage_ms=decalage_ms, delai_ms=delai_ms))
+    # Sources UDP isolées : échanges DNS non ambigus et média bidirectionnel.
+    for pair, samples in collect_udp_samples(all_packets, pairs, nat_tolerant).items():
+        echantillons[pair].extend(samples)
 
     for paire, valeurs in echantillons.items():
         r.clock_offset_samples[paire] = valeurs

@@ -1,0 +1,40 @@
+{
+  "schema": "netcross-bench",
+  "version": 1,
+  "date": "2026-11-09T16:58:33Z",
+  "environnement": {
+    "coeurs_logiques": 2,
+    "coeurs_utilisables": 2,
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.90GHz",
+    "ram_mio": 7957,
+    "systeme": "Linux 6.1.155 x86_64",
+    "python": "3.14.8",
+    "tshark": "TShark (Wireshark) 4.6.4.",
+    "netcross": "1.0.0"
+  },
+  "essais": [
+    {
+      "jeu": "mini",
+      "points": 2,
+      "paquets": 4000,
+      "parallele": 1,
+      "repetitions": 3,
+      "total_s": 1.119711,
+      "durees_totales_s": [
+        1.128122,
+        1.119711,
+        1.107641
+      ],
+      "mur_s": 1.961111,
+      "etapes_s": {
+        "lecture": 0.876616,
+        "correlation": 0.004814,
+        "detecteurs": 0.233987,
+        "rapport": 0.004295
+      },
+      "rss_max_mio": 111.0,
+      "rss_max_enfants_mio": 179.6,
+      "paquets_par_s": 3572
+    }
+  ]
+}

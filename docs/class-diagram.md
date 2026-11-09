@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-228 modules · 331 classes · 834 fonctions publiques de module.
+230 modules · 331 classes · 837 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -38,13 +38,13 @@ flowchart TD
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"32 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
-    netcross_gtk4 -->|"113 imports"| netcross_core
+    netcross_gtk4 -->|"115 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
     netcross_api -->|"21 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"56 imports"| netcross_core
+    netcross_api -->|"57 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"49 imports"| netcross_core
+    netcross_report -->|"51 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"25 imports"| pcap_parser
 ```
@@ -437,6 +437,7 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +str? rtcp_hash
         +str? comment
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -539,6 +540,7 @@ classDiagram
 | `netcross_core.capture_tools` | manipulation de fichiers de capture partagee par la CLI, la GUI et l'API (issues #868, #869, #870, #886, #887). |
 | `netcross_core.causality` | moteur de correlation causale (Session 3 de la section 13.3 de FEATURES.md, Job 4/issue #4). |
 | `netcross_core.client_diff` | comparaison "client vs client" : meme capture, memes points, seule la source (l'IP du poste) change. |
+| `netcross_core.clock_samples` | Échantillons d'horloge UDP conservateurs, sans identifiant DNS global. |
 | `netcross_core.clock_sync` | estimation robuste du decalage et de la derive d'horloge entre deux points de capture (issue #996). |
 | `netcross_core.compliance` | evaluateur de conformite, huitieme et neuvieme objets de contrat de la Session 0 (FEATURES.md section 13.3) : `ReferenceProfile`/`ComplianceResult` (netcross_core.expert_model). |
 | `netcross_core.config` | chargement de configuration depuis .netcross.toml (issue #170). |
@@ -563,6 +565,7 @@ classDiagram
 | `netcross_core.logging_config` | configuration centrale du logging (issue #245). |
 | `netcross_core.lua_dissectors` | catalogue des dissecteurs Wireshark écrits en Lua, dans la banque Lua (issue #917). |
 | `netcross_core.lua_doc` | banque SQLite locale de l'API Lua Wireshark (issue #387, rattachee a #331). |
+| `netcross_core.microburst` | Microrafales par point, fenêtres glissantes exactes et référence relative. |
 | `netcross_core.models` | structures de donnees partagees : un paquet normalise (Pkt) et le resultat d'analyse consolide (Report). |
 | `netcross_core.multiscale` | Debit crete multi-echelle en fenetre glissante (issue #1133). |
 | `netcross_core.naming` | table locale de correspondance adresse/MAC -> nom logique, type, contexte (Job 18 / issue #16-bis, section 6.15 de FEATURES.md). |
@@ -632,7 +635,7 @@ classDiagram
     %% ===== netcross_core.analysis =====
     class mod_netcross_core_analysis["netcross_core.analysis"] {
         <<module>>
-        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets)
+        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds)
     }
 
     %% ===== netcross_core.annotations =====
@@ -813,12 +816,19 @@ classDiagram
         +write_client_diff_csv(result, path) None
     }
 
+    %% ===== netcross_core.clock_samples =====
+    class mod_netcross_core_clock_samples["netcross_core.clock_samples"] {
+        <<module>>
+        +collect_udp_samples(packets, pairs, nat_tolerant) dict
+    }
+
     %% ===== netcross_core.clock_sync =====
     class EchantillonHorloge {
         <<dataclass, frozen>>
         +float t
         +float decalage_ms
         +float delai_ms
+        +str source
     }
     class EstimationHorloge {
         <<dataclass>>
@@ -831,6 +841,7 @@ classDiagram
         +int n_conserves
         +str methode
         +bool manuel
+        +tuple~str, ...~ sources
         +decalage_a(t) float
     }
     class mod_netcross_core_clock_sync["netcross_core.clock_sync"] {
@@ -1554,6 +1565,13 @@ classDiagram
         +suggest_classes(conn, nom, n) list~str~
     }
 
+    %% ===== netcross_core.microburst =====
+    class mod_netcross_core_microburst["netcross_core.microburst"] {
+        <<module>>
+        +detect_microbursts(packets, link_speeds) dict~str, dict~
+        +format_microburst(event) str
+    }
+
     %% ===== relations =====
     DiffFinding --> EvidenceLink : evidence
     CaptureGroup --> CaptureInventory : members
@@ -1697,6 +1715,7 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +str? rtcp_hash
         +str? ip_checksum
         +bool? ip_checksum_bad
         +str? tcp_checksum
@@ -1888,6 +1907,7 @@ classDiagram
         +list~str~ packet_comments
         +list~dict~ capture_infos
         +dict~str, dict~ link_speeds
+        +dict~str, dict~ microbursts
         +dict~str, dict~str, dict~str, int~~~ dechiffrement
         +list~str~ points_keylog
         +list~ChecksumError~ checksum_errors
@@ -1911,6 +1931,8 @@ classDiagram
         <<ValueError>>
     }
     class SlidingWindowPeak {
+        +current_bytes() int
+        +current_packets() int
         +update(ts_ns, length) None
     }
     class MultiScaleRates {

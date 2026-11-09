@@ -470,9 +470,14 @@ def test_analyse_and_write_compte_les_constats(tmp_path, monkeypatch):
     def _constats(report, packets):
         report.security_findings = [{"severity": "critique"}, {"severity": None}, {}]
 
+    def _analyse(flows, points, packets, *, link_speeds):
+        assert set(link_speeds) == {"A"}
+        assert link_speeds["A"]["speed_bps"] is None
+        return rapport
+
     monkeypatch.setattr(runner, "parse_capture", lambda label, path, raise_on_error: [])
     monkeypatch.setattr(runner, "correlate", lambda pkts: [])
-    monkeypatch.setattr(runner, "analyse", lambda *a: rapport)
+    monkeypatch.setattr(runner, "analyse", _analyse)
     monkeypatch.setattr(runner, "print_report", lambda r: print("rapport"))
     monkeypatch.setattr(runner.security_findings, "apply_security_findings", _constats)
     monkeypatch.setattr(runner, "build_security_report", lambda r: r)
