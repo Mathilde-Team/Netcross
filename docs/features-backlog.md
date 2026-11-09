@@ -747,6 +747,11 @@ point de vue de l'utilisateur final, sauf usage direct en bibliothèque).
 
 ### `netcross_core.tls_diagnostics` — TLS (pipeline indépendant, via `pcap_parser`)
 
+- **Guide utilisateur des clés, issue #1049** :
+  [collecte et utilisation des secrets TLS](guide/cles-tls.md), pour
+  navigateur, curl, Java et Python, association aux points et DSB.
+  Les incompatibilités actuelles de `--redact` restent conservées ;
+  aucun essai sur un environnement client de production n'est revendiqué.
 - ✅ Câblé via `--tls` sur `cross_capture_analyzer_cli.py`
 - ✅ **Câblé aussi via `--tls` sur `cross_capture_diff_cli.py` (Session 8)** :
   exécuté séparément sur le baseline et sur le run courant (`parse_tls_capture`

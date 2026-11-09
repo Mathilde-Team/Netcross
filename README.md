@@ -612,6 +612,9 @@ Options utiles :
   n'est pas définie, et sans objet en direct (`--live`). Le contenu du
   fichier n'est jamais lu ni journalisé par Netcross. Sans l'option,
   comportement inchangé (issue #1040, chantier #997).
+  Le [guide des clés TLS](docs/guide/cles-tls.md) explique la collecte
+  côté navigateur, curl, Java et Python, l'injection DSB avec editcap
+  et les précautions de conservation et de partage.
 - `--history-db chemin.db` : enregistre un résumé de ce run (score de
   santé, nombre de constats par sévérité) dans une base SQLite locale,
   créée si absente — pour suivre une tendance dans le temps sur des runs
