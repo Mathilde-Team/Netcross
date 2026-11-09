@@ -56,6 +56,7 @@ nav:
       - Présentation: guide/index.md
       - Installation: guide/installation.md
       - Préparer les captures: guide/preparer-captures.md
+      - Obtenir les clés TLS: guide/cles-tls.md
       - Première analyse: guide/premiere-analyse.md
       - Interface graphique: guide/interface-graphique.md
       - Lire le rapport: guide/lire-le-rapport.md
