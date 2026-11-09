@@ -15,6 +15,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   import, lecture des panneaux et exemples d'alertes Prometheus (perte de segment, délai p95,
   santé basse, flux perdus au point). Le test `test_grafana_dashboard.py` vérifie que le JSON
   est valide et que chaque métrique référencée existe dans le catalogue figé.
+- Image CI préconstruite effectivement utilisée (#968) : les cinq jobs en
+  conteneur chargent `ghcr.io/mathilde-team/netcross-ci:26.04` avec lecture
+  seule du registre ; les installations apt ne tournent que si un paquet
+  requis manque. Node.js est inclus et contrôlé dans l'image.
 - Orchestration automatique de la chaîne d'incident (#1001) : `netcross_core.incident_chain.ChaineIncidents`,
   branchée sur `LiveDiffEngine(gel=chaine)` à la place du `GelManager` nu, enchaîne à chaque alarme le gel
   rétroactif (#1087), l'attente effective de la fin de fenêtre (calculée depuis l'horodatage du dernier paquet vu,
