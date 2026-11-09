@@ -13,6 +13,17 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   compteurs directs sans métriques non mesurées. L'analyse finale d'une
   capture directe expose le catalogue complet ; cardinalité bornée et
   anonymisation des étiquettes avec `redact`.
+- Seconde passe ciblée en flux (#1025, sous-issue 6/6 du chantier pipeline en flux #995) :
+  la topologie est désormais déduite en mode `--streaming` comme en batch — un enregistrement
+  compact par (flux, point) (horodatage et TTL du premier paquet) est collecté au fil de l'eau
+  (ARP/STP exclus, doublons avec `--exclude-duplicates`, nat-tolerant identique à
+  `correlate`), puis la même déduction que le mode batch s'exécute à la fermeture : mêmes
+  seuils, mêmes arêtes/ambiguïtés/isolés/branchements/fusions. La mémoire est proportionnelle
+  au nombre de flux (pas de paquets) et déportée sur disque avec `--spill-seuil` (#1024),
+  sans changer les résultats. Exposé dans `streaming.seconde_passe` de `--json-report`.
+  Voir docs/seconde-passe.md. Restent hors de cette passe : `clock_sync`,
+  `detect_microbursts`, l'équivalence complète du rapport et le basculement du défaut
+  vers `--streaming` (décision humaine, voir l'issue).
 - Débordement sur disque des flux longs (#1024, chantier pipeline en flux #995) : `--spill-seuil N`
   borne en mémoire les structures de l'état par flux qui grandissent avec le nombre total de
   conversations vues (résumé TCP par clé du détecteur de coupure, coupures déjà comptées) ; au-delà

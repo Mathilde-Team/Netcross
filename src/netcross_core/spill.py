@@ -107,6 +107,19 @@ class SpillBackend:
         self._conn.execute(f'DELETE FROM "{nom}" WHERE k = ?', (cle,))
         logger.debug("SpillBackend.supprimer: retour None")
 
+    def iterer(self, nom: str):
+        """Toutes les (cle, valeur) de la table ``nom``, en un seul parcours
+        curseur -- sans charger la table entiere en memoire."""
+        logger.debug("SpillBackend.iterer: entrée ({})", nom)
+        curseur = self._conn.execute(f'SELECT k, v FROM "{nom}"')
+        while True:
+            lignes = curseur.fetchmany(1024)
+            if not lignes:
+                break
+            for ligne in lignes:
+                yield ligne[0], ligne[1]
+        logger.debug("SpillBackend.iterer: retour")
+
     def close(self) -> None:
         """Ferme la connexion et supprime le fichier temporaire ; idempotent."""
         logger.debug("SpillBackend.close: entrée")
@@ -235,6 +248,30 @@ class SpillDict(Generic[K, V]):
             self._backend.inserer(self._nom, self._en_attente)
             self._en_attente = []
         logger.debug("SpillDict._vider_attente: retour None")
+
+    def items(self):
+        """Toutes les entrees : la memoire d'abord, puis le disque (sans
+        dedoubler -- la valeur en memoire fait foi, plus recente que la
+        copie deportee)."""
+        logger.debug("SpillDict.items: entrée")
+        self._vider_attente()
+        vus: set[str] = set()
+        for sk, valeur in self._mem.items():
+            vus.add(sk)
+            yield sk, valeur
+        if self._backend is not None:
+            for sk, brute in self._backend.iterer(self._nom):
+                if sk in vus:
+                    continue
+                yield sk, self._load(brute)
+        logger.debug("SpillDict.items: retour")
+
+    def values(self):
+        """Toutes les valeurs (cle non demandee), memes regles que ``items``."""
+        logger.debug("SpillDict.values: entrée")
+        for _sk, valeur in self.items():  # noqa: PERF102
+            yield valeur
+        logger.debug("SpillDict.values: retour")
 
     def close(self) -> None:
         """Ecrit ce qui reste en attente ; supprime le fichier si le
