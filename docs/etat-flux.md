@@ -40,9 +40,13 @@ Deux mécanismes complémentaires ferment un état :
   (raison `expiration`) et ouvre un nouvel enregistrement — c'est le
   silence mesuré au point amont, la même règle que le plus grand silence
   du détecteur batch ;
-- **en tâche de fond** : à chaque paquet, les états silencieux depuis
-  plus de `timeout` secondes ferment, pour borner la mémoire même sans
-  trafic sur le flux.
+- **en tâche de fond** : à chaque paquet, un index d'échéances ferme les
+  états dont le délai est atteint. Un TCP à délai long ne bloque pas
+  l'expiration d'un UDP à délai court, même s'il a été vu avant lui.
+  L'index est compacté pour ne pas grossir avec les paquets d'un flux actif.
+
+Les délais doivent être strictement positifs et finis, y compris pour
+un appel direct à `FlowTable` : NaN et les infinis sont refusés.
 
 La réouverture d'un flux après expiration est comptée par protocole
 (`reopened`) : le réveil d'un flux expiré ouvre un nouvel enregistrement,
@@ -50,35 +54,53 @@ comme une nouvelle connexion Zeek.
 
 ## Détecteur incrémental : coupure NAT/pare-feu
 
-Le détecteur de coupure silencieuse NAT/pare-feu (celui du mode batch,
-`_analyse_idle_timeout`) est branché sur cet état : un enregistrement TCP
-vu aux deux points d'un segment, fermé par expiration, dont le réveil
-n'est jamais revu au point aval, compte une coupure pour ce segment
+Le détecteur de coupure silencieuse NAT/pare-feu est branché sur cet état
 (`nat_cutoffs`, lignes `COUPURE NAT/PARE-FEU` du rapport texte). Les
-règles sont celles du mode actuel :
+constats intermédiaires restent provisoires jusqu'à `finish()` : un
+paquet aval plus tardif peut encore invalider une coupure supposée.
+La réconciliation finale applique les règles de `_analyse_idle_timeout`
+à seuil TCP identique, même si plusieurs silences ont eu lieu :
 
-- au moins deux paquets en amont, pour que le silence soit mesurable ;
-- le réveil vu en aval exclut la coupure ;
-- un seul silence retenu par flux et par segment ;
+- au moins deux paquets au total en amont, pour mesurer un silence ;
+- le plus grand silence, et le premier maximum en cas d'égalité ;
+- une observation aval avant la reprise, et aucune après la reprise ;
+- un seul constat par flux et par segment ;
 - jamais vu en aval avant le silence : pas ce scénario.
 
-Les tests vérifient l'égalité des constats entre le mode actuel
-(`analyse`) et l'état par flux sur ces scénarios, y compris les contre-
-cas (réveil vu en aval, silence plus court que le délai, flux vu d'un
-seul point).
+Les tests comparent au mode actuel (`analyse`) les reprises tardivement
+revues en aval, les maxima égaux et les silences multiples, avec des seuils
+de 1, 60 et 3 600 secondes. Les entrées de `feed()` sont fusionnées en ordre
+chronologique par `run_flow_table`, comme celles de la corrélation en flux.
 
 ## Limites et mémoire
 
-- Les états ouverts sont proportionnels aux flux actifs ; un état fermé
-  ne laisse que des compteurs.
-- Deux mémoires bornées documentées : le résumé du dernier enregistrement
-  TCP multipoint (pour le détecteur de coupure) est proportionnel au
-  nombre de conversations TCP multipoints — comme `_conversations` de la
-  corrélation en flux ; les clés récemment fermées (pour compter les
-  réouvertures) sont plafonnées à 65 536 entrées.
+- Les états ouverts et leurs statistiques temporelles par point sont
+  proportionnels aux flux actifs. Le tas d'échéances contient au plus
+  deux entrées par flux actif plus 64 entrées de marge.
+- Les résumés TCP, statistiques globales et coupures déjà comptées sont
+  dans une base SQLite temporaire, dans un répertoire privé ; le cache
+  natif est plafonné à 1 Mio et les structures temporaires utilisent le
+  disque. Le disque peut croître avec les conversations et segments,
+  mais la RAM ne retient pas toutes les conversations terminées.
+- `--spill-seuil N` conserve au plus N résumés dans un cache LRU Python
+  facultatif, en plus du cache SQLite. Par défaut, ou avec zéro, aucun
+  résumé n'est gardé dans ce cache : l'historique exact reste sur disque,
+  jamais en RAM illimitée. Un point unique, sans segment NAT possible,
+  ne crée pas d'historique TCP inutile.
+- Aucun paquet ni contenu applicatif n'est enregistré dans cet
+  historique. Les clés de conversation et statistiques sont sensibles :
+  la base n'est pas un export, et son répertoire est supprimé à `finish()`
+  ou à la finalisation de l'objet abandonné. Les erreurs d'ouverture ou
+  d'initialisation sont journalisées et propagées, pas transformées en
+  rapport silencieusement incomplet.
+- Les clés récemment fermées, utilisées pour compter `reopened`, restent
+  plafonnées à 65 536 entrées ; une très ancienne réouverture peut donc
+  ne plus incrémenter ce compteur. Cela n'efface pas les preuves NAT,
+  conservées séparément sur disque jusqu'à la fin.
 - La lecture des captures reste entière avant la fusion (même limite que
   #1022) : le branchement de la lecture tshark en flux est le reste du
   chantier #995.
-- `nat_cutoffs` est l'équivalent flux du constat batch
-  `idle_timeout_dropped` : les deux sont calculés indépendamment (le mode
-  batch reste la référence du rapport principal).
+- `nat_cutoffs` final est l'équivalent de `idle_timeout_dropped` à seuil
+  identique : les deux sont calculés indépendamment, le mode batch
+  restant la référence du rapport principal. Les délais d'expiration
+  configurés différemment ne sont pas supposés donner les mêmes constats.
