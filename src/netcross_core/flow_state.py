@@ -41,18 +41,21 @@ Mémoire, bornes assumées et documentées :
 - ``_tcp_prev`` (résumé du dernier enregistrement TCP vu à plusieurs
   points, pour le détecteur de coupure) : proportionnel au nombre de
   conversations TCP multipoints, comme ``_conversations`` de la
-  corrélation en flux (#1022) ;
+  corrélation en flux (#1022) -- et, au-delà d'un seuil, déporté sur
+  disque (SQLite temporaire, #1024, module ``netcross_core.spill``) ;
 - ``_seen`` (clés récemment fermées, pour compter ``reopened``) : au
   plus ``_SEEN_CAP`` entrées, la plus ancienne est oubliée.
 """
 
 from __future__ import annotations
 
+import json
 from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Iterable
 
 from netcross_core.logging_config import get_logger
 from netcross_core.models import Pkt
+from netcross_core.spill import SpillBackend, SpillDict, SpillSet, cle_json
 
 logger = get_logger(__name__)
 
@@ -141,6 +144,27 @@ class _ResumeTcp:
         logger.debug("_ResumeTcp.__init__: fin")
 
 
+def _dump_resume_tcp(resume: _ResumeTcp) -> str:
+    """Sérialise un résumé TCP pour le débordement SQLite (#1024)."""
+    logger.debug("_dump_resume_tcp: entrée")
+    texte = json.dumps(
+        {"points": sorted(resume.points), "packets": resume.packets, "raison": resume.raison},
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    logger.debug("_dump_resume_tcp: retour")
+    return texte
+
+
+def _load_resume_tcp(texte: str) -> _ResumeTcp:
+    """Reconstruit le résumé TCP sérialisé par ``_dump_resume_tcp``."""
+    logger.debug("_load_resume_tcp: entrée")
+    doc = json.loads(texte)
+    resume = _ResumeTcp(frozenset(doc["points"]), dict(doc["packets"]), str(doc["raison"]))
+    logger.debug("_load_resume_tcp: retour")
+    return resume
+
+
 class FlowTable:
     """Table des flux actifs : ``feed()`` paquet par paquet, puis ``finish()``.
 
@@ -153,6 +177,7 @@ class FlowTable:
         self,
         points: list[str],
         timeouts: dict[str, float] | None = None,
+        spill_seuil: int | None = None,
     ) -> None:
         logger.debug("FlowTable.__init__: entrée ({} point(s))", len(points))
         if not points:
@@ -161,6 +186,14 @@ class FlowTable:
         self.points = list(points)
         self.pairs = list(zip(self.points, self.points[1:], strict=False))
         self.timeouts = dict(timeouts) if timeouts else dict(DEFAULT_FLOW_TIMEOUTS)
+        # débordement sur disque des structures non bornées par le nombre
+        # de flux ACTIFS (#1024) : _tcp_prev et _cutoff_seen grandissent
+        # avec le nombre total de conversations vues ; au-delà du seuil,
+        # les moins récentes partent dans une base SQLite temporaire.
+        self.spill_seuil = max(0, int(spill_seuil)) if spill_seuil else 0
+        self._spill_backend: SpillBackend | None = None
+        if self.spill_seuil > 0:
+            self._spill_backend = SpillBackend()
         self._open: OrderedDict[tuple, _EtatFlux] = OrderedDict()
         self._now = float("-inf")
         # compteurs
@@ -173,9 +206,24 @@ class FlowTable:
         self.nat_cutoffs: Counter = Counter()  # (a, b) -> coupures
         self.cutoff_examples: dict[tuple[str, str], list[str]] = defaultdict(list)
         self.examples: list[str] = []
-        # memoires bornees, voir docstring du module
-        self._tcp_prev: dict[tuple, _ResumeTcp] = {}
-        self._cutoff_seen: set[tuple[tuple, tuple[str, str]]] = set()
+        # memoires bornees, voir docstring du module. _tcp_prev et
+        # _cutoff_seen (non bornees par les flux actifs) débordent sur
+        # disque au-dela du seuil (#1024) ; a seuil nul, SpillDict et
+        # SpillSet sont de simples structures en RAM, memes resultats.
+        self._tcp_prev: SpillDict[tuple, _ResumeTcp] = SpillDict(
+            self.spill_seuil,
+            cle_json,
+            _dump_resume_tcp,
+            _load_resume_tcp,
+            backend=self._spill_backend,
+            nom="tcp_prev",
+        )
+        self._cutoff_seen: SpillSet[tuple] = SpillSet(
+            self.spill_seuil,
+            cle_json,
+            backend=self._spill_backend,
+            nom="cutoff_seen",
+        )
         self._seen: OrderedDict[tuple, None] = OrderedDict()
         self._finished = False
         logger.debug("FlowTable.__init__: fin")
@@ -270,14 +318,18 @@ class FlowTable:
                                 f"{key[1]}:{key[2]} -> {key[3]}:{key[4]} (réveil en {a} "
                                 f"jamais revu en {b} après expiration)"
                             )
-            self._tcp_prev[key] = _ResumeTcp(points, dict(etat.packets), raison)
+            self._tcp_prev.put(key, _ResumeTcp(points, dict(etat.packets), raison))
         self._seen[key] = None
         if len(self._seen) > _SEEN_CAP:
             self._seen.popitem(last=False)
         logger.debug("FlowTable._close: retour None")
 
     def finish(self) -> None:
-        """Ferme les états restants (raison ``fin``) ; idempotent."""
+        """Ferme les états restants (raison ``fin``) ; idempotent.
+
+        Le fichier temporaire du débordement (#1024) est supprimé ici :
+        en fin d'analyse, plus rien ne doit subsister sur disque.
+        """
         logger.debug("FlowTable.finish: entrée")
         if self._finished:
             logger.debug("FlowTable.finish: déjà terminé -> retour")
@@ -286,6 +338,8 @@ class FlowTable:
             key, etat = self._open.popitem(last=False)
             self._close(key, etat, "fin")
         self._finished = True
+        if self._spill_backend is not None:
+            self._spill_backend.close()
         logger.debug(
             "FlowTable.finish: retour ({} enregistrement(s), {} expiration(s), {} coupure(s) NAT)",
             self.total_records,
@@ -343,13 +397,14 @@ def run_flow_table(
     sources: Iterable[Iterable[Pkt]],
     points: list[str],
     timeouts: dict[str, float] | None = None,
+    spill_seuil: int | None = None,
 ) -> FlowTable:
     """Alimente une table de flux depuis des suites par point fusionnées
     en k voies (``streaming.merge_points``), puis la ferme."""
     logger.debug("run_flow_table: entrée ({} point(s))", len(points))
     from netcross_core.streaming import merge_points
 
-    table = FlowTable(points, timeouts=timeouts)
+    table = FlowTable(points, timeouts=timeouts, spill_seuil=spill_seuil)
     for pk in merge_points(sources):
         table.feed(pk)
     table.finish()
