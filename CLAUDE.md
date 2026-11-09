@@ -22,6 +22,13 @@ que pour un contexte spécifique, pas systématiquement.
 
 ## État courant
 
+- **Guide des clés TLS, issue #1049 (09/11/2026)** :
+  `docs/guide/cles-tls.md` décrit navigateur, curl, agent Java
+  extract-tls-secrets 5.0.0, contexte Python, association par point et
+  injection/retrait DSB. Renvois README, MkDocs et couverture du
+  déchiffrement ajoutés. Aucune modification du pipeline ni des restrictions
+  de `--redact` ; les environnements clients de production ne sont pas
+  déclarés validés par la CI. Journal : `docs/sessions/session-75.md`.
 - **Journalisation, issue #954 (08/11/2026)** : 183 traces d'entrée sans
   argument ajoutées aux fonctions éligibles hors chemins chauds. L'audit
   mesure désormais 9 entrées manquantes (référence abaissée de 193 à 9).

@@ -1,5 +1,9 @@
 # Couverture du déchiffrement TLS/QUIC
 
+Pour produire et associer les fichiers de clés, suivre le
+[guide des clés TLS](guide/cles-tls.md). Il couvre navigateur, curl,
+Java, Python et les précautions propres aux captures contenant des DSB.
+
 Un fichier de clés (`--tls-keylog`, champ « Cles TLS... » de la GUI, `tls_keylog` de l'API) ou des secrets
 embarqués dans une capture pcapng (blocs DSB, `editcap --inject-secrets`) ne couvrent souvent qu'une partie des
 sessions : navigateur lancé avant `SSLKEYLOGFILE`, autre poste, sessions reprises. Depuis l'issue #1043, le
