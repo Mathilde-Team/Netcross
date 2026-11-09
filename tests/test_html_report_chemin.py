@@ -193,6 +193,46 @@ def test_champs_de_detail_couvrent_path_metrics():
     assert {"delay_avg_ms", "delay_p95_ms", "jitter_ms", "loss_pct", "throughput_bps", "hops"} <= cles
 
 
+def test_incertitude_et_methode_dans_le_html_sans_javascript():
+    method = "DNS <Theil-Sen> & robuste"
+    page = render_html_report(_doc([_segment("A", "B", clock_ci_ms=8.0, clock_samples=60, clock_method=method)]))
+    static = page.split("<noscript>")[1].split("</noscript>")[0]
+    assert "IC95%" in static and "8,000 ms" in static
+    assert "Echantillons d&#x27;horloge" in static and "<td>60</td>" in static
+    assert "DNS &lt;Theil-Sen&gt; &amp; robuste" in static
+    assert "latence non mesurable" in static
+    assert "<td>4,000 ms</td>" not in static and "<td>4,500 ms</td>" not in static
+    assert "10,00 %" in static  # les pertes restent exploitables
+
+
+def test_incertitude_et_methode_dans_le_vrai_script_html():
+    method = "DNS <Theil-Sen> & robuste"
+    page = render_html_report(_doc([_segment("A", "B", clock_ci_ms=8.0, clock_samples=60, clock_method=method)]))
+    tree, (state,) = _rendre(page, [{"type": "survol", "index": 0}])
+    assert "latence non mesurable" in _chemin(tree)[1][1]
+    assert "IC95%" in state["detail"] and "8,000 ms" in state["detail"]
+    assert "Echantillons d'horloge60" in state["detail"]
+    assert method in state["detail"]
+    assert "Delai moyen4,000 ms" not in state["detail"]
+    assert "Delai P954,500 ms" not in state["detail"]
+    assert "Taux de perte10,00 %" in state["detail"]
+
+
+def test_json_marque_la_latence_incertaine_sans_effacer_les_autres_mesures():
+    from netcross_core.clock_sync import EstimationHorloge
+
+    report = Report(points=["A", "B"], pairs=[("A", "B")])
+    report.latency[("A", "B")] = [4.0]
+    report.loss_count["B"] = 1
+    report.seen_count["B"] = 10
+    report.clock_offset_estimate[("A", "B")] = EstimationHorloge(decalage_ms=0.0, ic_decalage_ms=8.0)
+    (segment,) = build_json_report_document(report, findings=[])["path_metrics"]
+    assert segment["latency_measurable"] is False
+    assert segment["measured"] is True
+    assert segment["delay_avg_ms"] == 4.0  # observation brute conservée pour audit
+    assert segment["loss_pct"] == 10.0
+
+
 # -- rendu headless du JavaScript -----------------------------------------------------------------
 
 

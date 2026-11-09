@@ -62,6 +62,7 @@ from pathlib import Path
 from netcross_core.i18n import N_, _, active_language
 from netcross_core.logging_config import get_logger
 from netcross_report.evidence_frames import CATEGORY_PROTOCOLS, GENERIC_PROTOCOL, finding_protocol
+from netcross_report.path_metrics import latency_is_measurable
 
 logger = get_logger(__name__)
 
@@ -101,6 +102,9 @@ _SEGMENT_FIELDS = (
     {"cle": "hop_outliers", "libelle": N_("Ecarts de sauts")},
     {"cle": "clock_offset_ms", "libelle": N_("Decalage d'horloge"), "unite": "ms", "decimales": 3},
     {"cle": "clock_drift_ppm", "libelle": N_("Derive d'horloge"), "unite": "ppm", "decimales": 2},
+    {"cle": "clock_ci_ms", "libelle": N_("IC95% (horloge)"), "unite": "ms", "decimales": 3},
+    {"cle": "clock_samples", "libelle": N_("Echantillons d'horloge")},
+    {"cle": "clock_method", "libelle": N_("Methode d'horloge")},
 )
 
 _CSS = """
@@ -137,8 +141,10 @@ th { background: #f9fafb; font-weight: 600; color: #374151; }
 .chemin .segment.non-mesurable { border-style: dashed; border-color: #6b7280; color: #374151; }
 .detail-segment { margin-top: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; padding: .85rem 1rem; }
 .detail-segment h3 { font-size: 1rem; margin: 0 0 .5rem; }
-.detail-segment dl { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1.25rem; margin: 0; }
-.detail-segment dt { color: #4b5563; } .detail-segment dd { margin: 0; font-variant-numeric: tabular-nums; }
+.detail-segment dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: .2rem 1.25rem; margin: 0; }
+.detail-segment dt { color: #4b5563; }
+.detail-segment dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.table-chemin, .table-defilante { overflow-x: auto; }
 .sip-perdu { background: #fee2e2; color: #7f1d1d; font-weight: 600; }
 .sip-reecrit { background: #ffedd5; color: #7c2d12; }
 .sip-retransmis { background: #fef9c3; color: #713f12; }
@@ -236,9 +242,15 @@ _JS = """
 
   // -- Vue chemin (issue #1075) --
   function fixe(v, n) { return Number(v).toFixed(n).replace(".", L.decimal); }
+  function latenceMesurable(seg) {
+    var v = seg.delay_avg_ms, ci = seg.clock_ci_ms;
+    return seg.latency_measurable !== false && v !== null && v !== undefined && Number.isFinite(v)
+      && (ci === null || ci === undefined || (Number.isFinite(ci) && ci >= 0 && ci <= Math.abs(v)));
+  }
   function valeur(seg, champ) {
     var v = seg[champ.cle];
     if (v === null || v === undefined) { return L.not_measured; }
+    if (champ.cle.indexOf("delay_") === 0 && !latenceMesurable(seg)) { return L.latency_not_measurable; }
     if (champ.format === "debit") {
       if (v >= 1e6) { return fixe(v / 1e6, 2) + " Mbit/s"; }
       return fixe(v / 1e3, 1) + " kbit/s";
@@ -250,7 +262,7 @@ _JS = """
     if (!seg.measured) { return L.not_measurable; }
     var morceaux = [];
     if (seg.delay_avg_ms !== null && seg.delay_avg_ms !== undefined) {
-      morceaux.push(fixe(seg.delay_avg_ms, 2) + " ms");
+      morceaux.push(latenceMesurable(seg) ? fixe(seg.delay_avg_ms, 2) + " ms" : L.latency_not_measurable);
     }
     if (seg.loss_pct !== null && seg.loss_pct !== undefined) {
       morceaux.push(fixe(seg.loss_pct, 1) + " % " + L.losses);
@@ -276,6 +288,9 @@ _JS = """
       detail.appendChild(el("h3", null, L.segment + " " + seg.segment + " : "
         + (seg.measured ? L.measured : L.not_measurable)));
       if (!seg.measured) { detail.appendChild(el("p", null, L.not_measurable_help)); }
+      if (seg.delay_avg_ms !== null && seg.delay_avg_ms !== undefined && !latenceMesurable(seg)) {
+        detail.appendChild(el("p", null, L.latency_not_measurable + " : " + L.clock_uncertainty));
+      }
       var dl = detail.appendChild(el("dl"));
       L.segment_fields.forEach(function (champ) {
         dl.appendChild(el("dt", null, champ.libelle));
@@ -520,7 +535,10 @@ _JS = """
     boutonsPreuve.forEach(function (b) { b.setAttribute("aria-pressed", b === bouton ? "true" : "false"); });
     if (!p || !p.found) { panneauPreuve.appendChild(el("p", {"class": "vide"}, L.evidence_not_found)); return; }
     panneauPreuve.appendChild(el("p", null, p.summary));
-    var t = panneauPreuve.appendChild(el("table", {"class": "diagramme-preuve"}));
+    var zonePreuve = panneauPreuve.appendChild(el("div", {
+      "class": "table-defilante", "role": "region", "aria-label": L.evidence_caption, "tabindex": "0"
+    }));
+    var t = zonePreuve.appendChild(el("table", {"class": "diagramme-preuve"}));
     t.appendChild(el("caption", null, L.evidence_caption));
     var tr = el("tr");
     tr.appendChild(el("th", {"scope": "col"}, L.evidence_frame));
@@ -540,7 +558,12 @@ _JS = """
       p.transits.forEach(function (tr2) {
         dl.appendChild(el("dt", null, L.transit + " " + tr2.segment));
         var brut = tr2.corrected ? "" : " (" + L.transit_raw + ")";
-        dl.appendChild(el("dd", null, fixe(tr2.transit_ms, 3) + " ms" + brut));
+        var transit = tr2.latency_measurable === false
+          ? L.latency_not_measurable : fixe(tr2.transit_ms, 3) + " ms" + brut;
+        if (tr2.clock_ci_ms !== null && tr2.clock_ci_ms !== undefined) {
+          transit += " (" + L.clock_ci + " " + fixe(tr2.clock_ci_ms, 3) + " ms)";
+        }
+        dl.appendChild(el("dd", null, transit));
       });
     }
   }
@@ -608,7 +631,10 @@ _JS = """
     tc.childNodes[tc.childNodes.length - 1].childNodes.forEach(function (ligne) { lignesConstats.push(ligne); });
     filtrer();
   }
-  constats.appendChild(tc);
+  var zoneConstats = constats.appendChild(el("div", {
+    "class": "table-defilante", "role": "region", "aria-label": L.findings_caption, "tabindex": "0"
+  }));
+  zoneConstats.appendChild(tc);
   if (boutonsPreuve.length) {
     panneauPreuve.appendChild(el("p", {"class": "vide"}, L.evidence_hint));
     constats.appendChild(panneauPreuve);
@@ -646,6 +672,9 @@ def _labels() -> dict:
         "path_caption": _("Metriques par segment, dans l'ordre du chemin"),
         "measured": _("mesure"),
         "not_measurable": _("non mesurable"),
+        "latency_not_measurable": _("latence non mesurable"),
+        "clock_uncertainty": _("incertitude d'horloge superieure a la latence ou invalide"),
+        "clock_ci": _("IC95%"),
         "not_measurable_help": _(
             "Aucun paquet correle ni aucune perte observee sur ce segment : ses valeurs sont inconnues, pas nulles."
         ),
@@ -759,7 +788,10 @@ def _static_table(caption: str, headers: list[str], rows: list[list[str]], empty
     entetes = "".join(f'<th scope="col">{_e(h)}</th>' for h in headers)
     corps = "".join("<tr>" + "".join(f"<td>{c}</td>" for c in r) + "</tr>" for r in rows)
     logger.debug("_static_table: retour tableau")
-    return f"<table><caption>{_e(caption)}</caption><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table>"
+    return (
+        f'<div class="table-defilante" role="region" aria-label="{_e(caption)}" tabindex="0">'
+        f"<table><caption>{_e(caption)}</caption><thead><tr>{entetes}</tr></thead><tbody>{corps}</tbody></table></div>"
+    )
 
 
 def _static_value(seg: dict, champ: dict, labels: dict) -> str:
@@ -769,6 +801,12 @@ def _static_value(seg: dict, champ: dict, labels: dict) -> str:
     if v is None:
         logger.debug("_static_value: si valeur inconnue -> retour libelle non mesure")
         return labels["not_measured"]
+    if champ["cle"].startswith("delay_") and (
+        seg.get("latency_measurable") is False
+        or not latency_is_measurable(seg.get("delay_avg_ms", v), seg.get("clock_ci_ms"))
+    ):
+        logger.debug("_static_value: latence non mesurable")
+        return labels["latency_not_measurable"]
     if champ.get("format") == "debit":
         texte = f"{v / 1e6:.2f} Mbit/s" if v >= 1e6 else f"{v / 1e3:.1f} kbit/s"
         logger.debug("_static_value: si debit -> retour {}", texte)
@@ -799,7 +837,11 @@ def _static_path(doc: dict, labels: dict) -> str:
         labels["no_path"],
     )
     logger.debug("_static_path: retour ({} segment(s))", len(segments))
-    return f"<h2>{_e(labels['path'])}</h2>{tableau}"
+    return (
+        f"<h2>{_e(labels['path'])}</h2>"
+        f'<div class="table-chemin" role="region" aria-label="{_e(labels["path_caption"])}" tabindex="0">'
+        f"{tableau}</div>"
+    )
 
 
 _SIP_FIELD_NAMES = {"sdp": "SDP", "via": "Via", "contact": "Contact"}
@@ -1044,8 +1086,20 @@ def _static_evidence(doc: dict, labels: dict) -> str:
             for r in p["rows"]
         ]
         transits = "".join(
-            f"<li>{_e(labels['transit'])} {_e(t['segment'])} : {_ms(t['transit_ms'], labels)} ms"
-            f"{'' if t['corrected'] else ' (' + _e(labels['transit_raw']) + ')'}</li>"
+            f"<li>{_e(labels['transit'])} {_e(t['segment'])} : "
+            + (
+                _e(labels["latency_not_measurable"])
+                if t.get("latency_measurable") is False
+                else _ms(t["transit_ms"], labels)
+                + " ms"
+                + ("" if t["corrected"] else " (" + _e(labels["transit_raw"]) + ")")
+            )
+            + (
+                f" ({_e(labels['clock_ci'])} {_ms(t['clock_ci_ms'], labels)} ms)"
+                if t.get("clock_ci_ms") is not None
+                else ""
+            )
+            + "</li>"
             for t in p["transits"]
         )
         blocs.append(

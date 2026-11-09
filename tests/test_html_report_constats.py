@@ -61,10 +61,10 @@ def _findings():
     ]
 
 
-def _doc(flows=True, decalage=True):
+def _doc(flows=True, decalage=True, ci_ms=0.0):
     r = Report(points=list(POINTS))
     if decalage:
-        r.clock_offset_estimate = {("A", "B"): EstimationHorloge(decalage_ms=DECALAGE_B * 1000.0)}
+        r.clock_offset_estimate = {("A", "B"): EstimationHorloge(decalage_ms=DECALAGE_B * 1000.0, ic_decalage_ms=ci_ms)}
     return build_json_report_document(r, title="T", findings=_findings(), packet_flows=_flows() if flows else None)
 
 
@@ -116,6 +116,23 @@ def test_transit_corrige_du_decalage():
     assert not brut["corrected"] and brut["transit_ms"] == 7.0
 
 
+@avec_node
+def test_transit_incertain_auditable_mais_non_mesurable_dans_les_deux_rendus():
+    doc = _doc(ci_ms=8.0)
+    transit = doc["evidence_frames"][0]["transits"][0]
+    assert transit["clock_ci_ms"] == 8.0
+    assert transit["latency_measurable"] is False
+    assert transit["raw_ms"] == 7.0 and transit["transit_ms"] == 2.0
+    page = render_html_report(doc)
+    static = page.split("<noscript>")[1].split("</noscript>")[0]
+    assert "Transit A -&gt; B : latence non mesurable (IC95% 8,000 ms)" in static
+    assert "Transit A -&gt; B : 2,000 ms" not in static
+    _, (state,) = _rendre(page, [{"type": "clic", "attr": "data-preuve", "valeur": "A#3"}])
+    assert "Transit A -> Blatence non mesurable (IC95% 8,000 ms)" in state["preuve"]
+    assert "Transit A -> B2,000 ms" not in state["preuve"]
+    assert "Transit B -> C-3,000 ms (non corrige" in state["preuve"]
+
+
 def test_preuve_de_segment_et_preuve_introuvable():
     preuves = {p["ref"]: p for p in _doc()["evidence_frames"]}
     seg = preuves["B -> C#14"]
@@ -163,7 +180,7 @@ def test_rendu_statique_colonnes_et_diagrammes():
     assert '<a href="#preuve-B_-__C-14">B -&gt; C #14</a>' in statique
     assert "C #999" in statique and 'href="#preuve-C-999"' not in statique
     assert '<h3 id="preuve-A-3">Preuve : trame 3 au point A</h3>' in statique
-    assert "Transit A -&gt; B : 2,000 ms</li>" in statique
+    assert "Transit A -&gt; B : 2,000 ms (IC95% 0,000 ms)</li>" in statique
     assert "Transit B -&gt; C : -3,000 ms (non corrige du decalage d&#x27;horloge)" in statique
     assert "<td>non vue</td>" in statique
 
@@ -202,6 +219,20 @@ def test_menus_de_filtre():
     }
     (compteur,) = _noeuds(arbre, lambda n: n["attrs"].get("id") == "compteur-constats")
     assert compteur["text"] == "3 / 3 constat(s) affiche(s)" and compteur["attrs"]["aria-live"] == "polite"
+
+
+@avec_node
+def test_tableaux_constats_et_preuves_defilent_dans_une_region_accessible():
+    page = render_html_report(_doc())
+    arbre, _ = _rendre(page, [{"type": "clic", "attr": "data-preuve", "valeur": "A#3"}])
+    regions = _noeuds(arbre, lambda n: n["attrs"].get("class") == "table-defilante")
+    assert len(regions) == 2
+    for region in regions:
+        assert region["attrs"]["role"] == "region"
+        assert region["attrs"]["tabindex"] == "0"
+        assert region["attrs"]["aria-label"]
+        assert region["children"][0]["tag"] == "table"
+    assert 'class="table-defilante" role="region"' in page.split("<noscript>")[1]
 
 
 @avec_node

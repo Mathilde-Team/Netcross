@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-235 modules · 335 classes · 856 fonctions publiques de module.
+235 modules · 335 classes · 857 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -4445,9 +4445,11 @@ classDiagram
         +int hop_outliers
         +label() str
         +measured() bool
+        +latency_measurable() bool
     }
     class mod_netcross_report_path_metrics["netcross_report.path_metrics"] {
         <<module>>
+        +latency_is_measurable(delay_ms, clock_ci_ms) bool
         +build_path_metrics(report) list~SegmentMetrics~
         +rank_path_segments(metrics) list~SegmentMetrics~
         +degradation_summary(metrics) str
