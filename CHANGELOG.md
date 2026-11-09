@@ -8,6 +8,13 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Débordement sur disque des flux longs (#1024, chantier pipeline en flux #995) : `--spill-seuil N`
+  borne en mémoire les structures de l'état par flux qui grandissent avec le nombre total de
+  conversations vues (résumé TCP par clé du détecteur de coupure, coupures déjà comptées) ; au-delà
+  du seuil, les entrées les moins récentes sont déportées dans une base SQLite temporaire, supprimée
+  en fin d'analyse, et retrouvées (promues) à la lecture — résultats identiques avec ou sans
+  débordement (mesure 10⁶ paquets : ~650 Mo en RAM contre ~10 Mo avec seuil 5 000). Voir
+  docs/debordement-flux.md.
 - État par flux avec expiration (#1023, chantier pipeline en flux #995) : `--flow-timeouts` (délais par
   protocole à la Zeek, format `TCP=3600,UDP=60,ICMP=60,AUTRE=60`) configure la table d'état de flux de
   `--streaming` — un flux inactif depuis son délai libère son état (mémoire bornée par les flux actifs),
