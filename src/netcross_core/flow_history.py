@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Historique TCP temporaire sur disque, sans rétention par flux en RAM."""
+"""Historique TCP privé sur disque, avec cache facultatif borné."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import sqlite3
 import tempfile
 import weakref
+from collections import OrderedDict
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -29,11 +30,14 @@ class FlowHistory:
 
     Les résumés et les coupures déjà comptées restent exacts même après
     une longue inactivité. Le disque croît avec les conversations, pas la
-    RAM ; aucun paquet ni contenu applicatif n'est conservé ici.
+    RAM hors cache facultatif de ``seuil`` résumés ; aucun paquet ni
+    contenu applicatif n'est conservé ici.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, seuil: int = 0) -> None:
         logger.debug("FlowHistory.__init__: entrée")
+        self._seuil = max(0, int(seuil))
+        self._cache: OrderedDict[str, str] = OrderedDict()
         repertoire = tempfile.TemporaryDirectory(prefix="netcross-flux-")
         self.path = Path(repertoire.name) / "historique.sqlite3"
         try:
@@ -63,10 +67,27 @@ class FlowHistory:
 
     def resume(self, cle: tuple) -> dict | None:
         logger.debug("FlowHistory.resume: entrée")
-        ligne = self._connexion.execute("SELECT document FROM resumes WHERE cle = ?", (json.dumps(cle),)).fetchone()
-        resultat = json.loads(ligne[0]) if ligne is not None else None
+        sk = json.dumps(cle)
+        if sk in self._cache:
+            self._cache.move_to_end(sk)
+            resultat = json.loads(self._cache[sk])
+        else:
+            ligne = self._connexion.execute("SELECT document FROM resumes WHERE cle = ?", (sk,)).fetchone()
+            resultat = json.loads(ligne[0]) if ligne is not None else None
+            if ligne is not None:
+                self._memoriser(sk, ligne[0])
         logger.debug("FlowHistory.resume: retour (présent={})", resultat is not None)
         return resultat
+
+    def _memoriser(self, cle: str, document: str) -> None:
+        """Cache de taille configurée, indépendant de la preuve sur disque."""
+        logger.debug("FlowHistory._memoriser: entrée")
+        if self._seuil:
+            self._cache[cle] = document
+            self._cache.move_to_end(cle)
+            if len(self._cache) > self._seuil:
+                self._cache.popitem(last=False)
+        logger.debug("FlowHistory._memoriser: fin")
 
     def enregistrer(
         self, cle: tuple, points: frozenset[str], paquets: dict, raison: str, statistiques: dict | None = None
@@ -76,10 +97,12 @@ class FlowHistory:
         if statistiques is not None:
             donnees["stats"] = statistiques
         document = json.dumps(donnees)
+        sk = json.dumps(cle)
         self._connexion.execute(
             "INSERT INTO resumes VALUES (?, ?) ON CONFLICT(cle) DO UPDATE SET document = excluded.document",
-            (json.dumps(cle), document),
+            (sk, document),
         )
+        self._memoriser(sk, document)
         logger.debug("FlowHistory.enregistrer: fin")
 
     def resumes(self) -> Iterator[tuple[tuple, dict]]:
@@ -106,4 +129,5 @@ class FlowHistory:
     def close(self) -> None:
         logger.debug("FlowHistory.close: entrée")
         self._finalisation()
+        self._cache.clear()
         logger.debug("FlowHistory.close: fin")

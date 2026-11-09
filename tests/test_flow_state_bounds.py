@@ -103,6 +103,7 @@ def test_echeances_identiques_ne_ferment_pas_deux_fois():
 
 
 @pytest.mark.parametrize("delai", [1.0, 60.0, 3600.0])
+@pytest.mark.parametrize("seuil", [0, 2])
 @pytest.mark.parametrize(
     ("amont", "aval"),
     [
@@ -113,7 +114,7 @@ def test_echeances_identiques_ne_ferment_pas_deux_fois():
         ([0, 1, 101], [150]),
     ],
 )
-def test_constats_identiques_avec_plusieurs_silences(amont, aval, delai):
+def test_constats_identiques_avec_plusieurs_silences(amont, aval, delai, seuil):
     facteur = delai / 60.0
     paquets = [make_pkt(point=point, ts=t * facteur) for point, temps in (("A", amont), ("B", aval)) for t in temps]
     reference = analyse(correlate(paquets), ["A", "B"], paquets, idle_timeout_seconds=delai)
@@ -121,6 +122,7 @@ def test_constats_identiques_avec_plusieurs_silences(amont, aval, delai):
         [sorted((p for p in paquets if p.point == point), key=lambda p: p.ts) for point in ("A", "B")],
         ["A", "B"],
         timeouts={"TCP": delai},
+        spill_seuil=seuil,
     )
     assert table.nat_cutoffs[("A", "B")] == reference.idle_timeout_dropped[("A", "B")]
 
@@ -143,3 +145,12 @@ def test_dix_coupures_comptent_dix_avec_cinq_exemples_seulement():
     table.finish()
     assert table.nat_cutoffs[("A", "B")] == 10
     assert len(table.cutoff_examples[("A", "B")]) == 5
+
+
+def test_un_seul_point_ne_garde_pas_d_historique_nat_inutile():
+    table = flow_state.FlowTable(["A"], timeouts={"TCP": 1.0}, spill_seuil=2)
+    for i in range(1000):
+        table.feed(make_pkt(point="A", ts=i * 3.0, sport=10000 + i))
+    table.finish()
+    assert table.total_records == 1000
+    assert table._history is None

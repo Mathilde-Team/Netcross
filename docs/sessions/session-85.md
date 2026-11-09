@@ -30,3 +30,12 @@ Les validations complètes finales, hooks, CI, relais vers main et
 vérifications finales restent nécessaires avant clôture. Le reste du
 pipeline #995 n'est pas déclaré borné : sa lecture entière et les autres
 composants conservent leurs limites propres.
+
+Une contribution #1024 est ensuite arrivée sur dev par la PR #1260,
+fusionnée par son auteur, et a été intégrée normalement. Son option
+`--spill-seuil` est conservée comme cache LRU facultatif ; le défaut ne
+revient pas à un historique illimité en RAM. L'historique privé reste la
+preuve exacte, et un point unique sans segment NAT n'en crée pas.
+Les tests d'équivalence, RSS million de paquets et structures génériques
+de #1024 sont conservés, sans leur attribuer une preuve multi-points
+qu'un jeu à un seul point ne fournit pas.

@@ -1363,6 +1363,7 @@ def _run_streaming(args, all_packets, points_order, r) -> None:
         sources.values(),
         points,
         timeouts=parse_flow_timeouts(getattr(args, "flow_timeouts", None)),
+        spill_seuil=getattr(args, "spill_seuil", None),
     )
     print("\n".join(table.summary_lines()))
     doc = resultat.to_dict()
@@ -1899,6 +1900,16 @@ def main():
         "au format « TCP=3600,UDP=60,ICMP=60,AUTRE=60 » (defauts a la Zeek ; AUTRE couvre les autres "
         "protocoles). Un flux inactif depuis son delai ferme son etat ; le compte des coupures "
         "NAT/pare-feu silencieuses y est incrementale. Voir docs/etat-flux.md.",
+    )
+    ap.add_argument(
+        "--spill-seuil",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Seuil de debordement sur disque de l'etat par flux de --streaming (issue #1024) : "
+        "au plus N resumes TCP sont gardes dans un cache LRU. L'historique exact reste sur disque "
+        "temporaire prive, supprime en fin d'analyse (resultats identiques). Defaut : pas de cache "
+        "Python, jamais tout l'historique en RAM. Voir docs/debordement-flux.md.",
     )
     ap.add_argument(
         "--detect-duplicates",

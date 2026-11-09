@@ -82,6 +82,11 @@ chronologique par `run_flow_table`, comme celles de la corrélation en flux.
   natif est plafonné à 1 Mio et les structures temporaires utilisent le
   disque. Le disque peut croître avec les conversations et segments,
   mais la RAM ne retient pas toutes les conversations terminées.
+- `--spill-seuil N` conserve au plus N résumés dans un cache LRU Python
+  facultatif, en plus du cache SQLite. Par défaut, ou avec zéro, aucun
+  résumé n'est gardé dans ce cache : l'historique exact reste sur disque,
+  jamais en RAM illimitée. Un point unique, sans segment NAT possible,
+  ne crée pas d'historique TCP inutile.
 - Aucun paquet ni contenu applicatif n'est enregistré dans cet
   historique. Les clés de conversation et statistiques sont sensibles :
   la base n'est pas un export, et son répertoire est supprimé à `finish()`

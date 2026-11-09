@@ -43,6 +43,8 @@ Mémoire, bornes assumées et documentées :
 - les résumés TCP et coupures déjà comptées sont sur disque temporaire
   privé (cache SQLite de 1 Mio), nettoyé en fin de traitement ou à la
   finalisation ; aucun oubli silencieux de preuve tardive ;
+- ``spill_seuil`` (#1024) borne un cache LRU facultatif de résumés ;
+  zéro n'autorise jamais un historique illimité en RAM ;
 - ``_seen`` (clés récemment fermées, pour compter ``reopened``) : au
   plus ``_SEEN_CAP`` entrées, la plus ancienne est oubliée.
 """
@@ -158,6 +160,7 @@ class FlowTable:
         self,
         points: list[str],
         timeouts: dict[str, float] | None = None,
+        spill_seuil: int | None = None,
     ) -> None:
         logger.debug("FlowTable.__init__: entrée ({} point(s))", len(points))
         if not points:
@@ -169,6 +172,9 @@ class FlowTable:
         if any(not math.isfinite(delai) or delai <= 0 for delai in self.timeouts.values()):
             logger.debug("FlowTable.__init__: délai non positif ou non fini -> ValueError")
             raise ValueError("les délais de flux doivent être strictement positifs et finis")
+        # Compatibilité #1024 : cache facultatif, jamais retour au stockage
+        # historique illimité en RAM lorsque le seuil est omis ou nul.
+        self.spill_seuil = max(0, int(spill_seuil)) if spill_seuil else 0
         self._open: OrderedDict[tuple, _EtatFlux] = OrderedDict()
         self._expiry: list[tuple[float, int, tuple]] = []
         self._expiry_seq = count()
@@ -231,7 +237,7 @@ class FlowTable:
         etat.last_ts_point[pk.point] = pk.ts
         etat.packets[pk.point] += 1
         etat.octets[pk.point] += pk.length
-        if pk.proto == "TCP":
+        if pk.proto == "TCP" and self.pairs:
             self._update_tcp_stats(etat, pk)
         self._index_expiry(key, etat, timeout)
         logger.debug("FlowTable.feed: retour None")
@@ -306,9 +312,9 @@ class FlowTable:
                 f"{key[1]}:{key[2]} -> {key[3]}:{key[4]} ({key[0]}, {sorted(points)}, "
                 f"{sum(etat.packets.values())} paquet(s), {duree:.3f} s, fermeture : {raison})"
             )
-        if key[0] == "TCP":
+        if key[0] == "TCP" and self.pairs:
             if self._history is None:
-                self._history = FlowHistory()
+                self._history = FlowHistory(seuil=self.spill_seuil)
             document = self._history.resume(key)
             precedent = (
                 _ResumeTcp(frozenset(document["points"]), document["packets"], document["raison"])
@@ -338,7 +344,11 @@ class FlowTable:
         logger.debug("FlowTable._close: retour None")
 
     def finish(self) -> None:
-        """Ferme les états restants (raison ``fin``) ; idempotent."""
+        """Ferme les états restants (raison ``fin``) ; idempotent.
+
+        Le fichier temporaire du débordement (#1024) est supprimé ici :
+        en fin d'analyse, plus rien ne doit subsister sur disque.
+        """
         logger.debug("FlowTable.finish: entrée")
         if self._finished:
             logger.debug("FlowTable.finish: déjà terminé -> retour")
@@ -433,13 +443,14 @@ def run_flow_table(
     sources: Iterable[Iterable[Pkt]],
     points: list[str],
     timeouts: dict[str, float] | None = None,
+    spill_seuil: int | None = None,
 ) -> FlowTable:
     """Alimente une table de flux depuis des suites par point fusionnées
     en k voies (``streaming.merge_points``), puis la ferme."""
     logger.debug("run_flow_table: entrée ({} point(s))", len(points))
     from netcross_core.streaming import merge_points
 
-    table = FlowTable(points, timeouts=timeouts)
+    table = FlowTable(points, timeouts=timeouts, spill_seuil=spill_seuil)
     for pk in merge_points(sources):
         table.feed(pk)
     table.finish()

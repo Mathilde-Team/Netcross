@@ -2,6 +2,7 @@
 """L'historique privé garde les preuves, puis efface ses fichiers."""
 
 import gc
+import json
 import sqlite3
 from pathlib import Path
 
@@ -10,6 +11,27 @@ import pytest
 from netcross_core import flow_history
 
 CLE = ("TCP", "192.0.2.1", 41000, "198.51.100.1", 443)
+
+
+def test_cache_lru_borne_et_copies_independantes():
+    historique = flow_history.FlowHistory(seuil=2)
+    try:
+        for i in range(3):
+            historique.enregistrer((i,), frozenset({"A"}), {"A": i}, "fin")
+        assert len(historique._cache) == 2
+        assert json.dumps((0,)) not in historique._cache
+        assert historique.resume((0,))["packets"] == {"A": 0}
+        assert json.dumps((1,)) not in historique._cache
+        copie = historique.resume((0,))
+        copie["packets"]["A"] = 999
+        assert historique.resume((0,))["packets"] == {"A": 0}
+        historique.enregistrer((0,), frozenset({"A"}), {"A": 4}, "fin")
+        assert historique.resume((0,))["packets"] == {"A": 4}
+        assert historique.resume(("absente",)) is None
+        assert len(list(historique.resumes())) == 3
+    finally:
+        historique.close()
+    assert historique._cache == {}
 
 
 def test_resume_remplacement_coupures_et_nettoyage():
