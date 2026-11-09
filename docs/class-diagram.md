@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-238 modules · 338 classes · 863 fonctions publiques de module.
+239 modules · 341 classes · 864 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -584,6 +584,7 @@ classDiagram
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
 | `netcross_core.sip_ladder` | diagramme d'echelle SIP multi-points (issue #1125, sous-issue 4/6 du chantier VoIP #1004). |
+| `netcross_core.spill` | debordement sur disque (SQLite) des structures de l'etat par flux (issue #1024, sous-issue 5/6 du chantier #995). |
 | `netcross_core.stats` | Exploration statistique interactive (Job 27 / issue #22, section 6.8). |
 | `netcross_core.streaming` | correlation des points en flux, par fenetre glissante (issue #1022, sous-issue 3/6 du chantier #995). |
 | `netcross_core.tls_diagnostics` | extrait l'etat des handshakes TLS (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de capture et localise le segment ou un handshake qui reussissait en amont se met a echouer. |
@@ -1223,7 +1224,7 @@ classDiagram
     class mod_netcross_core_flow_state["netcross_core.flow_state"] {
         <<module>>
         +parse_flow_timeouts(spec) dict~str, float~
-        +run_flow_table(sources, points, timeouts) FlowTable
+        +run_flow_table(sources, points, timeouts, spill_seuil) FlowTable
     }
 
     %% ===== netcross_core.flow_timeline =====
@@ -2203,6 +2204,32 @@ classDiagram
     class mod_netcross_core_sip_ladder["netcross_core.sip_ladder"] {
         <<module>>
         +build_sip_ladders(all_packets, points, max_calls) list~dict~
+    }
+
+    %% ===== netcross_core.spill =====
+    class SpillBackend {
+        <<__slots__>>
+        +chemin() str
+        +table(nom) None
+        +inserer(nom, lignes) None
+        +lire(nom, cle) str?
+        +supprimer(nom, cle) None
+        +close() None
+    }
+    class SpillDict {
+        <<__slots__, Generic[K, V]>>
+        +get(cle) V?
+        +put(cle, valeur) None
+        +close() None
+    }
+    class SpillSet {
+        <<__slots__, Generic[K]>>
+        +add(cle) None
+        +close() None
+    }
+    class mod_netcross_core_spill["netcross_core.spill"] {
+        <<module>>
+        +cle_json(cle) str
     }
 
     %% ===== netcross_core.stats =====
