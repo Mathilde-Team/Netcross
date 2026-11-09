@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-233 modules · 332 classes · 852 fonctions publiques de module.
+234 modules · 332 classes · 854 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -44,7 +44,7 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"62 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"51 imports"| netcross_core
+    netcross_report -->|"52 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"25 imports"| pcap_parser
 ```
@@ -4121,6 +4121,7 @@ classDiagram
 | `netcross_report.rule_engine` | premier PILOTE du moteur d'EXECUTION evoque comme premier chantier ouvert par CLAUDE.md/`Prochaine feature` depuis la Session 54 (bibliotheque de regles §6.2 complete, 41 regles) : faire evaluer une… |
 | `netcross_report.security_html` | rendu HTML du rapport de securite (issue #218, troisieme sortie apres le texte et le JSON). |
 | `netcross_report.security_report` | rapport de securite consolide et tableau de bord (CVE-5, issue #139, parent #133). |
+| `netcross_report.sequence_diagrams` | diagrammes de sequence multi-points du rapport HTML (issue #1079, sous-issue 4/6 du chantier #1000). |
 | `netcross_report.sequence_view` | diagramme de sequence multi-hotes (Job 14/issue #11, FEATURES.md section 6.5). |
 | `netcross_report.session_objects` | construction et rendu CONSOLE des objets de contrat de la Session 0 (Job 4/issue #13). |
 | `netcross_report.siem_export` | export des constats de securite pour integration SIEM : CEF (issue #170), LEEF 2.0 et STIX 2.1 (issue #279). |
@@ -4283,7 +4284,7 @@ classDiagram
     %% ===== netcross_report.json_report =====
     class mod_netcross_report_json_report["netcross_report.json_report"] {
         <<module>>
-        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows) dict
+        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows, sequence_budget_octets) dict
         +generate_json_report(r, output_path, title, kwargs) str
         +generate_json_diff(findings, baseline, current, output_path, title, meta, tls_findings_baseline, tls_findings_current, quic_findings_baseline, quic_findings_current, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, names) str
     }
@@ -4523,6 +4524,13 @@ classDiagram
         +format_security_report(sr) list~str~
         +print_security_report(sr) None
         +security_report_to_dict(sr) dict
+    }
+
+    %% ===== netcross_report.sequence_diagrams =====
+    class mod_netcross_report_sequence_diagrams["netcross_report.sequence_diagrams"] {
+        <<module>>
+        +build_sequence_diagrams(packet_flows, max_flows, budget_octets) list~dict~
+        +build_comm_map_dict(packet_flows) dict
     }
 
     %% ===== netcross_report.sequence_view =====
