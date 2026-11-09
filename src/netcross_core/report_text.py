@@ -12,6 +12,7 @@ from collections import Counter, defaultdict
 from netcross_core.dechiffrement import lignes as lignes_dechiffrement
 from netcross_core.forensic import annotations_by_tag
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.microburst import format_microburst
 from netcross_core.models import (
     SEQ_GAP_CAPTURE_DROP,
     SEQ_GAP_INDETERMINATE,
@@ -265,6 +266,12 @@ def print_report(r: Report):
             vitesse = f"{format_speed(speed)} (source : {fiche.get('speed_source')})" if speed else "inconnue"
             tick = f", horodatage au {resolution:g} s" if resolution else ""
             print(f"  {point_label} : {vitesse}{tick}")
+
+    bursts = [event for record in r.microbursts.values() for event in record["events"]]
+    if bursts:
+        print("\n-- Microrafales (indices à confirmer, fenêtres de détection) --")
+        for event in bursts:
+            print(f"  {format_microburst(event)}")
 
     couverture = lignes_dechiffrement(r)
     if couverture:

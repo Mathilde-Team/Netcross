@@ -86,6 +86,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         ("throughput",),
     ),
     Detecteur(
+        "detect_microbursts",
+        PHASE,
+        SECONDE_PASSE,
+        "médianes des tranches non vides et fenêtres glissantes par point",
+        "100 µs, 1 ms, 10 ms ; référence sur la capture entière",
+        ("microbursts",),
+        "tri et référence globale actuellement nécessaires ; ne prétend pas être un détecteur en flux",
+    ),
+    Detecteur(
         "detect_extracted_files",
         PHASE,
         FENETRE_BORNEE,

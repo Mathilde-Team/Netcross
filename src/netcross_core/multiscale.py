@@ -106,6 +106,16 @@ class SlidingWindowPeak:
         self.peak_end_ns = 0
         logger.debug("SlidingWindowPeak.__init__: {} ns", self._scale_ns)
 
+    @property
+    def current_bytes(self) -> int:
+        logger.debug("SlidingWindowPeak.current_bytes: retour {} o", self._bytes)
+        return self._bytes
+
+    @property
+    def current_packets(self) -> int:
+        logger.debug("SlidingWindowPeak.current_packets: retour {} paquet(s)", len(self._window))
+        return len(self._window)
+
     def update(self, ts_ns: int, length: int) -> None:
         """Ajoute un paquet (``ts_ns`` croissant) et met a jour la crete."""
         logger.debug("SlidingWindowPeak.update: {} ns, {} o", ts_ns, length)

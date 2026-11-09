@@ -206,7 +206,14 @@ def analyse_and_write(members: list[CaptureInventory], out_path: str, security: 
     for m in members:
         all_packets.extend(parse_capture(m.label, m.path, raise_on_error=True))
     points = [m.label for m in members]
-    report = analyse(correlate(all_packets), points, all_packets)
+    from netcross_core.link_speed import resolve_link_speeds
+
+    report = analyse(
+        correlate(all_packets),
+        points,
+        all_packets,
+        link_speeds=resolve_link_speeds([(m.label, m.path) for m in members]),
+    )
     counts: dict[str, int] = {}
     with open(out_path, "w", encoding="utf-8") as fh, contextlib.redirect_stdout(fh):
         print_report(report)
