@@ -4,7 +4,7 @@ netcross_core.expert_rules -- verifie le contrat `Rule` (calque exact sur
 le schema de la section 6.2 de FEATURES.md : id/domaine/preconditions/
 metriques requises/fenetre temporelle/seuils-percentiles/contexte requis/
 regle de correlation/severite/confiance/explication/pistes de
-verification) et le catalogue des quarante-et-une regles qu'il formalise :
+verification) et le catalogue des quarante-deux regles qu'il formalise :
 les treize "deja presentes" (Session 46) puis cinq des six "nouvelles"
 de la section 6.2 (Session 47), puis huit regles supplementaires
 (Session 49) formalisant des signaux voisins non nommes par la section
@@ -30,6 +30,7 @@ diverger silencieusement de la realite qu'il decrit.
 from netcross_core.expert_rules import _RULE_CATALOG, Rule, get_rule, list_rules
 
 _EXPECTED_IDS = (
+    "microburst",
     # Session 46 -- treize regles "deja presentes"
     "loss_per_segment",
     "tcp_retransmission_fast",
@@ -133,8 +134,8 @@ def test_rule_correlation_rule_explicite():
 # -- catalogue : structure ---------------------------------------------------
 
 
-def test_catalogue_quarante_et_une_regles():
-    assert len(_RULE_CATALOG) == 41
+def test_catalogue_quarante_deux_regles():
+    assert len(_RULE_CATALOG) == 42
 
 
 def test_catalogue_ids_uniques_et_attendus():
@@ -185,8 +186,9 @@ def test_catalogue_cinq_regles_seulement_ont_une_correlation():
     }
 
 
-def test_catalogue_domaines_couvrent_les_dix_neuf_familles_attendues():
+def test_catalogue_domaines_couvrent_les_vingt_familles_attendues():
     assert {r.domain for r in _RULE_CATALOG} == {
+        "Microrafales",
         "Pertes",
         "TCP",
         "Routage",
@@ -608,17 +610,17 @@ def test_domaines_correspondent_a_des_finding_category_reels():
 # -- tracabilite : Finding.rule_id (Session 48) --
 
 
-def test_rule_id_couvre_les_quarante_et_une_regles_et_respecte_le_domaine():
+def test_rule_id_couvre_les_quarante_deux_regles_et_respecte_le_domaine():
     """Verifie le cablage des Sessions 48 (`Finding.rule_id`), 49 (huit
     regles supplementaires), 51 (`server_processing_dominant`), 52 (cinq
     regles "HTTP"), 53 (deux regles "TLS", certificat) et 54 (deux
     regles "TLS", negociations incompletes) du point de vue du
-    CATALOGUE : construit un Report qui declenche les quarante-et-une
+    CATALOGUE : construit un Report qui declenche les quarante-deux
     signaux catalogues, puis verifie pour CHAQUE Finding produit que
     `rule_id` est soit None soit un identifiant qui resout reellement via
     `get_rule()` ET dont le `domain` correspond EXACTEMENT a
     `Finding.category` -- jamais une simple co-incidence de nommage.
-    Verifie aussi que les quarante-et-une regles sont chacune utilisee au
+    Verifie aussi que les quarante-deux regles sont chacune utilisee au
     moins une fois (aucune regle du catalogue orpheline de son cote).
     Depuis la Session 54, "negociations TLS incompletes" (§6.2) est
     elle-meme cataloguee -- plus aucun signal nomme par la section 6.2
@@ -686,6 +688,24 @@ def test_rule_id_couvre_les_quarante_et_une_regles_et_respecte_le_domaine():
     r.tls_handshake_no_reply["A"] = 1
     r.tls_handshake_incomplete["A"] = 1
 
+    # #1135 : étendre la fixture exhaustive, sans retirer la vérification
+    # d'égalité stricte avec toutes les règles du catalogue.
+    r.microbursts = {
+        "A": {
+            "events": [
+                {
+                    "point": "A",
+                    "start": 0.05,
+                    "duration_s": 0.002,
+                    "peak_bps": 10**9,
+                    "utilisation_pct": 100.0,
+                    "peak_median_ratio": 10.0,
+                    "packets": 250,
+                    "top_senders": [{"src": "10.0.0.1", "share_pct": 100.0}],
+                }
+            ]
+        }
+    }
     used_rule_ids = set()
     for f in build_findings(r):
         if f.rule_id is None:

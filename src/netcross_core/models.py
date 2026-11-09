@@ -752,11 +752,15 @@ class Report:
     # porte aucune metadonnee (cas le plus frequent).
     capture_infos: list[dict] = field(default_factory=list)
     # -- Vitesse de lien et resolution d'horodatage par point (issue
-    # #1132) -- remplie par l'appelant via
+    # #1132) -- transmise à analyse() par l'appelant via
     # netcross_core.link_speed.resolve_link_speeds(captures, overrides) :
     # point -> {speed_bps, speed_source ("if_speed", "--link-speed" ou
-    # None), ts_resolution (s), interfaces}. Vide hors CLI.
+    # None), ts_resolution (s), interfaces}. Vide si l'appelant ne fournit
+    # pas ces métadonnées ; la CLI les résout avant les détecteurs (#1135).
     link_speeds: dict[str, dict] = field(default_factory=dict)
+    # #1135 : événements et échelles refusées par point ; analyse automatique,
+    # médiane des tranches non vides et seuil relatif si vitesse inconnue.
+    microbursts: dict[str, dict] = field(default_factory=dict)
     # -- Couverture du dechiffrement TLS/QUIC (issue #1043) -- dechiffrement
     # est rempli par analyse() (netcross_core.dechiffrement.compter_sessions) :
     # point -> {"tls"/"quic": {"sessions", "dechiffrees"}}. points_keylog est

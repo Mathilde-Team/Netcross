@@ -185,7 +185,14 @@ def analyser_incident(
         for fichier in manifeste.fichiers:
             detections.extend(scanner(fichier.point, fichier.segment))
     flux = correlate(paquets)
-    rapport = analyse(flux, tuple(points), paquets)
+    from netcross_core.link_speed import resolve_link_speeds
+
+    rapport = analyse(
+        flux,
+        tuple(points),
+        paquets,
+        link_speeds=resolve_link_speeds([(f.point, f.segment) for f in manifeste.fichiers]),
+    )
     apply_security_findings(rapport, paquets, detections=detections)
 
     # 2. Score/level du tableau de bord (injecté — netcross_report).
