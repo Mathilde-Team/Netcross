@@ -19,6 +19,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   `python3 -m netcross_probe` (`capture`, `fenetre`). La sécurité mTLS (#1101),
   les métadonnées pertes/horloge (#1103) et le collecteur (#1105) viendront se
   brancher sur `AgentProbe`. Voir docs/probe-agent.md.
+- Image CI préconstruite effectivement utilisée (#968) : les cinq jobs en
+  conteneur chargent `ghcr.io/mathilde-team/netcross-ci:26.04` avec lecture
+  seule du registre ; les installations apt ne tournent que si un paquet
+  requis manque. Node.js est inclus et contrôlé dans l'image.
 - Orchestration automatique de la chaîne d'incident (#1001) : `netcross_core.incident_chain.ChaineIncidents`,
   branchée sur `LiveDiffEngine(gel=chaine)` à la place du `GelManager` nu, enchaîne à chaque alarme le gel
   rétroactif (#1087), l'attente effective de la fin de fenêtre (calculée depuis l'horodatage du dernier paquet vu,
