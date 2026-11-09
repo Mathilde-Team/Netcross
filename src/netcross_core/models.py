@@ -773,6 +773,11 @@ class Report:
     # -- Integrite/qualite de capture (Job 43/issue #163) -- voir
     # netcross_core.forensic.validate_checksums().
     checksum_errors: list[ChecksumError] = field(default_factory=list)
+    # Issue #1068 : uniquement renseigné après activation/simulation explicite.
+    active_confirmation: dict | None = None
+    # Clés réellement en perte au point aval, collectées par le détecteur ;
+    # pas de rattachement heuristique à tous les flux d'un segment.
+    active_flow_evidence: dict[tuple[str, str], list[tuple]] = field(default_factory=lambda: defaultdict(list))
 
 
 @dataclass(slots=True)

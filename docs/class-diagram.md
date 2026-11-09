@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-235 modules · 335 classes · 857 fonctions publiques de module.
+237 modules · 335 classes · 861 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -32,19 +32,19 @@ flowchart TD
     netcross_ai["netcross_ai"]
     netcross_core["netcross_core"]
     pcap_parser["pcap_parser"]
-    CLI -->|"26 imports"| netcross_report
+    CLI -->|"27 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"60 imports"| netcross_core
+    CLI -->|"61 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"34 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
     netcross_gtk4 -->|"120 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
-    netcross_api -->|"23 imports"| netcross_report
+    netcross_api -->|"24 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"62 imports"| netcross_core
+    netcross_api -->|"63 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"52 imports"| netcross_core
+    netcross_report -->|"58 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"25 imports"| pcap_parser
 ```
@@ -639,7 +639,7 @@ classDiagram
     %% ===== netcross_core.analysis =====
     class mod_netcross_core_analysis["netcross_core.analysis"] {
         <<module>>
-        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds)
+        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds, collect_active_evidence)
     }
 
     %% ===== netcross_core.annotations =====
@@ -1926,6 +1926,8 @@ classDiagram
         +dict~str, dict~str, dict~str, int~~~ dechiffrement
         +list~str~ points_keylog
         +list~ChecksumError~ checksum_errors
+        +dict? active_confirmation
+        +dict~tuple~str, str~, list~tuple~~ active_flow_evidence
     }
     class PacketAnnotation {
         <<dataclass, slots>>
@@ -2358,6 +2360,7 @@ classDiagram
 | Module | Rôle |
 |---|---|
 | `netcross_core.active` | confirmation active du diagnostic passif (chantier #999, parent #993). |
+| `netcross_core.active.confirmation` | Exécution bornée et exclusivement explicite des propositions (#1068). |
 | `netcross_core.active.paris_traceroute` | Traceroute Paris optionnel via Scamper, sans émission à l'import (#1065). |
 | `netcross_core.active.planner` | planificateur « constat localise -> mesure active proposee » (issue #1063, sous-issue 1/5 du chantier #999). |
 | `netcross_core.active.twamp` | client TWAMP-Light (RFC 5357, annexe I ; issue #1066, sous-issue 3/5 du chantier #999). |
@@ -2367,6 +2370,12 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_core.active.confirmation =====
+    class mod_netcross_core_active_confirmation["netcross_core.active.confirmation"] {
+        <<module>>
+        +confirmer(events, enabled, dry_run) dict
+    }
 
     %% ===== netcross_core.active.paris_traceroute =====
     class ParisError {
@@ -2392,6 +2401,7 @@ classDiagram
     }
     class mod_netcross_core_active_paris_traceroute["netcross_core.active.paris_traceroute"] {
         <<module>>
+        +commande(flux, parametres) list~str~
         +mesurer(flux, parametres, binaire) ResultatParis
         +mesurer_proposition(proposition, kwargs) ResultatParis
     }
@@ -4135,6 +4145,7 @@ classDiagram
 | Module | Rôle |
 |---|---|
 | `netcross_report` | synthese, triage, et generation de rapports (PDF, JSON) a partir d'un Report netcross_core. |
+| `netcross_report.active_confirmation` | Raccordement conservateur des constats aux mesures actives (#1068). |
 | `netcross_report.batch_runner` | Moteur du mode lot (issues #277, #872), commun à la CLI (``cross_capture_batch_cli.py``), à l'API (``POST /batches``) et à la GUI. |
 | `netcross_report.charts` | graphiques matplotlib exportes en PNG pour le PDF. |
 | `netcross_report.comm_map` | cartographie des communications observees (Job 15/issue #15, FEATURES.md section 6.6). |
@@ -4168,6 +4179,13 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_report.active_confirmation =====
+    class mod_netcross_report_active_confirmation["netcross_report.active_confirmation"] {
+        <<module>>
+        +confirmer_rapport(rapport, flows, enabled, dry_run, redact) dict
+        +lignes_confirmation(document) list~str~
+    }
 
     %% ===== netcross_report.batch_runner =====
     class BatchOptions {
@@ -4810,6 +4828,8 @@ classDiagram
         +NotifySettings? notify
         +str? names_path
         +bool split_interfaces
+        +bool confirm_active
+        +bool active_dry_run
         +bool rule_engine
         +bool expert_section
         +bool media_quality
@@ -4833,9 +4853,9 @@ classDiagram
     class mod_netcross_api_app["netcross_api.app"] {
         <<module>>
         +health() HealthResponse
-        +upload_capture(file, label, nat_tolerant, nat_window_ms, tls, quic, redact, max_packets, sample, test_net_external, parallel_workers, notify_on, notify_webhook, notify_slack, notify_email, notify_detail, names, known_destinations, known_hosts, extra_files, tls_keylog, tls_keylog_labels, split_interfaces, rule_engine, expert_section, media_quality, tshark_stats, flow_timeline, flow_timeline_window, bucket_ms, rtp_clock_rate, idle_timeout_seconds, detect_duplicates, exclude_duplicates, duplicate_threshold_ms, history, history_label, plugins, wait, _auth) JSONResponse
+        +upload_capture(file, label, nat_tolerant, nat_window_ms, tls, quic, redact, max_packets, sample, test_net_external, parallel_workers, notify_on, notify_webhook, notify_slack, notify_email, notify_detail, names, known_destinations, known_hosts, extra_files, tls_keylog, tls_keylog_labels, split_interfaces, confirm_active, active_dry_run, rule_engine, expert_section, media_quality, tshark_stats, flow_timeline, flow_timeline_window, bucket_ms, rtp_clock_rate, idle_timeout_seconds, detect_duplicates, exclude_duplicates, duplicate_threshold_ms, history, history_label, plugins, wait, _auth) JSONResponse
         +segment_losses(report) list~SegmentLoss~
-        +upload_multi_capture(files, labels, points_order, nat_tolerant, nat_window_ms, tls, quic, redact, max_packets, sample, test_net_external, parallel_workers, notify_on, notify_webhook, notify_slack, notify_email, notify_detail, names, known_destinations, known_hosts, tls_keylog, tls_keylog_labels, split_interfaces, rule_engine, expert_section, media_quality, tshark_stats, flow_timeline, flow_timeline_window, bucket_ms, rtp_clock_rate, idle_timeout_seconds, detect_duplicates, exclude_duplicates, duplicate_threshold_ms, history, history_label, plugins, wait, _auth) JSONResponse
+        +upload_multi_capture(files, labels, points_order, nat_tolerant, nat_window_ms, tls, quic, redact, max_packets, sample, test_net_external, parallel_workers, notify_on, notify_webhook, notify_slack, notify_email, notify_detail, names, known_destinations, known_hosts, tls_keylog, tls_keylog_labels, split_interfaces, confirm_active, active_dry_run, rule_engine, expert_section, media_quality, tshark_stats, flow_timeline, flow_timeline_window, bucket_ms, rtp_clock_rate, idle_timeout_seconds, detect_duplicates, exclude_duplicates, duplicate_threshold_ms, history, history_label, plugins, wait, _auth) JSONResponse
         +get_analysis(analysis_id, _auth) JSONResponse
         +get_analysis_report(analysis_id, _auth) JSONResponse
         +get_security_report(analysis_id, _auth) SecurityReport

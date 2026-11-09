@@ -71,6 +71,8 @@ def test_options_par_defaut_enregistrees():
         "known_hosts": None,
         "names_path": None,
         "rule_engine": False,
+        "confirm_active": False,
+        "active_dry_run": False,
         "expert_section": False,
         "media_quality": False,
         "tshark_stats": False,
