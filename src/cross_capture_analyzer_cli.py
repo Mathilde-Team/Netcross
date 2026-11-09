@@ -151,6 +151,7 @@ from netcross_core import (
 )
 from netcross_core.capture_tools import split_label_dir
 from netcross_core.discovery import load_baseline_hosts
+from netcross_core.flow_state import parse_flow_timeouts, run_flow_table
 from netcross_core.flow_timeline import build_flow_timelines
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
@@ -1341,11 +1342,13 @@ def _check_extraction_args(args) -> tuple[str, ...]:
 
 
 def _run_streaming(args, all_packets, points_order, r) -> None:
-    """--streaming (issue #1022) : correlation en flux, affichee et posee
-    sur ``r.streaming`` pour --json-report."""
+    """--streaming (issues #1022 et #1023) : correlation en flux puis etat
+    par flux avec expiration, affiches et poses sur ``r.streaming`` pour
+    --json-report (cles ``streaming`` et ``streaming.flow_state``)."""
     logger.debug("_run_streaming: entrée")
+    sources = sources_by_point(all_packets)
     resultat = correlate_streaming(
-        sources_by_point(all_packets),
+        sources,
         points_order,
         window_seconds=args.streaming_window,
         nat_tolerant=args.nat_tolerant,
@@ -1353,7 +1356,17 @@ def _run_streaming(args, all_packets, points_order, r) -> None:
         exclude_duplicates=args.exclude_duplicates,
     )
     print("\n" + "\n".join(resultat.summary_lines()))
-    r.streaming = resultat.to_dict()
+    # etat par flux (#1023) : memes sources fusionnees, delais par protocole
+    points = list(points_order) if points_order else sorted(sources)
+    table = run_flow_table(
+        sources.values(),
+        points,
+        timeouts=parse_flow_timeouts(getattr(args, "flow_timeouts", None)),
+    )
+    print("\n".join(table.summary_lines()))
+    doc = resultat.to_dict()
+    doc["flow_state"] = table.to_dict()
+    r.streaming = doc
     logger.debug("_run_streaming: retour None")
 
 
@@ -1866,6 +1879,15 @@ def main():
         metavar="SECONDES",
         help=f"Largeur de la fenetre de --streaming (defaut : {DEFAULT_WINDOW_SECONDS:g} s) : au moins le "
         "transit le plus long entre deux points, plus le delai de retransmission a rattacher.",
+    )
+    ap.add_argument(
+        "--flow-timeouts",
+        default=None,
+        metavar="SPEC",
+        help="Delais d'expiration par protocole de l'etat par flux de --streaming (issue #1023), "
+        "au format « TCP=3600,UDP=60,ICMP=60,AUTRE=60 » (defauts a la Zeek ; AUTRE couvre les autres "
+        "protocoles). Un flux inactif depuis son delai ferme son etat ; le compte des coupures "
+        "NAT/pare-feu silencieuses y est incrementale. Voir docs/etat-flux.md.",
     )
     ap.add_argument(
         "--detect-duplicates",
