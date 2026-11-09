@@ -64,7 +64,7 @@ jobs:
           docker run --rm "$IMAGE:$TAG" bash -c '
             set -e
             for outil in git curl gcc sudo python3 tshark editcap capinfos pdftotext msgfmt \
-                         pkg-config Xvfb xauth dpkg-buildpackage rpmbuild; do
+                         pkg-config Xvfb xauth dpkg-buildpackage rpmbuild node; do
               command -v "$outil" >/dev/null || { echo "outil manquant : $outil"; exit 1; }
             done
             python3 -m venv --help >/dev/null

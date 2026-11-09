@@ -8,6 +8,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Image CI préconstruite effectivement utilisée (#968) : les cinq jobs en
+  conteneur chargent `ghcr.io/mathilde-team/netcross-ci:26.04` avec lecture
+  seule du registre ; les installations apt ne tournent que si un paquet
+  requis manque. Node.js est inclus et contrôlé dans l'image.
 - Route `/metrics` en direct (#1113) : authentification commune à l'API,
   formats Prometheus/OpenMetrics, dernier relevé remplacé atomiquement et
   compteurs directs sans métriques non mesurées. L'analyse finale d'une
