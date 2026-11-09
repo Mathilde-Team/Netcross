@@ -96,7 +96,7 @@ ignore = ["RUF100"]
 ban-relative-imports = "all"
 
 [tool.importlinter]
-root_packages = ["netcross_gtk4", "netcross_report", "netcross_api", "netcross_ai", "netcross_core", "pcap_parser"]
+root_packages = ["netcross_gtk4", "netcross_report", "netcross_api", "netcross_ai", "netcross_core", "netcross_probe", "pcap_parser"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -110,6 +110,7 @@ layers = [
     "netcross_report",
     "netcross_ai",
     "netcross_core",
+    "netcross_probe",
     "pcap_parser",
 ]
 
