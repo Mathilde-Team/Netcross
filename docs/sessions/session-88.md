@@ -37,3 +37,16 @@ Après correction, les 71 tests dédiés et la nouvelle suite complète passent 
 7 426 réussis, 1 ignoré existant, 111 avertissements en 249,20 secondes,
 98,08 % de couverture combinée et code de sortie zéro. Les hooks, mypy,
 MkDocs strict et actionlint avec ShellCheck sont verts avant le nouveau push.
+
+Après avancement de dev à `1f2ee59`, fusion normale de cette base dans la
+branche de travail, en préservant les contributions et les deux entrées du
+changelog. Nouvelle suite complète sous Xvfb : 7 433 réussites, un saut
+préexistant, 111 avertissements, 294,38 secondes, 98,08 % de couverture
+combinée et code zéro. Hooks, mypy sur 244 fichiers et MkDocs strict passent.
+Actionlint 1.7.12 avec ShellCheck 0.11.0 passe sur les deux workflows modifiés.
+
+L'audit actionlint de tous les workflows, plus large que ce changement,
+signale l'interpolation directe de `github.head_ref` dans `guard-main.yml:26`.
+Ce fichier est identique à la base dev et n'est pas modifié par #968.
+Le résultat global est donc un échec préexistant, pas un contrôle vert ;
+aucune règle ni vérification n'est désactivée.
