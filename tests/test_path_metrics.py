@@ -26,8 +26,43 @@ from netcross_report.path_metrics import (
     SegmentMetrics,
     build_path_metrics,
     degradation_summary,
+    latency_is_measurable,
     rank_path_segments,
 )
+
+
+@pytest.mark.parametrize(
+    ("delay", "ci", "expected"),
+    [
+        (None, None, False),
+        (4.0, None, True),
+        (4.0, 8.0, False),
+        (4.0, 4.0, True),
+        (-4.0, 4.0, True),
+        (-4.0, 5.0, False),
+        (0.0, 0.0, True),
+        (0.0, 1.0, False),
+        (4.0, -1.0, False),
+        (4.0, float("nan"), False),
+        (4.0, float("inf"), False),
+        (float("nan"), None, False),
+        (float("inf"), None, False),
+    ],
+)
+def test_validite_latence_et_bornes_incertitude(delay, ci, expected):
+    assert latency_is_measurable(delay, ci) is expected
+
+
+def test_classement_et_synthese_refusent_la_latence_incertaine():
+    uncertain = SegmentMetrics("A", "B", samples=1, delay_avg_ms=100.0, delay_p95_ms=100.0, clock_ci_ms=200.0)
+    valid = SegmentMetrics("B", "C", samples=1, delay_avg_ms=4.0, delay_p95_ms=4.0)
+    assert rank_path_segments([uncertain, valid]) == [valid, uncertain]
+    assert "delai P95" not in degradation_summary([uncertain])
+    assert "latence non mesurable" in degradation_summary([uncertain])
+    uncertain.loss_pct = 10.0
+    uncertain.loss_count = 1
+    assert rank_path_segments([uncertain, valid])[0] is uncertain
+    assert "paquet(s) perdu(s)" in degradation_summary([uncertain, valid])
 
 
 def _report(points=("A", "B", "C"), pairs=(("A", "B"), ("B", "C"))):

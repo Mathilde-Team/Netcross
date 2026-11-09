@@ -28,6 +28,7 @@ import re
 from collections import defaultdict
 
 from netcross_core.logging_config import get_logger
+from netcross_report.path_metrics import latency_is_measurable
 
 logger = get_logger(__name__)
 
@@ -149,6 +150,7 @@ def _transits(seen: dict, points: list[str], clock_offsets: dict) -> list[dict]:
         raw_ms = (seen[b].ts - ts_a) * 1000.0
         estimate = clock_offsets.get((a, b))
         corrected = estimate is not None
+        clock_ci_ms = estimate.ic_decalage_ms if estimate is not None else None
         transit = raw_ms - estimate.decalage_a(ts_a) if estimate is not None else raw_ms
         rows.append(
             {
@@ -156,6 +158,8 @@ def _transits(seen: dict, points: list[str], clock_offsets: dict) -> list[dict]:
                 "transit_ms": round(transit, 3),
                 "raw_ms": round(raw_ms, 3),
                 "corrected": corrected,
+                "clock_ci_ms": clock_ci_ms,
+                "latency_measurable": latency_is_measurable(transit, clock_ci_ms),
             }
         )
     logger.debug("_transits: retour {} segment(s)", len(rows))
