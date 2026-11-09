@@ -280,6 +280,27 @@ def collect_samples(
 # -- exposition texte (issue #1112) ------------------------------------------------------
 
 
+def collect_live_samples(snapshot: dict, run: str) -> list[Sample]:
+    """Compteurs réellement mesurés au dernier relevé direct, sans faux zéros."""
+    logger.debug("collect_live_samples: entrée")
+    points = snapshot["points"]
+    labels = _cap(list(points), DEFAULT_MAX_POINTS)
+    samples: list[Sample] = []
+    for metric, field in (
+        ("netcross_point_packets_total", "packets"),
+        ("netcross_point_retransmissions_total", "retransmissions"),
+    ):
+        totals: dict[str, float] = {}
+        for point, values in points.items():
+            label = labels[point]
+            totals[label] = totals.get(label, 0.0) + values[field]
+        samples.extend(
+            Sample(metric, (("run", run), ("point", label)), float(value)) for label, value in totals.items()
+        )
+    logger.debug("collect_live_samples: retour {} série(s)", len(samples))
+    return samples
+
+
 def _family(sample_name: str) -> MetricSpec | None:
     """Metrique du catalogue a laquelle appartient une serie (``_count`` et
     ``_sum`` d'un resume compris)."""

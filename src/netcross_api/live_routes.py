@@ -197,9 +197,12 @@ class _LiveCaptures:
 
     def __init__(self, deps: dict[str, Callable[..., Any]]) -> None:
         logger.debug("_LiveCaptures.__init__: entrée | {} dépendance(s)", len(deps))
+        from netcross_api.metrics_routes import LatestMetrics
+
         self._deps = deps
         self._lock = threading.Lock()
         self._entries: dict[str, dict[str, Any]] = {}
+        self.metrics = LatestMetrics()
         logger.debug("_LiveCaptures.__init__: fin")
 
     # -- validation ------------------------------------------------------------------
@@ -342,6 +345,7 @@ class _LiveCaptures:
                 "live_report": req.live_report.model_dump() if req.live_report is not None else None,
                 "_report_dir": tempfile.mkdtemp(prefix="netcross-live-report-") if req.live_report else None,
                 "_report_token": secrets.token_urlsafe(24) if req.live_report else None,
+                "_metrics_redact": bool(options.redact),
                 "_analyse": analyse,
                 "_on_abort": on_abort,
                 "comparison_id": comparison_id,
@@ -359,7 +363,12 @@ class _LiveCaptures:
         if entry["live_report"] is None:
             logger.debug("_LiveCaptures._start_report: si entry['live_report'] is None -> retour tuple de 2")
             return None, []
-        reporter = self._deps["make_reporter"](entry["_report_dir"], entry["live_report"]["interval"])
+        reporter = self._deps["make_reporter"](
+            entry["_report_dir"],
+            entry["live_report"]["interval"],
+            entry["capture_id"],
+            entry["_metrics_redact"],
+        )
         for point in entry["points"]:
             reporter.aggregator.register(point["name"])
 
@@ -481,6 +490,7 @@ class _LiveCaptures:
             shutil.rmtree(entry["_workdir"], ignore_errors=True)
         analyse = self._deps["get_analysis"](entry["analysis_id"]) or {}
         if analyse.get("status") == COMPLETED:
+            self.metrics.report(analyse, entry["analysis_id"])
             entry["status"] = COMPLETED
         else:
             entry["status"] = FAILED
@@ -707,13 +717,14 @@ def register(app: FastAPI, verify: Callable[..., None], deps: dict[str, Callable
     ``make_options``, ``create_pending``, ``run_job``, ``get_analysis``) et
     l'enregistreur (``start_recorder``, ``stop_recorder``)."""
     from netcross_api.bpf_routes import resolve_bpf_library
-    from netcross_core.live_report import LiveReporter, LiveReportWriter
+    from netcross_api.metrics_routes import MetricsReportWriter
+    from netcross_core.live_report import LiveReporter
     from netcross_core.parsing import parse_live
     from netcross_report.live_html import render_live_html
 
-    def make_reporter(directory: str, interval: float) -> LiveReporter:
+    def make_reporter(directory: str, interval: float, run: str, redact: bool) -> LiveReporter:
         logger.debug("register.make_reporter: retour LiveReporter(…)")
-        return LiveReporter(LiveReportWriter(directory, render_live_html, interval))
+        return LiveReporter(MetricsReportWriter(directory, render_live_html, interval, live.metrics, run, redact))
 
     deps = {
         "parse_live": parse_live,

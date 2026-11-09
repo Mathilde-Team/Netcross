@@ -75,6 +75,7 @@ La spécification OpenAPI est disponible sur :
 | `POST` | `/batches` | Lot de captures ou archive ZIP, équivalent de `cross_capture_batch_cli.py` (issue #872, voir [mode lot](batch-mode.md#api-rest-issue-872)) |
 | `GET` | `/batches/{id}` | Avancement et résultat d'un lot ; `/index` et `/reports/{name}` pour les textes |
 | `GET` | `/analyses` | Liste des analyses |
+| `GET` | `/metrics` | Dernier relevé direct ou analyse finale de capture en direct ; même clé API ; Prometheus par défaut, `?format=openmetrics` pour OpenMetrics 1.0 (#1113) |
 | `GET` | `/history` | Historique des runs (`run_type` analyse/diff, `label`, `limit`) : `netcross-history`. Base fixée par l'administrateur (`NETCROSS_HISTORY_DB`) ; 503 si non configurée (issue #874) |
 | `POST` | `/tools/merge` | Fusion (`files`, `dedup`, `format` pcapng/pcap) : `--merge`, `--merge-dedup` (issue #868) |
 | `POST` | `/tools/split` | Découpage (`file`, `split` = `time:60`, `count:N`, `size:100M`), archive zip : `--split` (issue #869) |

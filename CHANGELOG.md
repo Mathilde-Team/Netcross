@@ -8,6 +8,11 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Route `/metrics` en direct (#1113) : authentification commune à l'API,
+  formats Prometheus/OpenMetrics, dernier relevé remplacé atomiquement et
+  compteurs directs sans métriques non mesurées. L'analyse finale d'une
+  capture directe expose le catalogue complet ; cardinalité bornée et
+  anonymisation des étiquettes avec `redact`.
 - Débordement sur disque des flux longs (#1024, chantier pipeline en flux #995) : `--spill-seuil N`
   borne en mémoire les structures de l'état par flux qui grandissent avec le nombre total de
   conversations vues (résumé TCP par clé du détecteur de coupure, coupures déjà comptées) ; au-delà
