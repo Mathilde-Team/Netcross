@@ -451,6 +451,8 @@ def build_json_report_document(
     # #1121 : jambes d'un meme flux RTP a plusieurs points (NAT/SBC).
     if getattr(r, "rtp_matches", None):
         doc["rtp_matches"] = list(r.rtp_matches)
+    if getattr(r, "rtp_segments", None):
+        doc["rtp_segments"] = list(r.rtp_segments)
     if getattr(r, "voip_calls", None):
         doc["voip_calls"] = list(r.voip_calls)
         doc["voip_quality_distribution"] = dict(r.voip_quality_distribution)

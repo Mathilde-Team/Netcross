@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-242 modules · 345 classes · 867 fonctions publiques de module.
+243 modules · 345 classes · 868 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -46,7 +46,7 @@ flowchart TD
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"58 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"25 imports"| pcap_parser
+    netcross_core -->|"26 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -584,6 +584,7 @@ classDiagram
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
+| `netcross_core.rtp_segments` | Qualité de transport entre jambes RTP appariées, sans lire le contenu. |
 | `netcross_core.seconde_passe` | seconde passe ciblée du mode en flux (issue #1025, sous-issue 6/6 du chantier #995 : pipeline en flux à empreinte mémoire bornée). |
 | `netcross_core.sip_ladder` | diagramme d'echelle SIP multi-points (issue #1125, sous-issue 4/6 du chantier VoIP #1004). |
 | `netcross_core.spill` | debordement sur disque (SQLite) des structures de l'etat par flux (issue #1024, sous-issue 5/6 du chantier #995). |
@@ -1891,6 +1892,7 @@ classDiagram
         +dict~tuple~str, str~, int~ encap_frag_correlated
         +list~dict~ rtp_streams
         +list~dict~ rtp_matches
+        +list~dict~ rtp_segments
         +list~dict~ voip_calls
         +dict~str, int~ voip_quality_distribution
         +dict~str, list~float~~ server_think_time
@@ -2210,6 +2212,12 @@ classDiagram
     class mod_netcross_core_rtp_match["netcross_core.rtp_match"] {
         <<module>>
         +match_rtp_streams(all_packets, points, window_seconds) list~dict~
+    }
+
+    %% ===== netcross_core.rtp_segments =====
+    class mod_netcross_core_rtp_segments["netcross_core.rtp_segments"] {
+        <<module>>
+        +analyse_rtp_segments(packets, matches, estimates, ordered, clock_rate)
     }
 
     %% ===== netcross_core.seconde_passe =====
