@@ -87,6 +87,7 @@ def analyse(
     duplicate_counts=None,
     clock_offsets=None,
     link_speeds=None,
+    collect_active_evidence=False,
 ):
     # Job 41/issue #161 : exclude_duplicates (defaut False -> comportement
     # historique inchange) retire de `flows` ET de `all_packets` les paquets
@@ -270,6 +271,8 @@ def analyse(
                     if prev_point not in per_point:
                         continue
                     r.loss_count[p] += 1
+                    if collect_active_evidence:
+                        r.active_flow_evidence[("loss_per_segment", p)].append(key)
                     nearest_j = max(j for j in range(idx) if points[j] in per_point)
                     a_point = points[nearest_j]
                     ts_a = min(pkt.ts for pkt in per_point[a_point])

@@ -4009,6 +4009,16 @@ components:
           description: 'true : séparer les interfaces d''un pcapng multi-interfaces
             (équiv. --split-interfaces)'
           default: false
+        confirm_active:
+          type: boolean
+          title: Confirm Active
+          description: Autorise explicitement les sondes actives (8 mesures maximum)
+          default: false
+        active_dry_run:
+          type: boolean
+          title: Active Dry Run
+          description: Simulation des commandes sans émission ; prioritaire sur confirm_active
+          default: false
         rule_engine:
           type: boolean
           title: Rule Engine
@@ -4250,6 +4260,16 @@ components:
           title: Split Interfaces
           description: 'true : séparer les interfaces d''un pcapng multi-interfaces
             (équiv. --split-interfaces)'
+          default: false
+        confirm_active:
+          type: boolean
+          title: Confirm Active
+          description: Autorise explicitement les sondes actives (8 mesures maximum)
+          default: false
+        active_dry_run:
+          type: boolean
+          title: Active Dry Run
+          description: Simulation des commandes sans émission ; prioritaire sur confirm_active
           default: false
         rule_engine:
           type: boolean

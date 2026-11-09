@@ -350,6 +350,7 @@ def build_json_report_document(
         "title": title,
         "generated_at": _now_iso(),
         "points": list(r.points),
+        "active_confirmation": getattr(r, "active_confirmation", None),
         "pairs": [list(p) for p in r.pairs],
         # Issue #996 : estimation d'horloge par paire -- decalage a t0,
         # derive (ppm), intervalles 95 %, echantillons et methode ; les
