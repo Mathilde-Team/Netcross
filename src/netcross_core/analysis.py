@@ -288,7 +288,11 @@ def analyse(
                 # t0 PLUS derive x duree ecoulee -- pas une constante.
                 estimation = r.clock_offset_estimate.get((a, b))
                 if estimation is not None:
-                    lat_ms -= estimation.decalage_a(pkt_a.ts)
+                    # La paire de points reste ordonnée a -> b, même pour
+                    # un paquet retour b -> a. Après correction d'horloge,
+                    # son temps de transit est positif dans les deux sens.
+                    # Sans estimation, conserver le delta signé pour l'audit.
+                    lat_ms = abs(lat_ms - estimation.decalage_a(pkt_a.ts))
                 r.latency[(a, b)].append(lat_ms)
                 r.latency_by_bucket[(a, b)][int(pkt_a.ts // bucket_seconds)].append(lat_ms)
 
@@ -1691,7 +1695,9 @@ def _analyse_rtp(r: Report, all_packets, points, points_order, clock_rate):
                 if offset_info is not None:
                     # #996 : correction au temps du premier paquet du flux,
                     # pas une constante -- la derive est integree.
-                    delay_ms -= offset_info.decalage_a(t_a)
+                    # Le flux RTP peut parcourir les points dans le sens
+                    # retour : ne pas produire de délai physique négatif.
+                    delay_ms = abs(delay_ms - offset_info.decalage_a(t_a))
 
         r_factor = mos = None
         ref_point = points[-1] if points_order and points[-1] in loss_pct else None
