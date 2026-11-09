@@ -13,6 +13,11 @@ Ce module isole l'estimateur (zero dependance : ni GTK, ni tshark, ni meme
 le reste de netcross_core) pour qu'il soit testable sur des jeux
 synthetiques :
 
+- **rejet preliminaire des aberrants** : tendance robuste sur les medianes
+  d'au plus 64 groupes d'effectifs voisins, puis seuil de trois MAD des residus
+  de la moitié des échanges les plus rapides (plancher 1 ms), AVANT la
+  selection au delai minimal. Celle-ci ne doit pas transformer 10 %
+  d'aberrants en majorite des points conserves ;
 - **filtre au delai minimal** : parmi les derniers echantillons, NTP ne
   garde que ceux dont le delai aller-retour apparent est le plus faible,
   car ce sont ceux qui ont le moins subi de files d'attente (RFC 5905
@@ -261,6 +266,60 @@ def _ecart_mad(valeurs: list[float]) -> float:
     return ecart
 
 
+def _filtre_aberrants(echantillons: list[EchantillonHorloge]) -> list[EchantillonHorloge]:
+    """Rejette les résidus extrêmes avant que le filtre RTT ne les concentre.
+
+    La moitié des échanges les plus rapides forme au plus 64 groupes d'effectif
+    voisin. Leurs médianes temporelles et de décalage servent à une médiane
+    répétée des pentes (Siegel), préliminaire à la régression finale.
+    Le coût quadratique est borné à 64 représentants ; tous les
+    échantillons participent ensuite au contrôle des résidus.
+    En dessous de seize échantillons, le filtre existant reste inchangé.
+    """
+    logger.debug("_filtre_aberrants: entrée n={}", len(echantillons))
+    if len(echantillons) < 16:
+        logger.debug("_filtre_aberrants: sortie inchangée (petit effectif)")
+        return echantillons
+    rapides = sorted(echantillons, key=lambda e: e.delai_ms)[: len(echantillons) // 2]
+    triees = sorted(rapides, key=lambda e: e.t)
+    nombre_groupes = min(64, len(triees))
+    groupes = [
+        triees[i * len(triees) // nombre_groupes : (i + 1) * len(triees) // nombre_groupes]
+        for i in range(nombre_groupes)
+    ]
+    representants = [
+        EchantillonHorloge(
+            t=_mediane([e.t for e in groupe]),
+            decalage_ms=_mediane([e.decalage_ms for e in groupe]),
+            delai_ms=0.0,
+        )
+        for groupe in groupes
+    ]
+    t0 = triees[0].t
+    pentes = [
+        _mediane([(autre.decalage_ms - e.decalage_ms) / (autre.t - e.t) for autre in representants if autre.t != e.t])
+        for e in representants
+    ]
+    pente = _mediane(pentes)
+    decalage = _mediane([e.decalage_ms - pente * (e.t - t0) for e in representants])
+    residus = [e.decalage_ms - decalage - pente * (e.t - t0) for e in echantillons]
+    # Estimer le bruit sur tous les RTT confondrait les files d'attente
+    # et le bruit d'horloge. La moitié la plus rapide garde une population
+    # suffisante (10 % bruts = au plus 20 % ici), au lieu d'un minimum
+    # isolé par fenêtre susceptible d'être entièrement aberrant.
+    residus_rapides = [e.decalage_ms - decalage - pente * (e.t - t0) for e in rapides]
+    centre = _mediane(residus_rapides)
+    seuil = max(1.0, 3.0 * _ecart_mad(residus_rapides))
+    conserves = [e for e, residu in zip(echantillons, residus, strict=True) if abs(residu - centre) <= seuil]
+    logger.debug(
+        "_filtre_aberrants: sortie n={} rejetés={} seuil_ms={}",
+        len(conserves),
+        len(echantillons) - len(conserves),
+        seuil,
+    )
+    return conserves
+
+
 def _theil_sen_ic(conserves: list[EchantillonHorloge]) -> tuple[float, float]:
     """Intervalles de confiance 95 % robustes (ecart MAD) pour une estimation.
 
@@ -302,7 +361,7 @@ def estimer_decalage(echantillons: list[EchantillonHorloge]) -> EstimationHorlog
         logger.debug("estimer_decalage: sortie None (aucun échantillon)")
         return None
     t0 = min(e.t for e in echantillons)
-    conserves = _filtre_delais_minimaux(echantillons)
+    conserves = _filtre_delais_minimaux(_filtre_aberrants(echantillons))
     decalage_t0, derive_ppm = _theil_sen(conserves, t0)
     # Intervalles 95 % : 1,96 x ecart robuste / sqrt(n). Hypothese
     # documentee (module) : residus approximativement gaussiens une fois
@@ -319,7 +378,8 @@ def estimer_decalage(echantillons: list[EchantillonHorloge]) -> EstimationHorlog
         ic_derive_ppm=ic_derive,
         n_echantillons=len(echantillons),
         n_conserves=len(conserves),
-        methode="filtre au délai minimal + Theil-Sen ; sources : "
+        methode=("rejet MAD (tendance Siegel) + " if len(echantillons) >= 16 else "")
+        + "filtre au délai minimal + Theil-Sen ; sources : "
         + ", ".join(sorted({sample.source for sample in echantillons})),
         sources=tuple(sorted({sample.source for sample in echantillons})),
     )

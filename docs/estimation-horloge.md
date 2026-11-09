@@ -142,6 +142,28 @@ valeur est imposée (dérive nulle).
 
 ## Les limites
 
+Avant le choix des délais minimaux, l'estimateur écarte les résidus
+extrêmes d'une tendance préliminaire robuste. Celle-ci utilise les
+médianes d'au plus 64 groupes d'effectifs voisins parmi la moitié
+des échanges les plus rapides, puis une médiane répétée des pentes
+(Siegel). Le bruit est estimé sur cette population rapide, pour ne
+pas le confondre avec les files d'attente ; 10 % d'aberrants bruts
+en constituent au plus 20 %, plutôt qu'une majorité de minima isolés.
+Le rejet porte sur tous les échantillons, à trois écarts MAD avec
+un plancher de 1 ms. Le choix final au délai minimal et la
+régression de décalage/dérive restent appliqués aux observations
+conservées. La méthode publiée mentionne ce rejet MAD.
+
+Cette étape évite que quelques observations aberrantes au RTT très bas
+deviennent majoritaires après le choix des minima. Les régressions
+couvrent exactement 10 % d'aberrants positifs ou négatifs, groupés,
+aléatoires ou placés sur les minima, ainsi que vingt jeux avec bruit
+et files asymétriques, perturbés de 2, 5, 20 ou 500 ms dans les deux
+sens. Il ne s'agit pas d'une garantie sur toute
+contamination arbitraire ni d'une authentification des captures.
+Avec moins de seize observations, cette étape préalable n'est pas
+appliquée ; la régression robuste existante reste utilisée.
+
 - **Chemin asymétrique.** La formule suppose des délais aller et retour
   égaux ; une file d'attente permanente dans un seul sens biaise
   l'estimation. Le filtre au délai minimal atténue ce biais en ne gardant
