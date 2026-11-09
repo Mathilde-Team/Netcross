@@ -21,6 +21,15 @@ toute divergence avec le README reflète l'état effectif du code.
 
 ### Outillage qualité (lint / format / architecture)
 
+Détection des microrafales (#1135, session 76) : `analyse` appelle
+automatiquement `netcross_core.microburst` ; les résultats par point
+alimentent le texte, le JSON et les constats `Microrafales` (règle
+`microburst`). La vitesse est résolue avant l'analyse CLI. Seuils
+et limites : [inventaire des détecteurs](detectors.md#microrafales-seuils-automatiques-et-interpretation).
+Le détecteur utilise une référence globale et reste classé seconde passe ;
+la corrélation aux pertes et la localisation par segment ne sont pas
+déclarées réalisées par ce lot.
+
 Journalisation (#954, 08/11/2026) : 183 traces d'entrée supplémentaires,
 sans arguments ni données réseau ; référence des entrées abaissée de 193
 à 9, référence des sorties maintenue à 0. Les neuf entrées restantes

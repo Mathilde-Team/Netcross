@@ -736,6 +736,8 @@ def _analyse_captures(
             all_packets = [pk for pk in all_packets if not pk.is_duplicate]
         flows = correlate(all_packets, options.nat_tolerant, options.nat_window_ms, options.exclude_duplicates)
         points_order = order_list if multi else [captures[0][0]]
+        from netcross_core.link_speed import resolve_link_speeds
+
         report = analyse(
             flows,
             points_order=points_order,
@@ -746,6 +748,7 @@ def _analyse_captures(
             idle_timeout_seconds=options.idle_timeout_seconds,
             exclude_duplicates=options.exclude_duplicates,
             duplicate_counts=duplicate_counts,
+            link_speeds=resolve_link_speeds(captures),
         )
         if truncation_note:
             report.truncated = True

@@ -450,6 +450,23 @@ class Rule:
 # compteurs Report, synthesis.py::build_findings pour la transformation
 # en Finding) pour verification directe.
 _RULE_CATALOG: tuple[Rule, ...] = (
+    Rule(
+        id="microburst",
+        domain="Microrafales",
+        preconditions=(
+            "Au moins deux paquets dans une fenêtre, pic au moins quatre fois la médiane des tranches non vides."
+        ),
+        required_metrics=("Report.microbursts", "Report.link_speeds"),
+        time_window="100 µs, 1 ms et 10 ms, sans descendre sous la résolution du point.",
+        required_context="Vitesse du lien optionnelle ; seuil relatif signalé explicitement si elle est inconnue.",
+        severity="a_surveiller",
+        confidence=0.6,
+        explanation="Concentration brève du trafic, avec au moins 80 % d'occupation si la vitesse est connue.",
+        verification_leads=(
+            "Comparer aux compteurs de files et pertes ; distinguer agrégation de capture et congestion réelle."
+        ),
+        thresholds={"min_peak_median_ratio": 4.0, "min_utilisation_pct": 80.0, "min_window_packets": 2.0},
+    ),
     # -- pertes par segment -- analysis.py::analyse() (boucle principale,
     # Report.loss_count) + synthesis.py::build_findings() ("-- pertes --")
     Rule(

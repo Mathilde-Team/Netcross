@@ -84,6 +84,7 @@ celui que produit `tableau_markdown()`.
 |---|---|---|---|---|---|---|
 | `infer_topology` | phase | seconde_passe | écarts de TTL et ensembles de flux vus par paire de points | capture entière | `topology_edges` | recouvrement de Jaccard entre ensembles complets ; sans objet avec --order |
 | `compute_throughput` | phase | incremental | octets par (point, tranche) | aucune | `throughput` |  |
+| `detect_microbursts` | phase | seconde_passe | médianes des tranches non vides et fenêtres glissantes par point | 100 µs, 1 ms, 10 ms ; référence sur la capture entière | `microbursts` | tri et référence globale actuellement nécessaires ; ne prétend pas être un détecteur en flux |
 | `detect_extracted_files` | phase | fenetre_bornee | charges utiles en cours de réassemblage par flux | durée du transfert de l'objet | `extracted_files` |  |
 | `application_transactions` | phase | fenetre_bornee | requêtes HTTP/DNS en attente de réponse | seuil de réponse du protocole ; « réponse manquante » décidée à l'expiration | `application_transactions` |  |
 | `clock_sync` | phase | seconde_passe | échanges SYN / SYN-ACK et copies d'un même paquet entre paires de points | capture entière | `clock_offset_estimate`, `clock_offset_samples` | estimateur robuste (Theil-Sen, #996) calculé avant la boucle des flux : la latence par segment est corrigée au temps de chaque paquet |
@@ -143,7 +144,7 @@ celui que produit `tableau_markdown()`.
 | `quic_diagnostics` | diagnostic | seconde_passe | paquets QUIC Initial de chaque point | capture entière |  | --quic : relit les fichiers avec tshark |
 | `greffons` | greffon | seconde_passe | DetectorContext : tous les paquets et le rapport, en lecture seule | capture entière |  | contrat de netcross_core.plugins.api ; un mode en flux devra proposer un contrat incrémental |
 
-Total : 60 détecteurs -- incremental : 28, fenetre_bornee : 26, seconde_passe : 6.
+Total : 61 détecteurs -- incremental : 28, fenetre_bornee : 26, seconde_passe : 7.
 
 <!-- inventaire-detecteurs:fin -->
 
@@ -158,6 +159,61 @@ Constats utiles pour la suite du chantier :
 - quelques détecteurs classés incrémentaux gardent aujourd'hui des listes
   qui croissent avec le trafic (`detect_exfiltration`, `analyze_flow_stats`,
   `detect_protocol_mismatches`) ; ils sont signalés dans la colonne « Note ».
+
+## Microrafales : seuils automatiques et interprétation
+
+L'analyse appelle automatiquement `detect_microbursts` pour chaque point
+sur les mêmes paquets que les autres détecteurs, après les éventuels
+filtres et la pseudonymisation. Les événements alimentent le texte CLI,
+le JSON (`microbursts`, avec les échelles refusées), et les constats
+`Microrafales` du rapport, avec la règle stable `microburst`.
+
+La CLI, l'API, les pipelines fichier GTK4, le mode batch et les archives
+d'incident résolvent vitesse et résolution avant l'analyse. Un appel sur
+des paquets en mémoire sans métadonnées, notamment en direct, conserve le
+mode relatif et ne prétend pas connaître la précision de la sonde.
+
+Les fenêtres glissantes de 100 µs, 1 ms et 10 ms réutilisent le calcul
+multi-échelle de #1133. Une échelle inférieure à la résolution du point
+est refusée et sa raison est conservée. Les horodatages relatifs sont
+arrondis au quantum du point, avec un plancher d'une microseconde.
+Une résolution inconnue reste inconnue ; ce plancher ne constitue pas
+une mesure de la précision de la sonde.
+
+Une fenêtre doit contenir au moins deux paquets et atteindre quatre fois
+la médiane des débits des tranches **non vides**, à la même échelle,
+sur la capture de ce point. Les tranches fixes servent seulement à cette
+référence : la crête est calculée en fenêtre glissante exacte, non par
+tranches fixes. Exclure les tranches vides évite de diviser par zéro
+ou de transformer un paquet isolé après un long silence en microrafale.
+La référence peut être dominée par les rafales dans une capture trop
+courte ou majoritairement occupée par celles-ci : absence de constat
+ne signifie donc pas absence de rafale.
+
+Avec une vitesse d'interface connue (`if_speed` ou repli `--link-speed`),
+la fenêtre doit aussi atteindre 80 % de cette vitesse. Sans vitesse connue,
+seul le seuil relatif s'applique, ce qui est explicitement écrit dans le
+rapport ; aucun pourcentage d'interface fictif n'est produit.
+
+Chaque épisode donne le point, début, fin, durée, crête, échelle de la
+crête, occupation si mesurable, référence médiane, rapport pic/médiane
+et cinq principaux émetteurs en octets avec leur part de l'épisode.
+Les fenêtres qui se chevauchent, y compris entre échelles, sont réunies :
+les bornes et la durée couvrent ces fenêtres de détection et peuvent
+déborder la rafale physique. Ce ne sont ni des instants exacts de
+début de congestion, ni une preuve de perte.
+
+Le constat reste `a_surveiller`. Offloading, agrégation de plusieurs
+interfaces dans un même point, capture tronquée ou vitesse erronée
+peuvent gonfler les crêtes, parfois au-delà de 100 %. Le pourcentage
+n'est pas plafonné pour ne pas cacher cette limite. La corrélation avec
+les pertes et la localisation par segment relèvent de #1137, pas de
+ce détecteur par point.
+
+Le tri, les médianes et l'attribution des émetteurs nécessitent actuellement
+la capture du point : le détecteur est honnêtement classé `seconde_passe`,
+pas présenté comme compatible en flux. Les tranches sont conservées dans
+une table creuse : un silence très long n'alloue pas une case par quantum.
 
 ## Voir aussi
 

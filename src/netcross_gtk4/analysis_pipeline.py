@@ -345,6 +345,7 @@ def _run_pipeline(
     # 5. Analyse
     _log("Analyse (pertes, latence, TTL, QoS, fragmentation, débit, TCP, VLAN, RTP, DHCP, SIP...)...")
     from netcross_core.analysis import analyse
+    from netcross_core.link_speed import resolve_link_speeds
 
     report = analyse(
         flows,
@@ -357,6 +358,7 @@ def _run_pipeline(
         idle_timeout_seconds=options.idle_timeout_seconds,
         exclude_duplicates=options.exclude_duplicates,
         duplicate_counts=duplicate_counts,
+        link_speeds=resolve_link_speeds(captures),
     )
     if truncation_note:  # issue #283 : jamais silencieuse, comme la CLI
         report.truncated = True
