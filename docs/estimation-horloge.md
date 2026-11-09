@@ -93,6 +93,9 @@ source automatique (`sources: []`).
 
 Dans le tableau « Latence par segment » du PDF, la colonne
 « Horloge (décalage / dérive) » reprend ces valeurs.
+Dans le HTML, ces informations figurent dans les détails du segment et
+dans le tableau statique lorsque JavaScript est désactivé. La méthode
+reste du texte, même si elle contient des caractères de balisage.
 
 ### Segment « non mesurable »
 
@@ -102,6 +105,24 @@ latence). Ce n'est pas une erreur : la capture ne permet pas de
 distinguer une vraie latence d'un artefact d'horloge. Pour la rendre
 mesurable : synchroniser les machines de capture (NTP, PTP), ou capturer
 plus longtemps (davantage d'échantillons resserre l'intervalle).
+
+Ce refus concerne les délais moyen et percentiles : ils ne sont plus
+présentés comme des latences mesurables dans les détails HTML, les
+graphiques ou le classement des délais. Les pertes, le débit et les
+compteurs restent utilisables ; la gigue décrit toujours la variation
+des observations et non une latence absolue garantie.
+
+Le JSON conserve les observations pour l'audit et ajoute
+`path_metrics[].latency_measurable`, distinct de `measured` : ce dernier
+signifie qu'au moins une métrique du segment existe, pas que sa latence
+est fiable. L'égalité entre IC et valeur absolue du délai est acceptée ;
+une incertitude négative ou non finie est refusée. En l'absence d'IC,
+le comportement historique est conservé, sans inventer une estimation.
+
+Les transits des preuves HTML appliquent le même contrôle à chaque trame,
+avant l'arrondi d'affichage. Le JSON des preuves garde `raw_ms` et
+`transit_ms`, accompagnés de `clock_ci_ms` et de `latency_measurable`.
+Un transit brut sans estimation conserve sa mention « non corrigé ».
 
 ## Imposer un décalage connu : `--clock-offset`
 

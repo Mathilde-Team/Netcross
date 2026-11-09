@@ -67,6 +67,7 @@ nav:
       - API REST: api-rest.md
       - Parité GUI / CLI / API: parite-surfaces.md
       - Filtres BPF: bpf-filters.md
+      - Gel rétroactif et incidents: incidents-gel.md
       - Mode batch: batch-mode.md
       - Capture distante: capture-distante.md
       - Métriques Prometheus: metriques-prometheus.md

@@ -21,6 +21,15 @@ toute divergence avec le README reflète l'état effectif du code.
 
 ### Outillage qualité (lint / format / architecture)
 
+Traceroute Paris (#1065, session 79) : backend explicite
+`netcross_core.active.paris_traceroute` via Scamper optionnel. Flux conservé,
+TTL à partir de 1, débit maximal de 10 sondes/s avec espacement natif
+minimum et arrêt sur silence persistant ; nombre natif vérifié et erreurs
+de droits explicites. Aucun branchement automatique CLI/API, réservé à
+#1068. Le job isolé impose TCP, UDP, ICMP et pertes réelles, quatre tests
+sans skip ; l'écriture du test ne vaut pas son exécution réussie.
+Voir [les mesures actives](mesures-actives.md#traceroute-paris-1065).
+
 Échantillons UDP d'horloge (#1029, session 78) : collecte isolée dans
 `netcross_core.clock_samples`. DNS : identifiant, nom normalisé et
 extrémités, refus des échanges incomplets et collisions ; rapprochement

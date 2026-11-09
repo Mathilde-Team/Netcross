@@ -464,6 +464,19 @@ def test_reseau_serveur_ralentissement_applicatif():
     assert findings[0].sample_size == 2
 
 
+def test_reseau_serveur_ne_conclut_pas_depuis_une_latence_incertaine():
+    from netcross_core.clock_sync import EstimationHorloge
+
+    report = Report(points=["A", "B"])
+    report.server_think_time["A"] = [100.0, 110.0]
+    report.latency[("A", "B")] = [4.0]
+    report.clock_offset_estimate[("A", "B")] = EstimationHorloge(decalage_ms=0.0, ic_decalage_ms=8.0)
+    assert not [finding for finding in build_findings(report) if finding.category == "Reseau/Serveur"]
+    report.clock_offset_estimate[("A", "B")] = EstimationHorloge(decalage_ms=0.0, ic_decalage_ms=4.0)
+    assert [finding for finding in build_findings(report) if finding.category == "Reseau/Serveur"]
+    assert report.latency[("A", "B")] == [4.0]
+
+
 def test_dns_duree_sample_size_est_le_nombre_de_mesures():
     r = Report(points=["A"])
     r.dns_duration_ms = [250.0, 260.0, 270.0]

@@ -33,6 +33,7 @@ geree est precisement le defaut que la regle de tracabilite du projet vise.
 
 from __future__ import annotations
 
+import math
 import os
 
 import pytest
@@ -88,6 +89,43 @@ def test_aucun_graphique_de_latence_sans_mesure_de_latence(tmp_path):
     chemin = tmp_path / "latence.png"
     assert chart_latency(_rapport(), str(chemin)) is None
     assert not chemin.exists()
+
+
+def test_aucune_barre_de_latence_pour_une_horloge_trop_incertaine(tmp_path, monkeypatch):
+    from netcross_core.clock_sync import EstimationHorloge
+    from netcross_report import charts
+    from netcross_report.path_metrics import build_path_metrics
+
+    report = _rapport(latency={("AMONT", "AVAL"): [4.0]}, loss_count={"AVAL": 1}, seen_count={"AVAL": 10})
+    report.clock_offset_estimate[("AMONT", "AVAL")] = EstimationHorloge(decalage_ms=0.0, ic_decalage_ms=8.0)
+    assert chart_latency(report, str(tmp_path / "latence.png")) is None
+    figures = []
+    monkeypatch.setattr(charts, "_save", lambda fig, _path: figures.append(fig))
+    charts.chart_path_quality(build_path_metrics(report), str(tmp_path / "chemin.png"))
+    (fig,) = figures
+    ax, losses = fig.axes
+    assert all(math.isnan(bar.get_height()) for bar in ax.patches)
+    assert [text.get_text() for text in ax.texts] == ["latence non mesurable"]
+    assert list(losses.lines[0].get_ydata()) == [10.0]
+    charts.plt.close(fig)
+
+
+def test_graphique_latence_conserve_uniquement_les_segments_valides(tmp_path, monkeypatch):
+    from netcross_core.clock_sync import EstimationHorloge
+    from netcross_report import charts
+
+    report = Report(points=["A", "B", "C"], pairs=[("A", "B"), ("B", "C")])
+    report.latency[("A", "B")] = [4.0]
+    report.latency[("B", "C")] = [12.0]
+    report.clock_offset_estimate[("A", "B")] = EstimationHorloge(decalage_ms=0.0, ic_decalage_ms=8.0)
+    figures = []
+    monkeypatch.setattr(charts, "_save", lambda fig, _path: figures.append(fig))
+    assert chart_latency(report, str(tmp_path / "valide.png")) is not None
+    (fig,) = figures
+    (ax,) = fig.axes
+    assert [label.get_text() for label in ax.get_xticklabels()] == ["B->C"]
+    assert [bar.get_height() for bar in ax.patches] == [12.0]
+    charts.plt.close(fig)
 
 
 def test_aucun_graphique_de_pertes_sans_perte(tmp_path):
@@ -536,6 +574,13 @@ def test_generate_topn_charts_sans_serie_ne_renvoie_rien(tmp_path):
     from netcross_report.charts import generate_topn_charts
 
     assert generate_topn_charts(_rapport(), str(tmp_path)) == {}
+
+
+@pytest.mark.parametrize("point", [None, "AMONT"])
+def test_generate_topn_charts_sans_aucun_point_ne_fabrique_pas_de_donnees(tmp_path, point):
+    from netcross_report.charts import generate_topn_charts
+
+    assert generate_topn_charts(Report(points=[]), str(tmp_path), point=point) == {}
 
 
 def test_generate_topn_charts_prefixe_ses_cles_par_dimension(tmp_path):
