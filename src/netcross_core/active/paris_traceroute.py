@@ -22,6 +22,7 @@ from netcross_core.logging_config import get_logger
 
 logger = get_logger(__name__)
 _METHODS = {"TCP": "tcp", "UDP": "udp-paris", "ICMP": "icmp-paris", "ICMPV6": "icmp-paris"}
+_NATIVE_METHODS = {"TCP": "tcp", "UDP": "udp-paris", "ICMP": "icmp-echo-paris", "ICMPV6": "icmp-echo-paris"}
 
 
 class ParisError(ValueError):
@@ -127,7 +128,7 @@ def _lire_sortie(text: str, flux: FiveTuple, parameters: Parametres) -> dict:
     trace = traces[0]
     if trace.get("src") != flux.src or trace.get("dst") != flux.dst:
         _refuser("les adresses mesurées ne correspondent pas au flux demandé")
-    if str(trace.get("method", "")).lower() != _METHODS[flux.proto]:
+    if str(trace.get("method", "")).lower() != _NATIVE_METHODS[flux.proto]:
         _refuser("la méthode native ne correspond pas au protocole demandé")
     if flux.sport is not None and (trace.get("sport") != flux.sport or trace.get("dport") != flux.dport):
         _refuser("les ports mesurés ne correspondent pas au flux demandé")

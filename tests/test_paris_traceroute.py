@@ -30,7 +30,9 @@ def native(flow=None, **overrides):
     flow = flow or flux()
     result = {
         "type": "trace",
-        "method": {"UDP": "udp-paris", "TCP": "tcp", "ICMP": "icmp-paris", "ICMPv6": "icmp-paris"}[flow.proto],
+        "method": {"UDP": "udp-paris", "TCP": "tcp", "ICMP": "icmp-echo-paris", "ICMPv6": "icmp-echo-paris"}[
+            flow.proto
+        ],
         "src": flow.src,
         "dst": flow.dst,
         "sport": flow.sport,
@@ -57,8 +59,11 @@ def backend(monkeypatch):
     return state
 
 
-@pytest.mark.parametrize("proto", ["UDP", "TCP", "ICMP", "ICMPv6"])
-def test_commande_paris_flux_constant_sans_shell_et_sortie_structuree(backend, proto):
+@pytest.mark.parametrize(
+    ("proto", "command_method"),
+    [("UDP", "udp-paris"), ("TCP", "tcp"), ("ICMP", "icmp-paris"), ("ICMPv6", "icmp-paris")],
+)
+def test_commande_paris_flux_constant_sans_shell_et_sortie_structuree(backend, proto, command_method):
     flow = flux(proto)
     backend.stdout = '\n{"type":"cycle-start"}\n' + json.dumps(native(flow)) + '\n{"type":"cycle-stop"}\n'
     result = paris.mesurer(flow)
@@ -67,7 +72,7 @@ def test_commande_paris_flux_constant_sans_shell_et_sortie_structuree(backend, p
     command, options = backend.calls[0]
     assert command[:6] == ["/outil/scamper", "-p", "10", "-O", "json", "-I"]
     trace = shlex.split(command[-1])
-    assert trace[trace.index("-P") + 1] == native(flow)["method"]
+    assert trace[trace.index("-P") + 1] == command_method
     assert trace[trace.index("-S") + 1] == flow.src and trace[-1] == flow.dst
     assert trace[trace.index("-s") + 1] == str(flow.sport or 33436)
     assert trace[trace.index("-d") + 1] == str(flow.dport or 33435)
@@ -83,6 +88,15 @@ def test_commande_paris_flux_constant_sans_shell_et_sortie_structuree(backend, p
     assert document["flux"]["dst"] == flow.dst
     assert document["donnees"]["hops"][1]["probe_ttl"] == 2
     json.dumps(document, allow_nan=False)
+
+
+@pytest.mark.parametrize("proto", ["ICMP", "ICMPv6"])
+@pytest.mark.parametrize("method", ["icmp-echo", "icmp-paris"])
+def test_icmp_natif_non_paris_ou_nom_de_commande_refuse(backend, proto, method):
+    backend.stdout = json.dumps(native(flux(proto), method=method))
+    result = paris.mesurer(flux(proto))
+    assert result.statut == "erreur" and result.envoyees is None
+    assert "méthode native" in result.message
 
 
 def test_budget_configurable_et_silence_persistant(backend):
