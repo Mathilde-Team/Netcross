@@ -154,6 +154,7 @@ from netcross_core.discovery import load_baseline_hosts
 from netcross_core.flow_state import parse_flow_timeouts, run_flow_table
 from netcross_core.flow_timeline import build_flow_timelines
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
+from netcross_core.i18n import _
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
 from netcross_core.profiling import creer_mesures, marquer
 from netcross_core.redact import SCOPE_ALL as REDACT_SCOPE_ALL
@@ -1783,6 +1784,16 @@ def main():
             " desactive l'estimation pour cette paire (repetable)"
         ),
     )
+    ap.add_argument(
+        "--confirm-active",
+        action="store_true",
+        help=_("Autorise explicitement les sondes actives vers les flux prouvés des constats (8 mesures maximum)."),
+    )
+    ap.add_argument(
+        "--active-dry-run",
+        action="store_true",
+        help=_("Affiche les commandes de confirmation active sans aucune émission, même avec --confirm-active."),
+    )
     ap.add_argument("--detail-csv", help="Chemin de sortie pour le detail par flux (CSV)")
     # Issue #911 : dashboard analytique (vue GUI « Dashboard »)
     ap.add_argument(
@@ -2598,6 +2609,8 @@ def main():
     add_debug_argument(ap)
     args = ap.parse_args()
     apply_debug_argument(args)
+    if args.redact and (args.confirm_active or args.active_dry_run):
+        ap.error(_("--confirm-active/--active-dry-run incompatibles avec --redact : cibles anonymisées"))
     if args.profile_tracemalloc and not args.profile_steps:
         logger.debug("main: --profile-tracemalloc sans --profile-steps -> levée SystemExit")
         ap.error("--profile-tracemalloc necessite --profile-steps")
@@ -3381,6 +3394,7 @@ def main():
         duplicate_counts=duplicate_counts,
         clock_offsets=args.clock_offset,
         link_speeds=resolved_link_speeds,
+        collect_active_evidence=args.confirm_active or args.active_dry_run,
     )
     # Commentaires de SECTION pcapng (Job 39/issue #159) -- lus ici, au
     # dernier moment avant le rendu : metadonnee de fichier, pas de paquet,
@@ -3402,6 +3416,18 @@ def main():
         r.truncation_note = truncation_note
     if args.streaming:
         _run_streaming(args, all_packets, points_order, r)
+    if args.confirm_active or args.active_dry_run:
+        from netcross_report.active_confirmation import confirmer_rapport, lignes_confirmation
+
+        confirmation = confirmer_rapport(
+            r,
+            flows,
+            enabled=args.confirm_active,
+            dry_run=args.active_dry_run,
+            redact=args.redact,
+        )
+        print("\n" + _("Confirmation active"))
+        print("\n".join(lignes_confirmation(confirmation)))
     marquer(mesures, "rapport")
     print_report(r)
     # Issue #910 : annotations des sidecars (GUI ou `netcross annotations`)

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from netcross_core.i18n import _
 from netcross_core.logging_config import get_logger, summarize
 from netcross_report.synthesis import Finding, build_findings
 from netcross_report.triage import health_label, health_score, rank_segments
@@ -279,6 +280,14 @@ def build_markdown_report_document(
     lines.append("")
 
     # -- Score de santé --
+    if getattr(r, "active_confirmation", None):
+        from html import escape
+
+        from netcross_report.active_confirmation import lignes_confirmation
+
+        lines.append("## " + _("Confirmation active") + "\n")
+        lines.extend(f"- {_cell(escape(ligne))}" for ligne in lignes_confirmation(r.active_confirmation))
+        lines.append("")
     lines.append("## Score de santé\n")
     lines.append(f"- Score : **{score}/100**")
     lines.append(f"- État : **{health_label(score)}**")

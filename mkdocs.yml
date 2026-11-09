@@ -89,6 +89,7 @@ nav:
       - Module IA local: module-ia.md
       - Rule engine: architecture-rule-engine.md
       - Mesures actives: mesures-actives.md
+      - Confirmation active (CLI et API): confirmation-active.md
       - Échelle SIP multi-points: echelle-sip.md
       - Constats filtrables et preuves: preuves-cliquables.md
       - Appariement RTP entre points: appariement-rtp.md

@@ -61,6 +61,7 @@ from netcross_api.models import (
 from netcross_api.store import COMPLETED, FAILED, PENDING, report_document, store
 from netcross_core import analyse, correlate, parse_capture
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
+from netcross_core.i18n import _
 from netcross_core.logging_config import get_logger, summarize
 from netcross_core.notify.request import NotifySettings, send_notifications
 from netcross_core.notify.request import validate_settings as validate_notify
@@ -161,6 +162,11 @@ _EXTRA_FILES = File(
     description="Fichiers pcap/pcapng supplémentaires pour le même point (rotation) — équiv. --capture NOM=a,b",
 )
 # Issue #673 : sections d'expertise
+_CONFIRM_ACTIVE_FORM = Form(False, description=_("Autorise explicitement les sondes actives (8 mesures maximum)"))
+_ACTIVE_ALLOWED = os.environ.get("NETCROSS_API_ACTIVE", "0") == "1"
+_ACTIVE_DRY_RUN_FORM = Form(
+    False, description=_("Simulation des commandes sans émission ; prioritaire sur confirm_active")
+)
 _RULE_ENGINE_FORM = Form(
     default=False, description="true : évaluer le moteur de règles déclaratif (équiv. --rule-engine)"
 )
@@ -355,6 +361,8 @@ class ApiAnalysisOptions:
     # Issue #671 : split_interfaces (--split-interfaces)
     split_interfaces: bool = False
     # Issue #673 : sections d'expertise
+    confirm_active: bool = False
+    active_dry_run: bool = False
     rule_engine: bool = False
     expert_section: bool = False
     media_quality: bool = False
@@ -420,6 +428,8 @@ def _options(
     notify_email: str | None = None,
     notify_detail: str = "resume",
     split_interfaces: bool = False,
+    confirm_active: bool = False,
+    active_dry_run: bool = False,
     rule_engine: bool = False,
     expert_section: bool = False,
     media_quality: bool = False,
@@ -442,6 +452,15 @@ def _options(
     Issue #672 : validation de ``sample`` (format 1/N) comme la CLI
     (``_parse_sample_spec``).
     """
+    if redact and (confirm_active or active_dry_run):
+        logger.debug("_options: confirmation active sur cibles anonymisées -> refus")
+        raise HTTPException(status_code=400, detail=_("confirm_active/active_dry_run incompatibles avec redact"))
+    if confirm_active and not active_dry_run and not _ACTIVE_ALLOWED:
+        logger.debug("_options: émission active non autorisée sur ce serveur -> refus")
+        raise HTTPException(
+            status_code=403,
+            detail=_("Confirmation active désactivée sur le serveur (NETCROSS_API_ACTIVE=1 requis)."),
+        )
     if redact and (tls or quic):
         logger.debug("_options: si redact and (tls or quic) -> levée HTTPException")
         raise HTTPException(
@@ -547,6 +566,8 @@ def _options(
         history=history,
         history_label=history_label,
         plugins=plugin_names,
+        confirm_active=confirm_active,
+        active_dry_run=active_dry_run,
     )
     logger.debug("_options: retour options={}", summarize(options, "options"))
     return options
@@ -749,6 +770,7 @@ def _analyse_captures(
             exclude_duplicates=options.exclude_duplicates,
             duplicate_counts=duplicate_counts,
             link_speeds=resolve_link_speeds(captures),
+            collect_active_evidence=options.confirm_active or options.active_dry_run,
         )
         if truncation_note:
             report.truncated = True
@@ -793,6 +815,16 @@ def _analyse_captures(
         # --security-report` (constats, triage, score de santé).
         # Issue #670 : findings calculés une fois, partagés entre le JSON
         # structuré et les exports texte/PDF/CSV ultérieurs.
+        if options.confirm_active or options.active_dry_run:
+            from netcross_report.active_confirmation import confirmer_rapport
+
+            confirmer_rapport(
+                report,
+                flows,
+                enabled=options.confirm_active,
+                dry_run=options.active_dry_run,
+                redact=options.redact,
+            )
         findings = build_findings(report)
         meta = {"Source": "API REST"}
         if options.redact:
@@ -1141,6 +1173,8 @@ async def upload_capture(
     tls_keylog: list[UploadFile] | None = _TLS_KEYLOG_FILES,
     tls_keylog_labels: str | None = _TLS_KEYLOG_LABELS_FORM,
     split_interfaces: bool = _SPLIT_INTERFACES_FORM,
+    confirm_active: bool = _CONFIRM_ACTIVE_FORM,
+    active_dry_run: bool = _ACTIVE_DRY_RUN_FORM,
     rule_engine: bool = _RULE_ENGINE_FORM,
     expert_section: bool = _EXPERT_SECTION_FORM,
     media_quality: bool = _MEDIA_QUALITY_FORM,
@@ -1190,6 +1224,8 @@ async def upload_capture(
         tls,
         quic,
         redact,
+        confirm_active=confirm_active,
+        active_dry_run=active_dry_run,
         max_packets=max_packets,
         sample=sample,
         test_net_external=test_net_external,
@@ -1380,6 +1416,8 @@ async def upload_multi_capture(
     tls_keylog: list[UploadFile] | None = _TLS_KEYLOG_FILES,
     tls_keylog_labels: str | None = _TLS_KEYLOG_LABELS_FORM,
     split_interfaces: bool = _SPLIT_INTERFACES_FORM,
+    confirm_active: bool = _CONFIRM_ACTIVE_FORM,
+    active_dry_run: bool = _ACTIVE_DRY_RUN_FORM,
     rule_engine: bool = _RULE_ENGINE_FORM,
     expert_section: bool = _EXPERT_SECTION_FORM,
     media_quality: bool = _MEDIA_QUALITY_FORM,
@@ -1427,6 +1465,8 @@ async def upload_multi_capture(
         tls,
         quic,
         redact,
+        confirm_active=confirm_active,
+        active_dry_run=active_dry_run,
         max_packets=max_packets,
         sample=sample,
         test_net_external=test_net_external,
