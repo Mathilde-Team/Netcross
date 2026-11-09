@@ -93,6 +93,7 @@ nav:
       - Échelle SIP multi-points: echelle-sip.md
       - Constats filtrables et preuves: preuves-cliquables.md
       - Appariement RTP entre points: appariement-rtp.md
+      - Transport RTP par segment: rtp-segments.md
   - Architecture:
       - Diagramme de classes: class-diagram.md
       - Internationalisation: i18n.md
@@ -101,6 +102,8 @@ nav:
       - Empreinte de paquet: empreinte-paquet.md
       - Corrélation en flux: correlation-en-flux.md
       - État par flux: etat-flux.md
+      - Débordement sur disque des flux longs: debordement-flux.md
+      - Seconde passe en flux (topologie): seconde-passe.md
       - Décisions d'architecture: adr/netflow-sflow-architecture.md
       - Qualité: quality/anonymization-plan.md
       - Couverture de la GUI: quality/gui-app-coverage.md

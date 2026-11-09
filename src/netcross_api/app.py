@@ -3350,6 +3350,10 @@ live_captures = _live_routes.register(
     },
 )
 
+from netcross_api import metrics_routes as _metrics_routes  # noqa: E402
+
+_metrics_routes.register(app, _verify_api_key, live_captures.metrics)
+
 # Issue #910 : annotations d'une analyse (rangées dans ses métadonnées, par point)
 from netcross_api import annotations_routes as _annotations_routes  # noqa: E402
 

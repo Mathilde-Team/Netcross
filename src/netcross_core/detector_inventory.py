@@ -267,6 +267,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         "appariement entre points malgré NAT/SBC (#1121) : décalage constant de séquence et d'horodatage",
     ),
     Detecteur(
+        "rtp_segments",
+        PHASE,
+        FENETRE_BORNEE,
+        "couples RTP normalisés par jambe et premiers instants de capture",
+        "recouvrement des jambes du flux",
+        ("rtp_segments",),
+        "transport RTP/SRTP par segment (#1123), délais soumis à l'incertitude d'horloge",
+    ),
+    Detecteur(
         "response_time",
         PHASE,
         FENETRE_BORNEE,

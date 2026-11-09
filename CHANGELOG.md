@@ -8,6 +8,45 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Orchestration automatique de la chaîne d'incident (#1001) : `netcross_core.incident_chain.ChaineIncidents`,
+  branchée sur `LiveDiffEngine(gel=chaine)` à la place du `GelManager` nu, enchaîne à chaque alarme le gel
+  rétroactif (#1087), l'attente effective de la fin de fenêtre (calculée depuis l'horodatage du dernier paquet vu,
+  en arrière-plan — le moteur live n'est jamais bloqué), l'archivage signé (#1090), l'analyse multi-points et la
+  notification (#1091) — sans rien relancer à la main. `chaine_incidents_depuis_reglages()` raccorde les réglages
+  partagés (gel_settings) au moteur live. Un gel sans fichier protégé est signalé sans archiver ; un échec à une
+  étape est journalisé sans interrompre le moteur ni les autres incidents. Voir docs/incidents-gel.md
+  (« L'orchestration automatique »).
+- Qualité de transport RTP/SRTP par segment (#1123) : pertes supplémentaires
+  entre paquets communs, gigue RFC 3550, délai corrigé avec incertitude d'horloge
+  et note indicative de transport, avec constat localisé. Réutilise l'appariement
+  NAT/SBC ; les pertes déjà présentes et les bords de capture ne sont pas recomptés.
+  Sans ordre du chemin, aucun segment n'est inventé ; sans horloge exploitable,
+  aucun délai physique n'est affirmé. Le contenu SRTP et la qualité perçue ne
+  sont pas analysés. Voir docs/rtp-segments.md.
+- Route `/metrics` en direct (#1113) : authentification commune à l'API,
+  formats Prometheus/OpenMetrics, dernier relevé remplacé atomiquement et
+  compteurs directs sans métriques non mesurées. L'analyse finale d'une
+  capture directe expose le catalogue complet ; cardinalité bornée et
+  anonymisation des étiquettes avec `redact`.
+- Seconde passe ciblée en flux (#1025, sous-issue 6/6 du chantier pipeline en flux #995) :
+  la topologie est désormais déduite en mode `--streaming` comme en batch — un enregistrement
+  compact par (flux, point) (horodatage et TTL du premier paquet) est collecté au fil de l'eau
+  (ARP/STP exclus, doublons avec `--exclude-duplicates`, nat-tolerant identique à
+  `correlate`), puis la même déduction que le mode batch s'exécute à la fermeture : mêmes
+  seuils, mêmes arêtes/ambiguïtés/isolés/branchements/fusions. La mémoire est proportionnelle
+  au nombre de flux (pas de paquets) et déportée sur disque avec `--spill-seuil` (#1024),
+  sans changer les résultats. Exposé dans `streaming.seconde_passe` de `--json-report`.
+  Voir docs/seconde-passe.md. Restent hors de cette passe : `clock_sync`,
+  `detect_microbursts`, l'équivalence complète du rapport et le basculement du défaut
+  vers `--streaming` (décision humaine, voir l'issue).
+- Historique TCP privé sur disque (#1023, intégration du débordement #1024) :
+  `--spill-seuil N` configure un cache LRU facultatif de N résumés ; à zéro comme sans option,
+  l'historique exact reste sur disque au lieu de grandir sans limite en RAM.
+  Les échéances sont indépendantes par protocole, la file d'expiration et les traces récentes
+  sont bornées, et les constats NAT restent équivalents au batch à seuil TCP identique.
+  La base temporaire est supprimée en fin d'analyse. Le test RSS sur 10⁶ paquets à un point
+  conserve son plafond de 250 Mio ; les tests multi-points vérifient séparément l'historique
+  et les réouvertures après éviction. Voir docs/debordement-flux.md et docs/etat-flux.md.
 - État par flux avec expiration (#1023, chantier pipeline en flux #995) : `--flow-timeouts` (délais par
   protocole à la Zeek, format `TCP=3600,UDP=60,ICMP=60,AUTRE=60`) configure la table d'état de flux de
   `--streaming` — un flux inactif depuis son délai libère son état (mémoire bornée par les flux actifs),
