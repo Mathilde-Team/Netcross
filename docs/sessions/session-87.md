@@ -27,5 +27,14 @@ entrées du changelog et régénère le diagramme. La suite complète finale inc
 les quatre PCAP : 7 354 réussites, un saut préexistant, 111 avertissements,
 232,36 secondes, couverture combinée 98,08 %, code de sortie nul.
 Les hooks, mypy et MkDocs strict passent sur cet arbre intégré.
+Le premier contrôle de couverture en CI a ensuite révélé l'absence de TShark
+sur son runner léger : les quatre essais PCAP échouaient explicitement.
+Le workflow installe désormais ce prérequis avant les mesures PR et base,
+avec un test de garde ; aucun essai n'est transformé en saut.
+La suite complète après ce correctif confirme 7 355 réussites, un saut
+préexistant, 111 avertissements et 98,08 % de couverture combinée en
+294,59 secondes, avec code de sortie nul. Les 47 tests RTP/PCAP et de
+publication de couverture passent aussi ; actionlint et ShellCheck
+valident le workflow modifié.
 La CI du dernier head et la livraison jusqu'à main restent nécessaires
 avant toute clôture.
