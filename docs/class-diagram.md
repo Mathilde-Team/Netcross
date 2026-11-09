@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-240 modules · 342 classes · 865 fonctions publiques de module.
+241 modules · 343 classes · 865 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -556,6 +556,7 @@ classDiagram
 | `netcross_core.expert_model` | objets de contrat partages entre netcross_core et netcross_report ("Session 0" de FEATURES.md section 13.3 : stabiliser les objets communs avant de batir le moteur d'expertise vise par la comparaison… |
 | `netcross_core.expert_rules` | bibliotheque de regles d'expertise reseau DECLARATIVE (FEATURES.md section 6.2), dernier chantier de la Session 2 de la section 13.3 ("moteur d'evenements d'expertise") apres la cloture cote… |
 | `netcross_core.exploit_signatures` | detection PASSIVE de signatures d'exploits CVE connus (Log4Shell, Shellshock, Heartbleed, EternalBlue, compression TLS/CRIME) dans la charge utile brute des paquets. |
+| `netcross_core.flow_history` | Historique TCP privé sur disque, avec cache facultatif borné. |
 | `netcross_core.flow_state` | etat par flux actif, expire par protocole (issue #1023, sous-issue 4/6 du chantier #995 : pipeline a empreinte memoire bornee). |
 | `netcross_core.flow_timeline` | vue temporelle detaillee d'un flux (Job 13/issue #10, section 6.4 de FEATURES.md). |
 | `netcross_core.flow_view` | vue enrichie d'un flux (FlowView), sixieme objet de contrat de la Session 0 (Job 9/issue #6, section 6.4 et 6.14 de FEATURES.md). |
@@ -1207,6 +1208,16 @@ classDiagram
         +load_signatures(paths) list~Signature~
         +detect_exploits(packets, signatures, point) list~Detection~
         +detections_to_dicts(detections) list~dict~str, Any~~
+    }
+
+    %% ===== netcross_core.flow_history =====
+    class FlowHistory {
+        +resume(cle) dict?
+        +enregistrer(cle, points, paquets, raison, statistiques) None
+        +resumes() Iterator~tuple~tuple, dict~~
+        +coupure_comptee(cle, amont, aval) bool
+        +compter_coupure(cle, amont, aval) None
+        +close() None
     }
 
     %% ===== netcross_core.flow_state =====

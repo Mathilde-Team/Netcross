@@ -1927,9 +1927,9 @@ def main():
         default=None,
         metavar="N",
         help="Seuil de debordement sur disque de l'etat par flux de --streaming (issue #1024) : "
-        "au-dela de N entrees en memoire, les moins recentes sont deportees dans une base SQLite "
-        "temporaire, supprimee en fin d'analyse (resultats identiques). Defaut : sans limite "
-        "(tout en RAM). Voir docs/debordement-flux.md.",
+        "au plus N resumes TCP sont gardes dans un cache LRU. L'historique exact reste sur disque "
+        "temporaire prive, supprime en fin d'analyse (resultats identiques). Defaut : pas de cache "
+        "Python, jamais tout l'historique en RAM. Voir docs/debordement-flux.md.",
     )
     ap.add_argument(
         "--detect-duplicates",
