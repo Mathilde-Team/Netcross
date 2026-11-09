@@ -156,6 +156,14 @@ th { background: #f9fafb; font-weight: 600; color: #374151; }
 .detail-preuve dt { color: #4b5563; } .detail-preuve dd { margin: 0; font-variant-numeric: tabular-nums; }
 .diagramme-preuve td { font-variant-numeric: tabular-nums; }
 .trame-preuve th, .trame-preuve td { background: #dbeafe; font-weight: 650; }
+.boutons-diagramme { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0; font-size: .82rem; }
+.sequence-conteneur { max-height: 26rem; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px;
+  background: #fff; }
+.sequence-conteneur svg { display: block; width: 100%; }
+.compteur-diagramme { color: #374151; font-size: .82rem; margin: .25rem 0 .5rem; }
+.carte-svg { max-width: 100%; }
+.trame-retr { stroke: #b91c1c; }
+.hote-anormal { stroke: #b91c1c; }
 @media print { body { padding: 0; } th { position: static; } }
 """
 
@@ -348,6 +356,146 @@ _JS = """
     racine.appendChild(sip);
   }
 
+  // -- Diagrammes de sequence non tronques + carte (issue #1079) --
+  var NS_SVG = "http://www.w3.org/2000/svg";
+  function svg(tag, attrs) {
+    var n = document.createElementNS(NS_SVG, tag);
+    if (attrs) { Object.keys(attrs).forEach(function (k) { n.setAttribute(k, attrs[k]); }); }
+    return n;
+  }
+  function texteSvg(x, y, contenu, attrs) {
+    var t = svg("text", Object.assign({"x": x, "y": y}, attrs || {}));
+    t.textContent = String(contenu);
+    return t;
+  }
+  var sectionDiagrammes = el("section", {"aria-labelledby": "titre-diagrammes"});
+  sectionDiagrammes.appendChild(el("h2", {"id": "titre-diagrammes"}, L.diagrams));
+  var diagrams = doc.sequence_diagrams || [];
+  if (!diagrams.length) {
+    sectionDiagrammes.appendChild(el("p", {"class": "vide"}, L.sequence_no_flows));
+  } else {
+    sectionDiagrammes.appendChild(el("p", {"class": "sous-titre"}, L.sequence_help));
+  }
+  diagrams.forEach(function (d, di) {
+    sectionDiagrammes.appendChild(el("h3", null, d.title));
+    if ((d.sampled_step || 1) > 1) {
+      sectionDiagrammes.appendChild(el("p", {"class": "vide"}, L.sequence_sampled
+        .replace("{step}", d.sampled_step).replace("{total}", d.total_steps)));
+    }
+    var etapes = d.steps || [];
+    if (!etapes.length) { return; }
+    var boutons = el("div", {"class": "boutons-diagramme", "role": "group", "aria-label": L.diagrams});
+    var cont = el("div", {"class": "sequence-conteneur", "data-conteneur-sequence": String(di),
+      "role": "region", "aria-label": d.title});
+    var compteurD = el("p", {"class": "compteur-diagramme", "aria-live": "polite"});
+    var pxParMs = 0.08;
+    var duree = (etapes[etapes.length - 1].rel_ms - etapes[0].rel_ms) || 1;
+    var MARGE_HAUT = 28;
+    var espace = svg("svg", {"data-role": "svg-sequence", "data-diagramme": String(di)});
+    var nomsColonnes = d.hosts || [];
+    var xColonne = function (hote) {
+      return nomsColonnes.indexOf(hote) < 0 ? 0
+        : ((nomsColonnes.indexOf(hote) + 1) / (nomsColonnes.length + 1)) * 100;
+    };
+    function dessinerLignesDeVie() {
+      nomsColonnes.forEach(function (h) {
+        var x = xColonne(h) + "%";
+        espace.appendChild(svg("line", {"x1": x, "y1": 12, "x2": x, "y2": 99999,
+          "stroke": "#e5e7eb", "stroke-width": 1}));
+        var texte = texteSvg(xColonne(h) + 0.5, 10, h, {"font-size": "11px", "font-weight": "650"});
+        texte.setAttribute("x", xColonne(h) + "%");
+        espace.appendChild(texte);
+      });
+    }
+    function dessinerFenetre() {
+      var st = cont.scrollTop || 0;
+      var hauteur = cont.clientHeight || 416;
+      var yMin = st - 120, yMax = st + hauteur + 120;
+      while (espace.childNodes.length) { espace.removeChild(espace.lastChild); }
+      dessinerLignesDeVie();
+      var rendues = 0;
+      etapes.forEach(function (etape) {
+        var y = MARGE_HAUT + (etape.rel_ms - etapes[0].rel_ms) * pxParMs;
+        if (y < yMin || y > yMax) { return; }
+        rendues += 1;
+        var x1 = xColonne(etape.src) + "%", x2 = xColonne(etape.dst) + "%";
+        var fleche = svg("line", {"x1": x1, "y1": y, "x2": x2, "y2": y,
+          "stroke": etape.is_retransmission ? "#b91c1c" : "#2563eb", "stroke-width": 1.2});
+        if (etape.is_retransmission) { fleche.setAttribute("class", "trame-retr"); }
+        espace.appendChild(fleche);
+        espace.appendChild(texteSvg((xColonne(etape.src) + xColonne(etape.dst)) / 2 + "%", y - 3,
+          etape.label + " -- " + etape.point + " " + fixe(etape.rel_ms, 1) + " ms",
+          {"font-size": "9.5px", "fill": "#374151"}));
+      });
+      compteurD.textContent = L.sequence_rendered
+        .replace("{shown}", rendues).replace("{total}", etapes.length);
+      espace.setAttribute("data-rendues", String(rendues));
+    }
+    function majEchelle() {
+      var hauteurTotale = MARGE_HAUT + duree * pxParMs + 24;
+      espace.setAttribute("height", String(Math.max(hauteurTotale, 60)));
+      espace.setAttribute("viewBox", "0 0 100 " + Math.max(hauteurTotale, 60));
+      espace.setAttribute("data-px-ms", String(pxParMs));
+    }
+    ["zoom-in", "zoom-out", "zoom-reset"].forEach(function (action) {
+      var b = el("button", {"type": "button", "data-diagramme": String(di), "data-action": action},
+        action === "zoom-in" ? L.sequence_zoom_in
+          : action === "zoom-out" ? L.sequence_zoom_out : L.sequence_zoom_reset);
+      b.addEventListener("click", function () {
+        var st = cont.scrollTop || 0;
+        var tHaut = st / pxParMs;
+        if (action === "zoom-in") { pxParMs = Math.min(pxParMs * 2, 100); }
+        if (action === "zoom-out") { pxParMs = Math.max(pxParMs / 2, 0.0005); }
+        if (action === "zoom-reset") { pxParMs = 0.08; }
+        majEchelle();
+        dessinerFenetre();
+        cont.scrollTop = tHaut * pxParMs;
+      });
+      boutons.appendChild(b);
+    });
+    cont.appendChild(espace);
+    cont.addEventListener("scroll", dessinerFenetre);
+    sectionDiagrammes.appendChild(boutons);
+    sectionDiagrammes.appendChild(cont);
+    sectionDiagrammes.appendChild(compteurD);
+    majEchelle();
+    dessinerFenetre();
+  });
+  var carte = doc.comm_map;
+  if (carte && (carte.edges || []).length) {
+    sectionDiagrammes.appendChild(el("h2", {"id": "titre-carte"}, L.comm_map));
+    sectionDiagrammes.appendChild(el("p", {"class": "sous-titre"}, L.comm_map_help));
+    var svgCarte = svg("svg", {"class": "carte-svg", "data-role": "svg-carte",
+      "role": "img", "aria-label": L.comm_map});
+    var hotes = carte.nodes || [];
+    var rayon = Math.max(120, 24 * hotes.length);
+    var position = {};
+    hotes.forEach(function (n, i) {
+      var angle = (2 * Math.PI * i) / Math.max(hotes.length, 1);
+      position[n.host] = [60 + rayon + rayon * Math.cos(angle), 60 + rayon + rayon * Math.sin(angle)];
+    });
+    (carte.edges || []).forEach(function (a) {
+      var p1 = position[a.src] || [0, 0], p2 = position[a.dst] || [0, 0];
+      var ligne = svg("line", {"x1": p1[0], "y1": p1[1], "x2": p2[0], "y2": p2[1],
+        "stroke": a.anomalies ? "#b91c1c" : "#2563eb", "stroke-width": 1.2});
+      svgCarte.appendChild(ligne);
+      svgCarte.appendChild(texteSvg((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2 - 3,
+        (a.protocols || []).join(",") + " " + a.bytes + " o", {"font-size": "9px", "fill": "#374151"}));
+    });
+    hotes.forEach(function (n) {
+      var p = position[n.host] || [0, 0];
+      var cercle = svg("circle", {"cx": p[0], "cy": p[1], "r": 14,
+        "fill": "#f9fafb", "stroke": n.anomalies ? "#b91c1c" : "#374151", "stroke-width": 1.5});
+      if (n.anomalies) { cercle.setAttribute("class", "hote-anormal"); }
+      svgCarte.appendChild(cercle);
+      svgCarte.appendChild(texteSvg(p[0], p[1] + 28, n.host + " (" + n.packets + ")", {"font-size": "10px"}));
+    });
+    svgCarte.setAttribute("width", String(2 * rayon + 120));
+    svgCarte.setAttribute("height", String(2 * rayon + 120));
+    sectionDiagrammes.appendChild(svgCarte);
+  }
+  racine.appendChild(sectionDiagrammes);
+
   var triage = el("section", {"aria-labelledby": "titre-triage"});
   triage.appendChild(el("h2", {"id": "titre-triage"}, L.triage));
   triage.appendChild(tableau(L.triage_caption, [L.segment, L.score, L.categories, L.findings_count],
@@ -524,6 +672,34 @@ def _labels() -> dict:
         "filters": _("Filtrer les constats"),
         "filter_all": _("Tous"),
         "counter": _("{shown} / {total} constat(s) affiche(s)"),
+        "diagrams": _("Diagrammes de sequence"),
+        "sequence_help": _(
+            "Echange des flux principaux, NON TRONQUE : defilez et zoomez dans le temps. "
+            "Chaque fleche est un paquet vu a un point de capture ; le meme paquet vu a "
+            "deux points donne deux fleches, et leur ecart vertical mesure le temps de transit."
+        ),
+        "sequence_sampled": _(
+            "Echantillonnage : 1 ligne sur {step} ({total} paquets dans le flux) -- "
+            "au-dela, le fichier aurait depasse le poids vise."
+        ),
+        "sequence_no_flows": _("Aucun flux corrélé : aucun diagramme."),
+        "sequence_zoom_in": _("Zoom temporel +"),
+        "sequence_zoom_out": _("Zoom temporel -"),
+        "sequence_zoom_reset": _("Échelle initiale"),
+        "sequence_rendered": _("{shown}/{total} ligne(s) rendue(s) dans la fenêtre visible"),
+        "comm_map": _("Carte des communications"),
+        "comm_map_help": _(
+            "Qui parle a qui : aretes orientees, protocoles, volumes et signaux "
+            "(retransmissions, expertise) ; les hotes anormaux sont en rouge."
+        ),
+        "comm_map_caption": _("Communications observées"),
+        "comm_map_empty": _("Aucune communication corrélée."),
+        "source": _("Source"),
+        "destination": _("Destination"),
+        "protocols": _("Protocoles"),
+        "packets": _("Paquets"),
+        "octets": _("Octets"),
+        "anomalies": _("Anomalies"),
         "evidence": _("Preuves"),
         "evidence_hint": _("Selectionner une preuve pour voir la trame a chaque point de capture."),
         "evidence_title": _("Preuve : trame {frame} au point {point}"),
@@ -695,6 +871,87 @@ def _static_evidence_links(finding: dict, ancres: dict) -> str:
     return ", ".join(liens)
 
 
+def _static_sequence(doc: dict, labels: dict) -> str:
+    """Diagrammes de sequence sans JS : le tableau integral des lignes
+    (l'echantillonnage, s'il y en a, est signe) -- meme information que le
+    rendu interactif, sans defilement ni zoom."""
+    logger.debug("_static_sequence: entrée")
+    blocs = []
+    for i, d in enumerate(doc.get("sequence_diagrams") or []):
+        titre = f"{_e(d.get('title') or labels['diagrams'])} ({_e(i)})"
+        entete = f"<h3>{titre}</h3>"
+        if (d.get("sampled_step") or 1) > 1:
+            entete += (
+                '<p class="vide">'
+                + _e(labels["sequence_sampled"].format(step=d.get("sampled_step"), total=d.get("total_steps")))
+                + "</p>"
+            )
+        lignes = [
+            [
+                _ms(etape.get("rel_ms", 0.0), labels),
+                _e(etape.get("label") or "?"),
+                _e(etape.get("src")),
+                _e(etape.get("dst")),
+                _e(etape.get("point")),
+            ]
+            for etape in d.get("steps") or []
+        ]
+        blocs.append(
+            entete
+            + _static_table(
+                labels["comm_map_caption"],
+                [
+                    labels["evidence_frame"],
+                    labels["category"],
+                    labels["source"],
+                    labels["destination"],
+                    labels["segment"],
+                ],
+                lignes,
+                labels["sequence_no_flows"],
+            )
+        )
+    if not blocs:
+        logger.debug("_static_sequence: retour vide")
+        return ""
+    corps = f"<h2>{_e(labels['diagrams'])}</h2>" + "".join(blocs)
+    logger.debug("_static_sequence: retour {} caractere(s)", len(corps))
+    return corps
+
+
+def _static_comm_map(doc: dict, labels: dict) -> str:
+    """Carte des communications sans JS : tableau des aretes orientees
+    (source, destination, protocoles, paquets, octets, anomalies)."""
+    logger.debug("_static_comm_map: entrée")
+    carte = doc.get("comm_map") or {}
+    lignes = [
+        [
+            _e(a.get("src")),
+            _e(a.get("dst")),
+            _e(", ".join(a.get("protocols") or [])),
+            _e(a.get("packets")),
+            _e(a.get("bytes")),
+            _e(a.get("anomalies") or 0),
+        ]
+        for a in carte.get("edges") or []
+    ]
+    corps = f"<h2>{_e(labels['comm_map'])}</h2>" + _static_table(
+        labels["comm_map_caption"],
+        [
+            labels["source"],
+            labels["destination"],
+            labels["protocols"],
+            labels["packets"],
+            labels["octets"],
+            labels["anomalies"],
+        ],
+        lignes,
+        labels["comm_map_empty"],
+    )
+    logger.debug("_static_comm_map: retour {} caractere(s)", len(corps))
+    return corps
+
+
 def _static_body(doc: dict, labels: dict) -> str:
     """Rendu sans JavaScript (``<noscript>``) : synthese, score, triage, constats."""
     logger.debug("_static_body: entrée")
@@ -748,6 +1005,8 @@ def _static_body(doc: dict, labels: dict) -> str:
         f"<p>{_e(labels['findings_count'])} : {len(findings)} ({_e(resume)})</p>"
         f"{_static_path(doc, labels)}"
         f"{_static_sip(doc, labels)}"
+        f"{_static_sequence(doc, labels)}"
+        f"{_static_comm_map(doc, labels)}"
         f"<h2>{_e(labels['triage'])}</h2>{triage}"
         f"<h2>{_e(labels['findings'])}</h2>{constats}"
         f"{_static_evidence(doc, labels)}"
