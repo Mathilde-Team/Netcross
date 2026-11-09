@@ -166,6 +166,8 @@ from dataclasses import dataclass, field
 
 from netcross_core.expert_model import EvidenceLink, ExpertEvent, PacketEvidence
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.microburst import format_microburst
+from netcross_report.path_metrics import latency_is_measurable
 
 logger = get_logger(__name__)
 SEVERITY_ORDER = {"anomalie": 0, "a_surveiller": 1, "info": 2}
@@ -255,6 +257,18 @@ def _http_error_evidence(examples: list[str], status_class: int, frames: list[in
 
 def build_findings(r) -> list[Finding]:
     findings: list[Finding] = []
+    for record in r.microbursts.values():
+        findings.extend(
+            Finding(
+                "a_surveiller",
+                "Microrafales",
+                event["point"],
+                format_microburst(event),
+                sample_size=event["packets"],
+                rule_id="microburst",
+            )
+            for event in record["events"]
+        )
 
     # -- pertes --
     for p in r.points:
@@ -763,7 +777,9 @@ def build_findings(r) -> list[Finding]:
             net_lat = r.latency.get(net_pair) if net_pair else None
             if net_lat:
                 avg_net = statistics.mean(net_lat)
-                if avg_server > 3 * avg_net and avg_server > 20:
+                estimate = r.clock_offset_estimate.get(net_pair)
+                ci = estimate.ic_decalage_ms if estimate is not None else None
+                if latency_is_measurable(avg_net, ci) and avg_server > 3 * avg_net and avg_server > 20:
                     findings.append(
                         Finding(
                             "a_surveiller",

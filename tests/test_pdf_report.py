@@ -36,6 +36,7 @@ import subprocess
 import pytest
 
 from netcross_core.baseline_diff import diff_reports
+from netcross_core.clock_sync import EstimationHorloge
 from netcross_core.models import Report
 from netcross_report.pdf import (
     _compliance_table,
@@ -95,6 +96,23 @@ def _rapport_vide() -> Report:
     donc le plus frequent en exploitation normale.
     """
     return Report(points=["A", "B"], pairs=[("A", "B")])
+
+
+def test_methode_horloge_dans_le_pdf_reel_et_non_mesurabilite(tmp_path):
+    report = _rapport_garni()
+    report.clock_offset_estimate[("POINT_AMONT", "POINT_AVAL")] = EstimationHorloge(
+        decalage_ms=37.0,
+        derive_ppm=15.0,
+        ic_decalage_ms=8.0,
+        n_echantillons=60,
+        methode="DNS <Theil-Sen> & robuste",
+    )
+    path = tmp_path / "horloge.pdf"
+    generate_pdf(report, str(path))
+    text = _texte_pdf(path)
+    assert "DNS <Theil-Sen> & robuste" in " ".join(text.split())
+    assert "non mesurable" in text
+    assert "37.00ms" in text and "15.0ppm" in text and "n=60" in text
 
 
 # --------------------------------------------------------------------------

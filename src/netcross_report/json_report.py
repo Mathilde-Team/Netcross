@@ -227,6 +227,7 @@ def _path_segment_dict(m) -> dict:
     d = dataclasses.asdict(m)
     d["segment"] = m.label
     d["measured"] = m.measured
+    d["latency_measurable"] = m.latency_measurable
     logger.debug("_path_segment_dict: retour dict")
     return d
 
@@ -278,6 +279,7 @@ def build_json_report_document(
     names=None,
     security_report=None,
     packet_flows=None,
+    sequence_budget_octets=None,
 ) -> dict:
     """
     Document de ``--json-report``, sans l'ecrire : servi tel quel par
@@ -315,7 +317,9 @@ def build_json_report_document(
     de paquet -> {point: [Pkt]}), a ne pas confondre avec ``flows``
     ci-dessus. Si fournie, la cle ``evidence_frames`` decrit chaque preuve
     des constats vue a chaque point (``netcross_report.evidence_frames``) ;
-    absente sinon.
+    les cles ``sequence_diagrams`` (flux principaux NON TRONQUES,
+    echantillonnes au-dela d'un budget de poids, issue #1079) et ``comm_map``
+    (carte des communications, issue #909) en sont deduites ; absentes sinon.
     """
     logger.debug(
         "build_json_report_document: r={} title={} meta={} findings={} tls_findings={} "
@@ -362,6 +366,7 @@ def build_json_report_document(
                 "samples": est.n_echantillons,
                 "kept": est.n_conserves,
                 "method": est.methode,
+                "sources": list(est.sources),
                 "forced": est.manuel,
             }
             for (a, b), est in r.clock_offset_estimate.items()
@@ -373,6 +378,8 @@ def build_json_report_document(
         "path_metrics": [_path_segment_dict(m) for m in build_path_metrics(r)],
         "meta": dict(meta) if meta else {},
         "findings": [_finding_dict(f) for f in findings],
+        "microbursts": r.microbursts,
+        "link_speeds": r.link_speeds,
         "triage": [_segment_score_dict(s) for s in ranked],
         # health_score/health_label : voir netcross_report.triage --
         # derives de "triage" ci-dessus (jamais un calcul independant), la
@@ -488,10 +495,22 @@ def build_json_report_document(
         }
     if packet_flows is not None:
         from netcross_report.evidence_frames import build_evidence_frames
+        from netcross_report.sequence_diagrams import (
+            BUDGET_DONNEES_DEFAUT,
+            build_comm_map_dict,
+            build_sequence_diagrams,
+        )
 
         doc["evidence_frames"] = build_evidence_frames(
             doc["findings"], packet_flows, list(r.points), getattr(r, "clock_offset_estimate", None)
         )
+        # Diagrammes de sequence non tronques + carte des communications
+        # (issue #1079) : meme correlation, meme document, une seule
+        # source de verite pour les trois surfaces.
+        doc["sequence_diagrams"] = build_sequence_diagrams(
+            packet_flows, budget_octets=sequence_budget_octets or BUDGET_DONNEES_DEFAUT
+        )
+        doc["comm_map"] = build_comm_map_dict(packet_flows)
 
     logger.debug("build_json_report_document: retour doc={}", summarize(doc, "doc"))
     return doc

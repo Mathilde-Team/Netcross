@@ -154,7 +154,7 @@ def chart_throughput(r, path):
 
 def chart_latency(r, path):
     logger.debug("chart_latency: r={} path={}", summarize(r, "r"), summarize(path, "path"))
-    pairs = [(a, b) for (a, b) in r.pairs if r.latency.get((a, b))]
+    pairs = [(s.upstream, s.downstream) for s in build_path_metrics(r) if s.latency_measurable]
     if not pairs:
         logger.debug("chart_latency: si not pairs -> retour None")
         return None
@@ -365,7 +365,9 @@ def chart_path_quality(metrics, path):
         return None
 
     labels = [seg.label for seg in metrics]
-    p95 = [seg.delay_p95_ms if seg.delay_p95_ms is not None else 0.0 for seg in metrics]
+    p95 = [
+        seg.delay_p95_ms if seg.latency_measurable and seg.delay_p95_ms is not None else float("nan") for seg in metrics
+    ]
     loss = [seg.loss_pct if seg.loss_pct is not None else 0.0 for seg in metrics]
 
     fig, ax = plt.subplots(figsize=(9, max(3.2, 0.8 * len(labels) + 2.0)))
@@ -384,9 +386,9 @@ def chart_path_quality(metrics, path):
     ax2.set_ylim(bottom=0)
 
     for i, seg in enumerate(metrics):
-        if seg.delay_p95_ms is None and seg.loss_pct is None:
+        if not seg.latency_measurable:
             ax.annotate(
-                "non mesure",
+                "latence non mesurable",
                 (i, 0),
                 textcoords="offset points",
                 xytext=(0, 6),

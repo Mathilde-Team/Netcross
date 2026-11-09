@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-229 modules · 334 classes · 836 fonctions publiques de module.
+236 modules · 338 classes · 859 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -36,15 +36,15 @@ flowchart TD
     CLI -->|"8 imports"| netcross_ai
     CLI -->|"61 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
-    netcross_gtk4 -->|"32 imports"| netcross_report
+    netcross_gtk4 -->|"34 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
-    netcross_gtk4 -->|"113 imports"| netcross_core
+    netcross_gtk4 -->|"120 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
-    netcross_api -->|"21 imports"| netcross_report
+    netcross_api -->|"23 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"56 imports"| netcross_core
+    netcross_api -->|"62 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"49 imports"| netcross_core
+    netcross_report -->|"52 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"25 imports"| pcap_parser
 ```
@@ -83,6 +83,7 @@ flowchart LR
     ExpertiseSettings["netcross_gtk4.expertise_view.ExpertiseSettings"]
     Exporter["netcross_core.plugins.api.Exporter"]
     Finding["netcross_report.synthesis.Finding"]
+    FiveTuple["netcross_core.active.planner.FiveTuple"]
     FlowView["netcross_core.flow_view.FlowView"]
     Flow["netcross_core.expert_model.Flow"]
     HistorySettings["netcross_gtk4.report_exports.HistorySettings"]
@@ -100,6 +101,7 @@ flowchart LR
     RawPacket["pcap_parser.packet.RawPacket"]
     ReportContext["netcross_gtk4.report_exports.ReportContext"]
     Report["netcross_core.models.Report"]
+    ResultatParis["netcross_core.active.paris_traceroute.ResultatParis"]
     RingFile["pcap_parser.capture.RingFile"]
     SegmentScore["netcross_report.triage.SegmentScore"]
     StreamQuality["netcross_core.extract.media.StreamQuality"]
@@ -135,6 +137,7 @@ flowchart LR
     RawPacket -->|radio| RadioInfo
     Report -->|clock_offset_estimate| EstimationHorloge
     Report -->|clock_offset_samples| EchantillonHorloge
+    ResultatParis -->|flux| FiveTuple
     SegmentScore -->|findings| Finding
     _Detector -->|run| netcross_core_security_expert_correlation__FlowState
 ```
@@ -437,6 +440,7 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +str? rtcp_hash
         +str? comment
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -539,6 +543,7 @@ classDiagram
 | `netcross_core.capture_tools` | manipulation de fichiers de capture partagee par la CLI, la GUI et l'API (issues #868, #869, #870, #886, #887). |
 | `netcross_core.causality` | moteur de correlation causale (Session 3 de la section 13.3 de FEATURES.md, Job 4/issue #4). |
 | `netcross_core.client_diff` | comparaison "client vs client" : meme capture, memes points, seule la source (l'IP du poste) change. |
+| `netcross_core.clock_samples` | Échantillons d'horloge UDP conservateurs, sans identifiant DNS global. |
 | `netcross_core.clock_sync` | estimation robuste du decalage et de la derive d'horloge entre deux points de capture (issue #996). |
 | `netcross_core.compliance` | evaluateur de conformite, huitieme et neuvieme objets de contrat de la Session 0 (FEATURES.md section 13.3) : `ReferenceProfile`/`ComplianceResult` (netcross_core.expert_model). |
 | `netcross_core.config` | chargement de configuration depuis .netcross.toml (issue #170). |
@@ -556,6 +561,7 @@ classDiagram
 | `netcross_core.flow_view` | vue enrichie d'un flux (FlowView), sixieme objet de contrat de la Session 0 (Job 9/issue #6, section 6.4 et 6.14 de FEATURES.md). |
 | `netcross_core.forensic` | index de correlation bidirectionnel evenement ↔ flow ↔ paquet (Job 8/issue #5, §6.3 et §6.14 de FEATURES.md). |
 | `netcross_core.forensic_search` | moteur de recherche analytique post-capture transversal (Job 17 / issue #16, section 6.13 de FEATURES.md). |
+| `netcross_core.gel_settings` | réglages du gel rétroactif et inventaire des incidents archivés (issue #1095, chantier #1001). |
 | `netcross_core.i18n` | internationalisation par GNU gettext (issue #299). |
 | `netcross_core.incident_analysis` | netcross_core.incident_analysis — analyse multi-points de la fenêtre gelée (issue #1091, chantier #1001 : enregistrement rétroactif déclenché par alarme). |
 | `netcross_core.link_speed` | Vitesse de lien et resolution d'horodatage par point (issue #1132). |
@@ -564,6 +570,7 @@ classDiagram
 | `netcross_core.logging_config` | configuration centrale du logging (issue #245). |
 | `netcross_core.lua_dissectors` | catalogue des dissecteurs Wireshark écrits en Lua, dans la banque Lua (issue #917). |
 | `netcross_core.lua_doc` | banque SQLite locale de l'API Lua Wireshark (issue #387, rattachee a #331). |
+| `netcross_core.microburst` | Microrafales par point, fenêtres glissantes exactes et référence relative. |
 | `netcross_core.models` | structures de donnees partagees : un paquet normalise (Pkt) et le resultat d'analyse consolide (Report). |
 | `netcross_core.multiscale` | Debit crete multi-echelle en fenetre glissante (issue #1133). |
 | `netcross_core.naming` | table locale de correspondance adresse/MAC -> nom logique, type, contexte (Job 18 / issue #16-bis, section 6.15 de FEATURES.md). |
@@ -633,7 +640,7 @@ classDiagram
     %% ===== netcross_core.analysis =====
     class mod_netcross_core_analysis["netcross_core.analysis"] {
         <<module>>
-        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets)
+        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds)
     }
 
     %% ===== netcross_core.annotations =====
@@ -814,12 +821,19 @@ classDiagram
         +write_client_diff_csv(result, path) None
     }
 
+    %% ===== netcross_core.clock_samples =====
+    class mod_netcross_core_clock_samples["netcross_core.clock_samples"] {
+        <<module>>
+        +collect_udp_samples(packets, pairs, nat_tolerant) dict
+    }
+
     %% ===== netcross_core.clock_sync =====
     class EchantillonHorloge {
         <<dataclass, frozen>>
         +float t
         +float decalage_ms
         +float delai_ms
+        +str source
     }
     class EstimationHorloge {
         <<dataclass>>
@@ -832,6 +846,7 @@ classDiagram
         +int n_conserves
         +str methode
         +bool manuel
+        +tuple~str, ...~ sources
         +decalage_a(t) float
     }
     class mod_netcross_core_clock_sync["netcross_core.clock_sync"] {
@@ -1349,6 +1364,17 @@ classDiagram
         +search(query) list~ForensicSearchResult~
     }
 
+    %% ===== netcross_core.gel_settings =====
+    class mod_netcross_core_gel_settings["netcross_core.gel_settings"] {
+        <<module>>
+        +valider_reglages(demande) dict~str, Any~
+        +lire_reglages(chemin) dict~str, Any~
+        +ecrire_reglages(reglages, chemin) dict~str, Any~
+        +vers_gel_config(reglages) tuple~GelConfig, str~
+        +lister_incidents(archives_dir) list~dict~str, Any~~
+        +detail_incident(archives_dir, incident) dict~str, Any~?
+    }
+
     %% ===== netcross_core.i18n =====
     class mod_netcross_core_i18n["netcross_core.i18n"] {
         <<module>>
@@ -1574,6 +1600,13 @@ classDiagram
         +suggest_classes(conn, nom, n) list~str~
     }
 
+    %% ===== netcross_core.microburst =====
+    class mod_netcross_core_microburst["netcross_core.microburst"] {
+        <<module>>
+        +detect_microbursts(packets, link_speeds) dict~str, dict~
+        +format_microburst(event) str
+    }
+
     %% ===== relations =====
     DiffFinding --> EvidenceLink : evidence
     CaptureGroup --> CaptureInventory : members
@@ -1717,6 +1750,7 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +str? rtcp_hash
         +str? ip_checksum
         +bool? ip_checksum_bad
         +str? tcp_checksum
@@ -1908,6 +1942,7 @@ classDiagram
         +list~str~ packet_comments
         +list~dict~ capture_infos
         +dict~str, dict~ link_speeds
+        +dict~str, dict~ microbursts
         +dict~str, dict~str, dict~str, int~~~ dechiffrement
         +list~str~ points_keylog
         +list~ChecksumError~ checksum_errors
@@ -1931,6 +1966,8 @@ classDiagram
         <<ValueError>>
     }
     class SlidingWindowPeak {
+        +current_bytes() int
+        +current_packets() int
         +update(ts_ns, length) None
     }
     class MultiScaleRates {
@@ -2341,6 +2378,7 @@ classDiagram
 | Module | Rôle |
 |---|---|
 | `netcross_core.active` | confirmation active du diagnostic passif (chantier #999, parent #993). |
+| `netcross_core.active.paris_traceroute` | Traceroute Paris optionnel via Scamper, sans émission à l'import (#1065). |
 | `netcross_core.active.planner` | planificateur « constat localise -> mesure active proposee » (issue #1063, sous-issue 1/5 du chantier #999). |
 | `netcross_core.active.twamp` | client TWAMP-Light (RFC 5357, annexe I ; issue #1066, sous-issue 3/5 du chantier #999). |
 
@@ -2349,6 +2387,34 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_core.active.paris_traceroute =====
+    class ParisError {
+        <<ValueError>>
+    }
+    class Parametres {
+        <<dataclass, frozen>>
+        +int max_ttl
+        +int tentatives
+        +int debit_max
+        +int timeout
+        +int silence_max
+    }
+    class ResultatParis {
+        <<dataclass>>
+        +FiveTuple flux
+        +str debut
+        +str statut
+        +str message
+        +int? envoyees
+        +dict? donnees
+        +to_dict() dict
+    }
+    class mod_netcross_core_active_paris_traceroute["netcross_core.active.paris_traceroute"] {
+        <<module>>
+        +mesurer(flux, parametres, binaire) ResultatParis
+        +mesurer_proposition(proposition, kwargs) ResultatParis
+    }
 
     %% ===== netcross_core.active.planner =====
     class FiveTuple {
@@ -2427,6 +2493,7 @@ classDiagram
     }
 
     %% ===== relations =====
+    ResultatParis --> FiveTuple : flux
     ProposedMeasurement --> FiveTuple : five_tuple
     Sonde --> Reponse : reponse
     ResultatTwamp --> Sonde : sondes
@@ -4107,6 +4174,7 @@ classDiagram
 | `netcross_report.rule_engine` | premier PILOTE du moteur d'EXECUTION evoque comme premier chantier ouvert par CLAUDE.md/`Prochaine feature` depuis la Session 54 (bibliotheque de regles §6.2 complete, 41 regles) : faire evaluer une… |
 | `netcross_report.security_html` | rendu HTML du rapport de securite (issue #218, troisieme sortie apres le texte et le JSON). |
 | `netcross_report.security_report` | rapport de securite consolide et tableau de bord (CVE-5, issue #139, parent #133). |
+| `netcross_report.sequence_diagrams` | diagrammes de sequence multi-points du rapport HTML (issue #1079, sous-issue 4/6 du chantier #1000). |
 | `netcross_report.sequence_view` | diagramme de sequence multi-hotes (Job 14/issue #11, FEATURES.md section 6.5). |
 | `netcross_report.session_objects` | construction et rendu CONSOLE des objets de contrat de la Session 0 (Job 4/issue #13). |
 | `netcross_report.siem_export` | export des constats de securite pour integration SIEM : CEF (issue #170), LEEF 2.0 et STIX 2.1 (issue #279). |
@@ -4269,7 +4337,7 @@ classDiagram
     %% ===== netcross_report.json_report =====
     class mod_netcross_report_json_report["netcross_report.json_report"] {
         <<module>>
-        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows) dict
+        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows, sequence_budget_octets) dict
         +generate_json_report(r, output_path, title, kwargs) str
         +generate_json_diff(findings, baseline, current, output_path, title, meta, tls_findings_baseline, tls_findings_current, quic_findings_baseline, quic_findings_current, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, names) str
     }
@@ -4397,9 +4465,11 @@ classDiagram
         +int hop_outliers
         +label() str
         +measured() bool
+        +latency_measurable() bool
     }
     class mod_netcross_report_path_metrics["netcross_report.path_metrics"] {
         <<module>>
+        +latency_is_measurable(delay_ms, clock_ci_ms) bool
         +build_path_metrics(report) list~SegmentMetrics~
         +rank_path_segments(metrics) list~SegmentMetrics~
         +degradation_summary(metrics) str
@@ -4509,6 +4579,13 @@ classDiagram
         +format_security_report(sr) list~str~
         +print_security_report(sr) None
         +security_report_to_dict(sr) dict
+    }
+
+    %% ===== netcross_report.sequence_diagrams =====
+    class mod_netcross_report_sequence_diagrams["netcross_report.sequence_diagrams"] {
+        <<module>>
+        +build_sequence_diagrams(packet_flows, max_flows, budget_octets) list~dict~
+        +build_comm_map_dict(packet_flows) dict
     }
 
     %% ===== netcross_report.sequence_view =====
@@ -4704,6 +4781,7 @@ classDiagram
 | `netcross_api.batches` | lots de captures de l'API (issue #872). |
 | `netcross_api.bpf_routes` | bibliothèque de filtres BPF enregistrés (issue #906), équivalent API de ``--bpf-library NOM`` et des boutons « Filtres… » / « Enregistrer » de la GUI. |
 | `netcross_api.history_routes` | historique SQLite des runs (issue #874). |
+| `netcross_api.incident_routes` | gel rétroactif et incidents archivés (issue #1095, chantier #1001) : configurer le gel, consulter les incidents, lancer leur analyse. |
 | `netcross_api.live_routes` | capture en direct sur des interfaces du serveur, puis analyse (issue #902), équivalent API de ``--live`` et de la case « Capture en direct » de la GUI. |
 | `netcross_api.lua_doc_routes` | documentation hors ligne de l'API Lua Wireshark (issue #873), équivalent de ``netcross-lua-doc --json``. |
 | `netcross_api.models` | modèles Pydantic pour les requêtes/réponses API (issue #209). |
@@ -4856,6 +4934,22 @@ classDiagram
         +require_history_db() str
         +record_comparison(findings, baseline_report, current_report, label, redact) dict~str, Any~
         +record_analysis(report, findings, tls_findings, quic_findings, label, redact) dict~str, Any~
+        +register(app, verify) None
+    }
+
+    %% ===== netcross_api.incident_routes =====
+    class GelConfigBody {
+        <<BaseModel>>
+        +float? seconds_before
+        +float? seconds_after
+        +str? min_severity
+        +float? min_delay_between_gels
+        +int? max_octets_archives
+        +str? archives_dir
+    }
+    class mod_netcross_api_incident_routes["netcross_api.incident_routes"] {
+        <<module>>
+        +gel_config_path() Path?
         +register(app, verify) None
     }
 
@@ -5052,6 +5146,7 @@ classDiagram
 | `netcross_gtk4.forensic_panel` | panneau GTK « Recherche forensic » de la page Resultats (issue #675). |
 | `netcross_gtk4.forensic_view` | recherche forensic de la GUI (issue #675). |
 | `netcross_gtk4.history_window` | fenetre « Historique des runs » (issue #874) : consultation d'une base ``--history-db`` sans relancer d'analyse, avec les filtres de ``netcross-history`` (``--run-type``, ``--label``, ``--limit``). |
+| `netcross_gtk4.incidents_panel` | Décisions de l'onglet « Incidents » (issue #1095, chantier #1001), sorties de ``netcross_gtk4/app.py``. |
 | `netcross_gtk4.live_capture_points` | points de capture en direct de la GUI (Job 48, issue #168) : une ligne du panneau de capture live peut porter PLUSIEURS interfaces d'une meme machine ("eth0, eth1"), chacune devenant son propre point… |
 | `netcross_gtk4.live_report_session` | rapport HTML rafraichi en continu pendant une capture en direct de la GUI (issue #676). |
 | `netcross_gtk4.lua_doc_view` | logique sans GTK de la fenetre « Documentation Lua » (issue #873), equivalent de ``netcross-lua-doc``. |
@@ -5489,6 +5584,18 @@ classDiagram
         <<Gtk.Window>>
         +selected_run_type() str?
         +show_history() str
+    }
+
+    %% ===== netcross_gtk4.incidents_panel =====
+    class mod_netcross_gtk4_incidents_panel["netcross_gtk4.incidents_panel"] {
+        <<module>>
+        +lire_reglages_partages(chemin) dict~str, Any~
+        +ecrire_reglages_partages(reglages, chemin) dict~str, Any~
+        +lister_incidents_depuis_reglages(reglages) list~dict~str, Any~~
+        +formater_taille(octets) str
+        +texte_etat_rapport(rapport_json, rapport_html) str
+        +texte_incident(incident) str
+        +reglages_depuis_saisie(seconds_before, seconds_after, min_severity, min_delay_between_gels, max_octets, archives_dir) dict~str, Any~
     }
 
     %% ===== netcross_gtk4.live_capture_points =====

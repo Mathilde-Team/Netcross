@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: netcross\n"
 "Report-Msgid-Bugs-To: https://github.com/MathildeDec/Netcross/issues\n"
-"POT-Creation-Date: 2026-11-08 14:37+0000\n"
+"POT-Creation-Date: 2026-11-09 18:51+0000\n"
 "PO-Revision-Date: 2026-09-23 07:01+0000\n"
 "Last-Translator: Netcross\n"
 "Language-Team: none\n"
@@ -64,11 +64,11 @@ msgstr "Flux"
 msgid "Latence (ms)"
 msgstr "Latence (ms)"
 
-#: src/netcross_gtk4/stats_view.py
+#: src/netcross_gtk4/stats_view.py src/netcross_report/html_report.py
 msgid "Octets"
 msgstr "Octets"
 
-#: src/netcross_gtk4/stats_view.py
+#: src/netcross_gtk4/stats_view.py src/netcross_report/html_report.py
 msgid "Paquets"
 msgstr "Paquets"
 
@@ -152,7 +152,15 @@ msgid "Anomalie"
 msgstr ""
 
 #: src/netcross_report/html_report.py
+msgid "Anomalies"
+msgstr ""
+
+#: src/netcross_report/html_report.py
 msgid "Aucun constat : rien d'anormal detecte."
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Aucun flux corrélé : aucun diagramme."
 msgstr ""
 
 #: src/netcross_report/html_report.py
@@ -178,7 +186,15 @@ msgid "Aucun segment selectionne."
 msgstr ""
 
 #: src/netcross_report/html_report.py
+msgid "Aucune communication corrélée."
+msgstr ""
+
+#: src/netcross_report/html_report.py
 msgid "Bon"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Carte des communications"
 msgstr ""
 
 #: src/netcross_report/html_report.py
@@ -205,6 +221,10 @@ msgstr ""
 
 #: src/netcross_report/html_report.py
 msgid "Chemin observe"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Communications observées"
 msgstr ""
 
 #: src/netcross_report/html_report.py
@@ -248,11 +268,38 @@ msgid "Derive d'horloge"
 msgstr ""
 
 #: src/netcross_report/html_report.py
+msgid "Destination"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Diagrammes de sequence"
+msgstr ""
+
+#: src/netcross_report/html_report.py
 msgid "Ecarts de sauts"
 msgstr ""
 
 #: src/netcross_report/html_report.py
+msgid ""
+"Echange des flux principaux, NON TRONQUE : defilez et zoomez dans le temps. "
+"Chaque fleche est un paquet vu a un point de capture ; le meme paquet vu a "
+"deux points donne deux fleches, et leur ecart vertical mesure le temps de "
+"transit."
+msgstr ""
+
+#: src/netcross_report/html_report.py
+#, python-brace-format
+msgid ""
+"Echantillonnage : 1 ligne sur {step} ({total} paquets dans le flux) -- au-"
+"dela, le fichier aurait depasse le poids vise."
+msgstr ""
+
+#: src/netcross_report/html_report.py
 msgid "Echantillons"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Echantillons d'horloge"
 msgstr ""
 
 #: src/netcross_report/html_report.py
@@ -280,6 +327,14 @@ msgid "Gigue"
 msgstr ""
 
 #: src/netcross_report/html_report.py
+msgid "IC95%"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "IC95% (horloge)"
+msgstr ""
+
+#: src/netcross_report/html_report.py
 msgid "Information"
 msgstr ""
 
@@ -292,14 +347,16 @@ msgid "Messages SIP de l'appel, une colonne par point de capture"
 msgstr ""
 
 #: src/netcross_report/html_report.py
+msgid "Methode d'horloge"
+msgstr ""
+
+#: src/netcross_report/html_report.py
 msgid "Metriques par segment, dans l'ordre du chemin"
 msgstr ""
 
 #: src/netcross_report/html_report.py
-#, fuzzy
-#| msgid "Paquets"
 msgid "Paquets perdus"
-msgstr "Paquets"
+msgstr "Paquets perdus"
 
 #: src/netcross_report/html_report.py
 msgid "Points de capture"
@@ -316,6 +373,16 @@ msgstr ""
 
 #: src/netcross_report/html_report.py
 msgid "Preuves vues a chaque point"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Protocoles"
+msgstr "Protocoles"
+
+#: src/netcross_report/html_report.py
+msgid ""
+"Qui parle a qui : aretes orientees, protocoles, volumes et signaux "
+"(retransmissions, expertise) ; les hotes anormaux sont en rouge."
 msgstr ""
 
 #: src/netcross_report/html_report.py
@@ -352,6 +419,10 @@ msgstr ""
 
 #: src/netcross_report/html_report.py
 msgid "Severite"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Source"
 msgstr ""
 
 #: src/netcross_report/html_report.py
@@ -396,6 +467,22 @@ msgstr ""
 
 #: src/netcross_report/html_report.py
 msgid "Trous noirs PMTUD"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Zoom temporel +"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Zoom temporel -"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "incertitude d'horloge superieure a la latence ou invalide"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "latence non mesurable"
 msgstr ""
 
 #: src/netcross_report/html_report.py
@@ -446,7 +533,16 @@ msgstr ""
 
 #: src/netcross_report/html_report.py
 #, python-brace-format
+msgid "{shown}/{total} ligne(s) rendue(s) dans la fenêtre visible"
+msgstr ""
+
+#: src/netcross_report/html_report.py
+#, python-brace-format
 msgid ""
 "{total} message(s) : {lost} perdu(s), {retransmitted} retransmis, "
 "{rewritten} reecrit(s)."
+msgstr ""
+
+#: src/netcross_report/html_report.py
+msgid "Échelle initiale"
 msgstr ""

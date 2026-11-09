@@ -15,8 +15,8 @@ ici fait donc échouer la CI.
 | Surface | Points d'entrée | Capacités |
 |---|---|---|
 | CLI | `cross_capture_analyzer_cli.py` (136 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
-| GUI | `netcross_gtk4` : 3 pages, 44 cases à cocher, 31 réglages numériques | Analyse interactive et exploration visuelle |
-| API | 62 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) |
+| GUI | `netcross_gtk4` : 4 pages, 44 cases à cocher, 35 réglages numériques | Analyse interactive et exploration visuelle ; onglet « Incidents » : réglages du gel rétroactif et archives (issue #1095) |
+| API | 67 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) |
 
 
 Légende : **oui** = disponible ; **non** = absent ; **auto** = toujours
@@ -52,7 +52,7 @@ actif, non réglable.
 | Fenêtre temporelle du débit | oui | `--bucket-ms` | `bucket_ms` (#330, #841) |
 | Cadence RTP | oui | `--rtp-clock-rate` | `rtp_clock_rate` (#330, #841) |
 | Vitesse de lien (repli si `if_speed` absent) | non | `--link-speed` | non (#1132) |
-| Décalage d'horloge entre points (estimation TCP/DNS, correction automatique des délais) | non | `--clock-offset` (décalage manuel imposé, désactive l'estimation de la paire) | non |
+| Décalage d'horloge entre points (estimation TCP/DNS/RTP/RTCP bidirectionnel, correction automatique des délais) | non | `--clock-offset` (décalage manuel imposé, désactive l'estimation de la paire) | non |
 | Seuil de coupure NAT/pare-feu silencieuse | oui (« Coupure silencieuse (s) », 0 = défaut 60 s) | `--idle-timeout-seconds` | `idle_timeout_seconds` (#330, #841) |
 | Limiter ou échantillonner les paquets | oui (« Paquets max. », « Echantillonnage 1/N » en analyse simple, troncature annoncée dans le rapport ; issue #672) | `--max-packets`, `--sample` | `max_packets`, `sample` (issue #672) |
 | Noms logiques des hôtes | oui (« Table des noms... », exports CSV détaillé et JSON) | `--names` | `names` (fichier joint, issue #672) |
@@ -333,6 +333,11 @@ l'option CLI de même nom) : `nat_tolerant`, `nat_window_ms`, `tls`,
 | `GET /bpf-filters` | Bibliothèque de filtres BPF : catalogue puis filtres enregistrés (issue #906) |
 | `PUT /bpf-filters/{nom}` | Crée ou remplace un filtre BPF enregistré, `expression`, `description` (issue #906) |
 | `DELETE /bpf-filters/{nom}` | Supprime un filtre BPF enregistré (issue #906) |
+| `GET /gel/config` | Réglages du gel rétroactif, fichier partagé avec la GUI `~/.netcross/gel_config.json` (issue #1095) |
+| `PUT /gel/config` | Remplace les réglages du gel, corps `corps` (même validation que la GUI, issue #1095) |
+| `GET /incidents` | Inventaire des incidents archivés : manifestes des gels, état des rapports (issue #1095) |
+| `GET /incidents/{incident}` | Détail d'un incident archivé, manifeste et rapport d'analyse (issue #1095) |
+| `POST /incidents/{incident}/analyse` | Analyse multi-points de la fenêtre gelée, rapport JSON et HTML (issues #1091, #1095) |
 
 Réglages par variables d'environnement (`NETCROSS_API_TOKEN` pour
 l'en-tête `X-API-Key`, `NETCROSS_MAX_UPLOAD_MB`, `NETCROSS_API_MAX_FILES`,

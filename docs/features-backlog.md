@@ -21,6 +21,34 @@ toute divergence avec le README reflète l'état effectif du code.
 
 ### Outillage qualité (lint / format / architecture)
 
+Traceroute Paris (#1065, session 79) : backend explicite
+`netcross_core.active.paris_traceroute` via Scamper optionnel. Flux conservé,
+TTL à partir de 1, débit maximal de 10 sondes/s avec espacement natif
+minimum et arrêt sur silence persistant ; nombre natif vérifié et erreurs
+de droits explicites. Aucun branchement automatique CLI/API, réservé à
+#1068. Le job isolé impose TCP, UDP, ICMP et pertes réelles, quatre tests
+sans skip ; l'écriture du test ne vaut pas son exécution réussie.
+Voir [les mesures actives](mesures-actives.md#traceroute-paris-1065).
+
+Échantillons UDP d'horloge (#1029, session 78) : collecte isolée dans
+`netcross_core.clock_samples`. DNS : identifiant, nom normalisé et
+extrémités, refus des échanges incomplets et collisions ; rapprochement
+NAT uniquement avec les empreintes des deux messages. RTP/RTCP :
+datagrammes uniques aux deux points et deux sens de la même connexion,
+proximité ≤ 1 s à chaque point. Aucun offset depuis un seul sens ;
+symétrie des transits supposée, non prouvée. Sources collectées exposées
+dans la méthode et le JSON, sans prétendre que toutes passent le filtre.
+Voir [l'estimation d'horloge](estimation-horloge.md).
+
+Détection des microrafales (#1135, session 76) : `analyse` appelle
+automatiquement `netcross_core.microburst` ; les résultats par point
+alimentent le texte, le JSON et les constats `Microrafales` (règle
+`microburst`). La vitesse est résolue avant l'analyse CLI. Seuils
+et limites : [inventaire des détecteurs](detectors.md#microrafales-seuils-automatiques-et-interpretation).
+Le détecteur utilise une référence globale et reste classé seconde passe ;
+la corrélation aux pertes et la localisation par segment ne sont pas
+déclarées réalisées par ce lot.
+
 Journalisation (#954, 08/11/2026) : 183 traces d'entrée supplémentaires,
 sans arguments ni données réseau ; référence des entrées abaissée de 193
 à 9, référence des sorties maintenue à 0. Les neuf entrées restantes

@@ -3363,6 +3363,11 @@ def main():
         all_packets = [pk for pk in all_packets if not pk.is_duplicate]
     flows = correlate(all_packets, args.nat_tolerant, args.nat_window_ms, args.exclude_duplicates)
     marquer(mesures, "detecteurs")
+    resolved_link_speeds = {}
+    if captures:
+        from netcross_core.link_speed import resolve_link_speeds
+
+        resolved_link_speeds = resolve_link_speeds(captures, link_speed_overrides)
     r = analyse(
         flows,
         points_order,
@@ -3375,6 +3380,7 @@ def main():
         exclude_duplicates=args.exclude_duplicates,
         duplicate_counts=duplicate_counts,
         clock_offsets=args.clock_offset,
+        link_speeds=resolved_link_speeds,
     )
     # Commentaires de SECTION pcapng (Job 39/issue #159) -- lus ici, au
     # dernier moment avant le rendu : metadonnee de fichier, pas de paquet,
@@ -3385,9 +3391,6 @@ def main():
         r.capture_comments = read_capture_comments(captures)
         r.capture_infos = read_capture_infos(captures)
         r.points_keylog = sorted(tls_keylogs)
-        from netcross_core.link_speed import resolve_link_speeds
-
-        r.link_speeds = resolve_link_speeds(captures, link_speed_overrides)
     # Report.truncated/truncation_note (issue #283, Etape 3) : ecrit ici, pas
     # dans analyse() -- meme discipline que capture_comments/capture_infos
     # ci-dessus, la troncature est une decision de l'appelant (CLI), pas un
