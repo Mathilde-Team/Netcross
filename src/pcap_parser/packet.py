@@ -317,6 +317,8 @@ class RawPacket:
     # Metadonnees radio 802.11 (RSSI, MCS, debit, retry, canal -- issue
     # #1142) : None hors capture 802.11. Voir pcap_parser.radio.
     radio: RadioInfo | None = None
+    # RTCP disséqué par tshark : empreinte de la charge utile, jamais le contenu.
+    rtcp_hash: str | None = None
     # Commentaire de paquet pcapng (Enhanced Packet Block, option
     # opt_comment -- Job 39, issue #159). None sur un pcap classique (le
     # format ne porte aucune notion de commentaire) ou sur un paquet
@@ -651,7 +653,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
         udp_checksum = g(udp, "udp_udp_checksum")
         udp_checksum_bad = checksum_is_bad(g(udp, "udp_udp_checksum_status"))
 
-        rtp = extract_rtp(layers, payload)
+        rtp = None if "rtcp" in layers else extract_rtp(layers, payload)
         if rtp:
             is_rtp = True
             rtp_seq, rtp_ts, rtp_ssrc = rtp["seq"], rtp["ts"], rtp["ssrc"]
@@ -874,6 +876,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
         rtp_seq=rtp_seq,
         rtp_ts=rtp_ts,
         rtp_ssrc=rtp_ssrc,
+        rtcp_hash=hashlib.sha256(payload).hexdigest() if "rtcp" in layers and payload else None,
         encap_tags=encap_tags,
         dhcp_xid=dhcp_xid,
         dhcp_msg_type=dhcp_msg_type,

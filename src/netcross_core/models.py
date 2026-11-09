@@ -207,6 +207,8 @@ class Pkt:
     # Metadonnees radio 802.11 par trame (issue #1142), reportees depuis
     # RawPacket.radio ; None hors capture 802.11.
     radio: RadioInfo | None = None
+    # Empreinte SHA-256 d'un datagramme identifié RTCP par tshark (#1029).
+    rtcp_hash: str | None = None
     # -- Checksums IP/TCP/UDP (Job 43/issue #163) : valeurs brutes (chaine
     # hex) et verdicts tri-etats (True=invalide, False=valide, None=non
     # determine) reportes tels quels depuis RawPacket. Pas encore consommes

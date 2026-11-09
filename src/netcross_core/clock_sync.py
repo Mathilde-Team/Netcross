@@ -59,18 +59,21 @@ class EchantillonHorloge:
     """Un couple requete/reponse vu aux deux points d'une paire.
 
     Args:
-        t (float): Instant de la requete vu au point amont (secondes,
-            horloge du point amont) -- ancre temporelle de l'echantillon.
+        t (float): Ancre temporelle de l'échantillon (secondes, horloge
+            du point amont) : requête TCP ou milieu des observations UDP.
         decalage_ms (float): Decalage NTP ``b - a`` estime sur cet
             echange (millisecondes).
         delai_ms (float): Delai aller-retour apparent ``(t4-t1)-(t3-t2)``
             (millisecondes) -- plus il est faible, moins l'echantillon a
             subi de files d'attente, plus il est digne de confiance.
+        source (str): Protocole de collecte ; TCP par défaut pour
+            compatibilité avec les constructions historiques à trois champs.
     """
 
     t: float
     decalage_ms: float
     delai_ms: float
+    source: str = "TCP"
 
 
 @dataclass
@@ -110,6 +113,7 @@ class EstimationHorloge:
     n_conserves: int = 0
     methode: str = ""
     manuel: bool = False
+    sources: tuple[str, ...] = ()
 
     def decalage_a(self, t: float) -> float:
         """Decalage extrapole au temps ``t`` (correction par paquet).
@@ -315,7 +319,9 @@ def estimer_decalage(echantillons: list[EchantillonHorloge]) -> EstimationHorlog
         ic_derive_ppm=ic_derive,
         n_echantillons=len(echantillons),
         n_conserves=len(conserves),
-        methode="filtre au délai minimal + Theil-Sen",
+        methode="filtre au délai minimal + Theil-Sen ; sources : "
+        + ", ".join(sorted({sample.source for sample in echantillons})),
+        sources=tuple(sorted({sample.source for sample in echantillons})),
     )
     logger.debug("estimer_decalage: sortie {}", estimation)
     return estimation
