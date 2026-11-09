@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-233 modules · 332 classes · 852 fonctions publiques de module.
+234 modules · 335 classes · 854 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -83,6 +83,7 @@ flowchart LR
     ExpertiseSettings["netcross_gtk4.expertise_view.ExpertiseSettings"]
     Exporter["netcross_core.plugins.api.Exporter"]
     Finding["netcross_report.synthesis.Finding"]
+    FiveTuple["netcross_core.active.planner.FiveTuple"]
     FlowView["netcross_core.flow_view.FlowView"]
     Flow["netcross_core.expert_model.Flow"]
     HistorySettings["netcross_gtk4.report_exports.HistorySettings"]
@@ -100,6 +101,7 @@ flowchart LR
     RawPacket["pcap_parser.packet.RawPacket"]
     ReportContext["netcross_gtk4.report_exports.ReportContext"]
     Report["netcross_core.models.Report"]
+    ResultatParis["netcross_core.active.paris_traceroute.ResultatParis"]
     RingFile["pcap_parser.capture.RingFile"]
     SegmentScore["netcross_report.triage.SegmentScore"]
     StreamQuality["netcross_core.extract.media.StreamQuality"]
@@ -135,6 +137,7 @@ flowchart LR
     RawPacket -->|radio| RadioInfo
     Report -->|clock_offset_estimate| EstimationHorloge
     Report -->|clock_offset_samples| EchantillonHorloge
+    ResultatParis -->|flux| FiveTuple
     SegmentScore -->|findings| Finding
     _Detector -->|run| netcross_core_security_expert_correlation__FlowState
 ```
@@ -2355,6 +2358,7 @@ classDiagram
 | Module | Rôle |
 |---|---|
 | `netcross_core.active` | confirmation active du diagnostic passif (chantier #999, parent #993). |
+| `netcross_core.active.paris_traceroute` | Traceroute Paris optionnel via Scamper, sans émission à l'import (#1065). |
 | `netcross_core.active.planner` | planificateur « constat localise -> mesure active proposee » (issue #1063, sous-issue 1/5 du chantier #999). |
 | `netcross_core.active.twamp` | client TWAMP-Light (RFC 5357, annexe I ; issue #1066, sous-issue 3/5 du chantier #999). |
 
@@ -2363,6 +2367,34 @@ classDiagram
 ```mermaid
 classDiagram
     direction LR
+
+    %% ===== netcross_core.active.paris_traceroute =====
+    class ParisError {
+        <<ValueError>>
+    }
+    class Parametres {
+        <<dataclass, frozen>>
+        +int max_ttl
+        +int tentatives
+        +int debit_max
+        +int timeout
+        +int silence_max
+    }
+    class ResultatParis {
+        <<dataclass>>
+        +FiveTuple flux
+        +str debut
+        +str statut
+        +str message
+        +int? envoyees
+        +dict? donnees
+        +to_dict() dict
+    }
+    class mod_netcross_core_active_paris_traceroute["netcross_core.active.paris_traceroute"] {
+        <<module>>
+        +mesurer(flux, parametres, binaire) ResultatParis
+        +mesurer_proposition(proposition, kwargs) ResultatParis
+    }
 
     %% ===== netcross_core.active.planner =====
     class FiveTuple {
@@ -2441,6 +2473,7 @@ classDiagram
     }
 
     %% ===== relations =====
+    ResultatParis --> FiveTuple : flux
     ProposedMeasurement --> FiveTuple : five_tuple
     Sonde --> Reponse : reponse
     ResultatTwamp --> Sonde : sondes
