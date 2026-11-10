@@ -25,6 +25,18 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   la table `--redact-map` pour que la correspondance couvre aussi les adresses
   découvertes dans les trames brutes. Implémentation `netcross_core.redact_pcap`,
   tests `test_redact_pcap.py`.
+- Encart « Anonymisation » du rapport (#1159, sous-issue 5/5 du chantier
+  anonymisation #1007) : le rapport certifie ce qui a été masqué. Un encart en
+  tête du Markdown, en page de garde du PDF, clé `redaction` du JSON (donc du
+  rapport HTML et de l'API) liste précisément le périmètre appliqué : portée
+  (`--redact-scope`), nombre d'adresses IP/MAC et de noms anonymisés, pcapng
+  anonymisés produits (`--redact-pcap`) et traitement de leurs charges
+  utiles, table `--redact-map` — et rappelle que les constats (protocoles,
+  ports, longueurs, horodatages) ne changent pas. Source unique
+  `netcross_report.redaction_note`, aucun recalcul dans les générateurs.
+  README (« Limites connues » remis à jour : combinable `--tls`/`--quic`/
+  `--client-group` depuis #1155) et features-backlog section 5.2 actualisés.
+  Tests `test_redaction_note.py`.
 - Tableau de bord Grafana d'exemple (#1118, sous-issue 5/5 de l'export observabilité #1003) :
   `docs/grafana/netcross-segments.json` (score de santé, pertes et délais par segment via `$segment`,
   triage, constats, paquets/flux perdus/retransmissions par point — variables `$run` et `$segment`)

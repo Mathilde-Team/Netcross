@@ -235,6 +235,7 @@ def build_markdown_report_document(
     security_report=None,
     rule_engine_findings=None,
     names=None,
+    redaction=None,
 ) -> str:
     """
     Construit le document Markdown complet (sans l'écrire).
@@ -248,10 +249,14 @@ def build_markdown_report_document(
     security_report : SecurityReport optionnel (issue #218).
     rule_engine_findings : dict optionnel {rule_id: [Finding, ...]}.
     names : dict optionnel {host: name} pour résolution de noms.
+    redaction : dict optionnel issu de redaction_note.build_redaction_info()
+    (issue #1159) ; fourni, un encart certifie le périmètre d'anonymisation
+    appliqué.
     """
     logger.debug(
         "build_markdown_report_document: r={} title={} meta={} findings={} tls_findings={} "
-        "quic_findings={} session_objects={} security_report={} rule_engine_findings={} names={}",
+        "quic_findings={} session_objects={} security_report={} rule_engine_findings={} names={} "
+        "redaction={}",
         summarize(r, "r"),
         summarize(title, "title"),
         summarize(meta, "meta"),
@@ -262,6 +267,7 @@ def build_markdown_report_document(
         summarize(security_report, "security_report"),
         summarize(rule_engine_findings, "rule_engine_findings"),
         summarize(names, "names"),
+        summarize(redaction, "redaction"),
     )
     if findings is None:
         findings = build_findings(r)
@@ -278,6 +284,12 @@ def build_markdown_report_document(
     if meta:
         lines.extend(f"**{k}** : {v}" for k, v in meta.items())
     lines.append("")
+    # -- Encart Anonymisation (issue #1159) --
+    if redaction:
+        from netcross_report.redaction_note import lignes_encart_markdown
+
+        lines.extend(lignes_encart_markdown(redaction))
+        lines.append("")
 
     # -- Score de santé --
     if getattr(r, "active_confirmation", None):
