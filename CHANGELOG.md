@@ -8,6 +8,17 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Sonde `netcross-probe` (#1099, sous-issue 2/6 du chantier sondes distribuées #1002) :
+  agent léger de capture locale en tampon circulaire (tshark/dumpcap,
+  `ring_recorder_args`), qui extrait à la demande une fenêtre [t1, t2] filtrée BPF
+  et la livre en pcapng avec son SHA-256 et son intervalle réellement couvert
+  (contrat v1, `docs/probe-api-v1.yaml`). Le filtre BPF est appliqué par libpcap
+  elle-même en relecture (tshark interdit `-f` avec `-r`, dumpcap ne filtre pas un
+  tube) via `netcross_probe.bpf` (ctypes, aucune dépendance ajoutée) ; la fenêtre
+  est découpée par editcap, fusionnée par mergecap, convertie en pcapng. CLI
+  `python3 -m netcross_probe` (`capture`, `fenetre`). La sécurité mTLS (#1101),
+  les métadonnées pertes/horloge (#1103) et le collecteur (#1105) viendront se
+  brancher sur `AgentProbe`. Voir docs/probe-agent.md.
 - Image CI préconstruite effectivement utilisée (#968) : les cinq jobs en
   conteneur chargent `ghcr.io/mathilde-team/netcross-ci:26.04` avec lecture
   seule du registre ; les installations apt ne tournent que si un paquet

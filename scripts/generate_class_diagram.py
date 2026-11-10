@@ -55,7 +55,15 @@ DEFAULT_OUTPUT = REPO_ROOT / "docs" / "class-diagram.md"
 # Ordre des couches, de la plus basse a la plus haute (contrat import-linter de
 # pyproject.toml, lu a l'envers). Tout module de src/ hors de ces packages est
 # range dans le groupe CLI.
-LAYER_ORDER = ["pcap_parser", "netcross_core", "netcross_ai", "netcross_report", "netcross_api", "netcross_gtk4"]
+LAYER_ORDER = [
+    "pcap_parser",
+    "netcross_probe",
+    "netcross_core",
+    "netcross_ai",
+    "netcross_report",
+    "netcross_api",
+    "netcross_gtk4",
+]
 CLI_GROUP = "CLI"
 
 # Marge sous la limite de 50 000 caracteres par defaut de mermaid (maxTextSize).
