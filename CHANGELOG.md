@@ -159,6 +159,18 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   sécurité) et à la demande. `ci.yml` basculera dessus dans une seconde PR, une fois l'image publiée.
 
 ### Modifié
+- Levée de l'exclusion `--redact` avec `--tls`/`--quic`/`--client-group`
+  (#1155, sous-issue 3/5 du chantier anonymisation #1007) : les évènements
+  TLS/QUIC des pipelines indépendants sont rédigés par
+  `redact_diagnostic_events()` (adresses src/dst et SNI via la table commune
+  aux paquets) et les adresses `--client-group` sont traduites avant usage par
+  `redact_client_group()` — un run combiné ne laisse filtrer aucune adresse
+  réelle. Branché sur les deux CLI (analyseur et diff), l'API
+  (`redact` + `tls`/`quic` autorisés ; route `client-diff` traduite par la
+  table du run, conservée en mémoire dans l'analyse) et la GUI (cases
+  combinables, seuls le rapport de sécurité et `--tls-keylog` restent
+  refusés avec l'anonymisation). Tests `test_redact_tls_quic.py` et
+  couverture CLI/API/GUI du run combiné.
 - Licence (#986) : passage de MIT à **GPL-3.0-or-later** — texte officiel
   GPLv3 dans `LICENSE`, déclaration `license = "GPL-3.0-or-later"` dans
   `pyproject.toml`, en-têtes `SPDX-License-Identifier` sur tous les

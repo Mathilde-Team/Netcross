@@ -30,6 +30,7 @@ from netcross_core.correlate import correlate
 from netcross_core.logging_config import get_logger, summarize
 from netcross_core.models import Report
 from netcross_core.parsing import parse_capture
+from netcross_core.redact import redact_client_group, redact_diagnostic_events
 from netcross_core.report_text import print_report
 from netcross_core.tls_keylog import options_lecture, options_lecture_parallele
 from netcross_core.wireshark_expert import build_wireshark_expert_events
@@ -212,11 +213,9 @@ def run_analysis_pipeline(
         logger.debug("run_analysis_pipeline: si options.security and options.redact -> levée ValueError")
         raise ValueError("le rapport de securite n'est pas disponible avec l'anonymisation des adresses")
 
-    if options.client_groups and options.redact:
-        # meme refus que --client-group --redact (CLI) : les groupes portent
-        # des IP reelles, introuvables dans des paquets anonymises
-        logger.debug("run_analysis_pipeline: client_groups and redact -> levée ValueError")
-        raise ValueError("la comparaison de postes n'est pas disponible avec l'anonymisation des adresses")
+    # Issue #1155 : --client-group --redact est AUTORISE -- les adresses
+    # des groupes sont traduites par la table commune apres anonymisation
+    # (voir l'etape 3), la comparaison cherche donc des pseudonymes.
 
     def _log(msg: str) -> None:
         # Avec la GUI, on_progress aboutit a MainWindow._log qui trace deja
@@ -328,6 +327,7 @@ def _run_pipeline(
         _log(f"  -> {duplicate_total} paquet(s) dupliqué(s) détecté(s)")
 
     redaction_map: tuple = ()
+    redactor = None
     # 3. Anonymisation
     if options.redact:
         _log("Anonymisation des adresses IP/MAC (--redact)...")
@@ -336,6 +336,10 @@ def _run_pipeline(
         redactor = redact_packets(all_packets)
         redaction_map = tuple(redactor.entries())  # issue #876 : --redact-map
         _log(f"  -> {len(redactor)} adresse(s) anonymisée(s)")
+        # Issue #1155 : les adresses des groupes --client-group sont
+        # traduites AVANT usage -- meme table que les paquets rediges.
+        if options.client_groups:
+            options.client_groups = redact_client_group(options.client_groups, redactor)
 
     # 4. Corrélation
     _log("Correlation des flux entre points de capture...")
@@ -455,7 +459,11 @@ def _run_pipeline(
 
         tls_events = []
         for label, path in captures:
-            tls_events.extend(parse_tls_capture(label, path))
+            events = parse_tls_capture(label, path)
+            # Issue #1155 : memes pseudonymes que les paquets rediges.
+            if redactor is not None:
+                redact_diagnostic_events(events, redactor)
+            tls_events.extend(events)
         status_by_point = build_handshake_status(tls_events)
         tls_findings = diagnose_tls(status_by_point, report.points)
         with contextlib.redirect_stdout(buf):
@@ -481,11 +489,13 @@ def _run_pipeline(
         else:
             quic_events = []
             for label, path in captures:
-                quic_events.extend(
-                    parse_quic_capture(
-                        label, path, **({"tls_keylog": advanced.tls_keylog} if advanced.tls_keylog else {})
-                    )
+                quic_found = parse_quic_capture(
+                    label, path, **({"tls_keylog": advanced.tls_keylog} if advanced.tls_keylog else {})
                 )
+                # Issue #1155 : memes pseudonymes que les paquets rediges.
+                if redactor is not None:
+                    redact_diagnostic_events(quic_found, redactor)
+                quic_events.extend(quic_found)
             quic_findings = diagnose_quic(quic_events, report.points)
             with contextlib.redirect_stdout(buf):
                 print("\n" + "=" * 70)

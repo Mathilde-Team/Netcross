@@ -39,19 +39,18 @@ Chaque valeur reelle garde un pseudonyme stable pendant tout le run : les
 regroupements (dialogue SIP par Call-ID, certificat auto-signe quand sujet =
 emetteur, requetes vers un meme hote) restent exacts apres anonymisation.
 
-Egalement HORS PERIMETRE, par construction architecturale plutot que
-par choix : les diagnostics TLS/QUIC (netcross_core.tls_diagnostics/
-quic_diagnostics) et la comparaison client vs client
-(netcross_core.client_diff) operent chacun sur leur PROPRE reparse
-independant des fichiers (voir leurs docstrings respectives) ou sur des
-adresses IP fournies explicitement par l'operateur sur la ligne de
-commande (--client-group) -- aucun des deux ne passe par la liste
-`all_packets` redigee ici. Combiner --redact avec --tls/--quic/
---client-group laisserait donc filtrer des adresses reelles par ces
-canaux : les deux CLI refusent explicitement cette combinaison plutot
-que de produire un rapport partiellement redige sans le signaler (voir
-cross_capture_analyzer_cli.py/cross_capture_diff_cli.py, meme discipline
-que le refus deja existant de --tls/--quic/--parallel avec --live).
+Les diagnostics TLS/QUIC (netcross_core.tls_diagnostics/quic_diagnostics)
+et la comparaison client vs client (netcross_core.client_diff) operent
+chacun sur leur PROPRE reparse independant des fichiers (voir leurs
+docstrings respectives) ou sur des adresses IP fournies explicitement par
+l'operateur sur la ligne de commande (--client-group) -- aucun des deux
+ne passe par la liste `all_packets` redigee ici. Issue #1155 : ces trois
+canaux ne sont plus refuses avec --redact, ils passent par la MEME table
+de pseudonymes -- les evenements TLS/QUIC sont rediges par
+`redact_diagnostic_events()` (adresses src/dst et SNI, coherence avec les
+paquets garantie par la table partagee) et les adresses --client-group
+sont traduites AVANT usage par `redact_client_group()`, si bien qu'un
+run combine ne laisse filtrer aucune adresse reelle.
 
 Mapping deterministe et partage : une meme adresse d'origine produit
 toujours le meme pseudonyme, sur tout l'appel a AddressRedactor.redact()
@@ -463,6 +462,39 @@ class AddressRedactor:
         pour un usage programmatique simple (tests notamment)."""
         logger.debug("AddressRedactor.mapping: retour dictionnaire")
         return {addr: pseudo for addr, pseudo, _kind in self._table.entries()}
+
+
+def redact_diagnostic_events(events, redactor: AddressRedactor) -> None:
+    """Redige en place les evenements des pipelines independants --tls/
+    --quic (TlsEvent/QuicEvent, issue #1155) : adresses src/dst via la
+    table commune aux paquets (une adresse vue dans un paquet ET dans un
+    evenement garde le meme pseudonyme), SNI via la table des noms quand
+    la portee couvre les noms. A appeler AVANT build_handshake_status()/
+    diagnose_*(), qui corralent les flux sur src/dst et affichent le SNI."""
+    logger.debug("redact_diagnostic_events: {} evenement(s)", len(events))
+    for ev in events:
+        ev.src = redactor.pseudonymize_address(ev.src)
+        ev.dst = redactor.pseudonymize_address(ev.dst)
+        if redactor.named_fields:
+            sni = getattr(ev, "sni", None)
+            if sni:
+                ev.sni = redactor.pseudonymize_name(sni)
+    logger.debug("redact_diagnostic_events: fin")
+
+
+def redact_client_group(client_group, redactor: AddressRedactor) -> dict:
+    """Traduit les adresses --client-group (dict nom -> iterable d'IP)
+    AVANT tout usage (issue #1155) : les paquets sont deja rediges, la
+    comparaison client vs client doit chercher des PSEUDONYMES -- meme
+    table, donc un groupe dont une IP apparait dans les captures garde
+    la correspondance du run."""
+    logger.debug(
+        "redact_client_group: {} groupe(s)",
+        len(client_group),
+    )
+    translated = {name: {redactor.pseudonymize_address(ip) for ip in ips} for name, ips in client_group.items()}
+    logger.debug("redact_client_group: retour traduits")
+    return translated
 
 
 def redact_packets(packets, scope: str = SCOPE_ALL) -> AddressRedactor:
