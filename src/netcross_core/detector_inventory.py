@@ -121,6 +121,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         "la latence par segment est corrigée au temps de chaque paquet",
     ),
     Detecteur(
+        "microburst_causality",
+        PHASE,
+        SECONDE_PASSE,
+        "épisodes de rafale et impacts localisés, dix preuves maximum par épisode et segment",
+        "50 ms après la fin de l'épisode par défaut, configurable",
+        ("microburst_correlations",),
+        "paquets communs encadrants ; horloge corrigée et incertitude pour les retransmissions aval",
+    ),
+    Detecteur(
         "pmtud",
         PHASE,
         FENETRE_BORNEE,
@@ -265,6 +274,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         "durée du flux RTP, plus 5 s de recouvrement entre jambes",
         ("rtp_matches",),
         "appariement entre points malgré NAT/SBC (#1121) : décalage constant de séquence et d'horodatage",
+    ),
+    Detecteur(
+        "rtp_segments",
+        PHASE,
+        FENETRE_BORNEE,
+        "couples RTP normalisés par jambe et premiers instants de capture",
+        "recouvrement des jambes du flux",
+        ("rtp_segments",),
+        "transport RTP/SRTP par segment (#1123), délais soumis à l'incertitude d'horloge",
     ),
     Detecteur(
         "response_time",

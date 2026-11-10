@@ -380,6 +380,7 @@ def build_json_report_document(
         "meta": dict(meta) if meta else {},
         "findings": [_finding_dict(f) for f in findings],
         "microbursts": r.microbursts,
+        "microburst_correlations": r.microburst_correlations,
         "link_speeds": r.link_speeds,
         "triage": [_segment_score_dict(s) for s in ranked],
         # health_score/health_label : voir netcross_report.triage --
@@ -451,6 +452,8 @@ def build_json_report_document(
     # #1121 : jambes d'un meme flux RTP a plusieurs points (NAT/SBC).
     if getattr(r, "rtp_matches", None):
         doc["rtp_matches"] = list(r.rtp_matches)
+    if getattr(r, "rtp_segments", None):
+        doc["rtp_segments"] = list(r.rtp_segments)
     if getattr(r, "voip_calls", None):
         doc["voip_calls"] = list(r.voip_calls)
         doc["voip_quality_distribution"] = dict(r.voip_quality_distribution)

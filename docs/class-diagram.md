@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-242 modules · 345 classes · 867 fonctions publiques de module.
+244 modules · 347 classes · 870 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -44,9 +44,9 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"67 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"58 imports"| netcross_core
+    netcross_report -->|"59 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"25 imports"| pcap_parser
+    netcross_core -->|"27 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -565,6 +565,7 @@ classDiagram
 | `netcross_core.gel_settings` | réglages du gel rétroactif et inventaire des incidents archivés (issue #1095, chantier #1001). |
 | `netcross_core.i18n` | internationalisation par GNU gettext (issue #299). |
 | `netcross_core.incident_analysis` | netcross_core.incident_analysis — analyse multi-points de la fenêtre gelée (issue #1091, chantier #1001 : enregistrement rétroactif déclenché par alarme). |
+| `netcross_core.incident_chain` | netcross_core.incident_chain — orchestration production de la chaîne d'incident (issue #1001 : enregistrement rétroactif déclenché par alarme). |
 | `netcross_core.link_speed` | Vitesse de lien et resolution d'horodatage par point (issue #1132). |
 | `netcross_core.live_diff` | Capture en continu + diff en direct (Job 33, issue #33). |
 | `netcross_core.live_report` | issue #274 : export / rapport temps reel du mode ``--live``. |
@@ -584,6 +585,7 @@ classDiagram
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
+| `netcross_core.rtp_segments` | Qualité de transport entre jambes RTP appariées, sans lire le contenu. |
 | `netcross_core.seconde_passe` | seconde passe ciblée du mode en flux (issue #1025, sous-issue 6/6 du chantier #995 : pipeline en flux à empreinte mémoire bornée). |
 | `netcross_core.sip_ladder` | diagramme d'echelle SIP multi-points (issue #1125, sous-issue 4/6 du chantier VoIP #1004). |
 | `netcross_core.spill` | debordement sur disque (SQLite) des structures de l'etat par flux (issue #1024, sous-issue 5/6 du chantier #995). |
@@ -643,7 +645,7 @@ classDiagram
     %% ===== netcross_core.analysis =====
     class mod_netcross_core_analysis["netcross_core.analysis"] {
         <<module>>
-        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds, collect_active_evidence)
+        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds, collect_active_evidence, microburst_window_ms)
     }
 
     %% ===== netcross_core.annotations =====
@@ -789,8 +791,14 @@ classDiagram
     }
 
     %% ===== netcross_core.causality =====
+    class MicroburstCorrelator {
+        +add_loss(a, b, packet)
+        +add_retransmissions(per_point)
+        +results() list~dict~
+    }
     class mod_netcross_core_causality["netcross_core.causality"] {
         <<module>>
+        +format_microburst_correlation(record) str
         +correlate_event_causes(events) list~ExpertEvent~
         +correlate_diagnosis_causes(diagnoses) list~Diagnosis~
     }
@@ -1417,6 +1425,16 @@ classDiagram
         +analyser_incident(manifeste, dossier_incident, parseur, scanner, evaluateur, generateur_html, seuil_notification, notificateur, cfg_notification) RapportIncident
     }
 
+    %% ===== netcross_core.incident_chain =====
+    class ChaineIncidents {
+        +on_alarm(event, ts_courant) GelReport?
+        +attendre_termine(timeout) bool
+    }
+    class mod_netcross_core_incident_chain["netcross_core.incident_chain"] {
+        <<module>>
+        +chaine_incidents_depuis_reglages(reglages, points, injectables) ChaineIncidents
+    }
+
     %% ===== netcross_core.link_speed =====
     class mod_netcross_core_link_speed["netcross_core.link_speed"] {
         <<module>>
@@ -1891,6 +1909,7 @@ classDiagram
         +dict~tuple~str, str~, int~ encap_frag_correlated
         +list~dict~ rtp_streams
         +list~dict~ rtp_matches
+        +list~dict~ rtp_segments
         +list~dict~ voip_calls
         +dict~str, int~ voip_quality_distribution
         +dict~str, list~float~~ server_think_time
@@ -1956,6 +1975,7 @@ classDiagram
         +list~dict~ capture_infos
         +dict~str, dict~ link_speeds
         +dict~str, dict~ microbursts
+        +list~dict~ microburst_correlations
         +dict~str, dict~str, dict~str, int~~~ dechiffrement
         +list~str~ points_keylog
         +list~ChecksumError~ checksum_errors
@@ -2210,6 +2230,12 @@ classDiagram
     class mod_netcross_core_rtp_match["netcross_core.rtp_match"] {
         <<module>>
         +match_rtp_streams(all_packets, points, window_seconds) list~dict~
+    }
+
+    %% ===== netcross_core.rtp_segments =====
+    class mod_netcross_core_rtp_segments["netcross_core.rtp_segments"] {
+        <<module>>
+        +analyse_rtp_segments(packets, matches, estimates, ordered, clock_rate)
     }
 
     %% ===== netcross_core.seconde_passe =====

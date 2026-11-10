@@ -556,6 +556,8 @@ class Report:
     # Flux RTP apparies entre points malgre NAT/SBC (#1121), voir
     # netcross_core.rtp_match.match_rtp_streams.
     rtp_matches: list[dict] = field(default_factory=list)
+    # #1123 : transport RTP/SRTP par segment, avec incertitude d'horloge.
+    rtp_segments: list[dict] = field(default_factory=list)
     # -- VoIP orientee appel (Job 24 / §6.12) --
     voip_calls: list[dict] = field(default_factory=list)
     voip_quality_distribution: dict[str, int] = field(default_factory=lambda: defaultdict(int))
@@ -763,6 +765,9 @@ class Report:
     # #1135 : événements et échelles refusées par point ; analyse automatique,
     # médiane des tranches non vides et seuil relatif si vitesse inconnue.
     microbursts: dict[str, dict] = field(default_factory=dict)
+    # #1137 : associations temporelles épisode/segment aval, preuves bornées.
+    # Une absence de paquet n'est pas une preuve de congestion physique.
+    microburst_correlations: list[dict] = field(default_factory=list)
     # -- Couverture du dechiffrement TLS/QUIC (issue #1043) -- dechiffrement
     # est rempli par analyse() (netcross_core.dechiffrement.compter_sessions) :
     # point -> {"tls"/"quic": {"sessions", "dechiffrees"}}. points_keylog est
