@@ -31,6 +31,7 @@ from netcross_core.expert_rules import _RULE_CATALOG, Rule, get_rule, list_rules
 
 _EXPECTED_IDS = (
     "microburst",
+    "microburst_downstream_impact",
     # Session 46 -- treize regles "deja presentes"
     "loss_per_segment",
     "tcp_retransmission_fast",
@@ -134,8 +135,8 @@ def test_rule_correlation_rule_explicite():
 # -- catalogue : structure ---------------------------------------------------
 
 
-def test_catalogue_quarante_deux_regles():
-    assert len(_RULE_CATALOG) == 42
+def test_catalogue_quarante_trois_regles():
+    assert len(_RULE_CATALOG) == 43
 
 
 def test_catalogue_ids_uniques_et_attendus():
@@ -706,6 +707,19 @@ def test_rule_id_couvre_les_quarante_deux_regles_et_respecte_le_domaine():
             ]
         }
     }
+    # #1137 : la nouvelle règle doit être produite par un vrai constat,
+    # sans remplacer l'égalité exhaustive avec les identifiants du catalogue.
+    r.microburst_correlations = [
+        {
+            "upstream": "A",
+            "downstream": "B",
+            "burst_end": 0.052,
+            "window_ms": 50.0,
+            "losses": 1,
+            "retransmissions": 0,
+            "evidence": [{"point": "A", "frame_number": 17, "ts": 0.06, "kind": "losses"}],
+        }
+    ]
     used_rule_ids = set()
     for f in build_findings(r):
         if f.rule_id is None:

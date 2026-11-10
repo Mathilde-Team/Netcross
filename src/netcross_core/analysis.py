@@ -21,6 +21,7 @@ from netcross_core.application import (
     build_http_transactions,
     classify_transaction,
 )
+from netcross_core.causality import MicroburstCorrelator
 from netcross_core.clock_samples import collect_udp_samples
 from netcross_core.clock_sync import (
     EchantillonHorloge,
@@ -88,6 +89,7 @@ def analyse(
     clock_offsets=None,
     link_speeds=None,
     collect_active_evidence=False,
+    microburst_window_ms=None,
 ):
     # Job 41/issue #161 : exclude_duplicates (defaut False -> comportement
     # historique inchange) retire de `flows` ET de `all_packets` les paquets
@@ -216,10 +218,13 @@ def analyse(
             clock_offsets,
         )
 
+    microburst_correlator = MicroburstCorrelator(r, flows, bool(points_order), microburst_window_ms)
     for key, per_point in flows.items():
         present_points = [p for p in points if p in per_point]
         is_tcp = key[0] == "TCP"
         conversation_seen = conversation_points.get(_conversation_key(key))
+        if microburst_correlator.bounds:
+            microburst_correlator.add_retransmissions(per_point)
 
         for p in present_points:
             r.seen_count[p] += 1
@@ -277,6 +282,10 @@ def analyse(
                     a_point = points[nearest_j]
                     ts_a = min(pkt.ts for pkt in per_point[a_point])
                     r.loss_event_buckets[(a_point, p)].append(int(ts_a // bucket_seconds))
+                    if microburst_correlator.bounds:
+                        microburst_correlator.add_loss(
+                            a_point, p, min(per_point[a_point], key=lambda packet: packet.ts)
+                        )
 
         for a, b in pairs:
             if a in per_point and b in per_point:
@@ -414,6 +423,8 @@ def analyse(
                 if per_point_encap.get(a) != per_point_encap.get(b):
                     r.encap_frag_correlated[(a, b)] += 1
 
+    with _phase("microburst_causality"):
+        r.microburst_correlations = microburst_correlator.results()
     with _phase("pmtud"):
         _analyse_pmtud(r, flows, pairs)
     # idle_timeout_seconds=None (defaut) -> _IDLE_TIMEOUT_SECONDS via le
