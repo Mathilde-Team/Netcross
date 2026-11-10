@@ -118,6 +118,58 @@ class MetricSeries:
 ChartKind = Literal["line", "area", "bars", "histogram", "scatter"]
 
 
+def render_microburst(event: dict, correlations: list[dict], path: str) -> str | None:
+    """Zoom d'un épisode : débit agrégé mesuré et preuves aval échantillonnées."""
+    logger.debug("render_microburst: entrée point={}", event.get("point"))
+    profile = event.get("profile")
+    if not profile or not profile["bytes"]:
+        logger.debug("render_microburst: sortie sans profil")
+        return None
+    origin = profile["origin"]
+    start = event["start"] - origin
+    xs = [(profile["start_offset_s"] + i * profile["bin_s"] - start) * 1000 for i in range(len(profile["bytes"]))]
+    ys = [size * 8 / duration / 1e6 for size, duration in zip(profile["bytes"], profile["durations_s"])]
+    fig, (traffic, impacts) = plt.subplots(2, 1, figsize=(10, 5), sharex=True, gridspec_kw={"height_ratios": [3, 1]})
+    try:
+        traffic.bar(xs, ys, width=[d * 1000 for d in profile["durations_s"]], align="edge", color="#2563eb")
+        traffic.axvspan(0, (event["end"] - event["start"]) * 1000, alpha=0.15, color="#f59e0b", label="Episode detecte")
+        traffic.set_ylabel("Debit moyen (Mbit/s)")
+        traffic.set_title(f"Microrafale au point {event['point']} | tranches de {profile['bin_s'] * 1e6:g} us")
+        traffic.legend(loc="upper right")
+        records = [
+            record
+            for record in correlations
+            if record["upstream"] == event["point"]
+            and record["burst_start"] == event["start"]
+            and record["burst_end"] == event["end"]
+        ]
+        for row, record in enumerate(records):
+            evidence = [proof for proof in record["evidence"] if proof["kind"] == "losses"]
+            times = [(proof["upstream_ts"] - origin - start) * 1000 for proof in evidence]
+            impacts.scatter(times, [row] * len(times), marker="x", color="#dc2626")
+            impacts.text(
+                1.01,
+                row,
+                f"{record['upstream']} -> {record['downstream']} : {record['losses']} pertes ({len(times)} preuves)",
+                transform=impacts.get_yaxis_transform(),
+                va="center",
+                fontsize=8,
+            )
+        if not records:
+            impacts.text(0.02, 0.5, "Aucune perte aval correlee etablie", transform=impacts.transAxes, fontsize=8)
+        impacts.set_ylim(-0.7, max(0.7, len(records) - 0.3))
+        impacts.set_yticks([])
+        impacts.set_ylabel("Pertes aval")
+        impacts.set_xlabel("Temps depuis le debut de l'episode (ms), horloge amont")
+        impacts.set_xlim(xs[0], xs[-1] + profile["durations_s"][-1] * 1000)
+        fig.tight_layout()
+        fig.savefig(path, dpi=130, bbox_inches="tight")
+    finally:
+        plt.close(fig)
+    logger.debug("render_microburst: sortie {}", path)
+    return path
+
+
 def _x_values(series: MetricSeries) -> list[float]:
     """Abscisses pour les rendus ligne/aire/scatter : timestamps
     si fournis, sinon index numeriques."""

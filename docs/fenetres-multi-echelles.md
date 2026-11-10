@@ -57,8 +57,28 @@ peaks = multiscale_peaks(packets_by_point, speeds)  # {point: {"scales": [...], 
 
 ## Limites
 
-- Le module calcule seulement les crêtes. Il ne décide pas de ce qui constitue une microrafale (#1135). Il ne fait
-  pas non plus le lien avec les pertes du segment aval (#1137), et ses résultats n'apparaissent pas encore dans le
-  rapport (#1139).
+- Le module multi-échelle calcule seulement les crêtes. Le détecteur `microburst` identifie les épisodes (#1135)
+  et `MicroburstCorrelator` associe les impacts aval dans une fenêtre configurable (#1137).
 - La taille comptée est celle de la trame capturée (`length`). Le préambule et l'espace inter-trames Ethernet ne
   sont pas comptés : le taux d'occupation est donc légèrement sous-estimé pour les petites trames.
+
+## Zooms du rapport PDF
+
+Chaque épisode détecté dispose d'un zoom dans la section « Microrafales et pertes aval » (#1139).
+Le profil est calculé à partir des paquets du même point : cinq échelles de contexte avant l'épisode,
+puis la fenêtre de corrélation après sa fin (50 ms par défaut, réglable via
+`NETCROSS_MICROBURST_WINDOW_MS`). Les bornes sont limitées à la capture : aucun silence n'est inventé
+avant son début ou après sa fin. Un contexte tronqué est signalé.
+
+Le profil conserve au plus 512 tranches, leur durée effective et leur volume d'octets, sans conserver les paquets
+dans le rapport. La largeur est au moins celle de l'échelle détectée et respecte le quantum d'horodatage.
+Le débit représenté est une moyenne par tranche, pas la crête glissante exacte : la largeur est inscrite
+sur le graphique et la crête du détecteur est rappelée séparément avec son échelle. Une agrégation plus
+large peut lisser un pic très bref ; elle ne modifie pas la détection.
+
+Les croix rouges placent uniquement les preuves de pertes déjà établies par le corrélateur, au temps
+`upstream_ts` dans l'horloge du point amont. Elles ne déduisent pas de pertes à partir de la courbe.
+Chaque segment indique le compteur exhaustif et le nombre de preuves affichées ; le corrélateur
+limite l'ensemble des preuves de pertes/retransmissions à dix par épisode et segment.
+L'absence de preuve ne signifie pas absence de perte. Cette association temporelle ne prouve pas une
+congestion physique. Un ancien rapport sans profil ne reçoit pas de courbe reconstruite arbitrairement.

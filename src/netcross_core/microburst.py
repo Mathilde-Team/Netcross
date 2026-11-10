@@ -177,3 +177,53 @@ def format_microburst(event: dict) -> str:
     )
     logger.debug("format_microburst: retour du résumé")
     return text
+
+
+def add_microburst_profiles(report, packets, window_ms: float) -> None:
+    """Conserve au plus 512 tranches réelles par épisode, jamais les paquets.
+
+    Les moyennes de ces tranches ne remplacent pas la crête glissante du
+    détecteur. La fenêtre est limitée à la capture : hors capture ne signifie
+    pas silence. Les horodatages restent dans le référentiel du point amont.
+    """
+    logger.debug("add_microburst_profiles: entrée fenêtre={} ms", window_ms)
+    active = {point for point, record in report.microbursts.items() if record["events"]}
+    if not active:
+        logger.debug("add_microburst_profiles: sortie sans épisode")
+        return
+    grouped: dict[str, list[Pkt]] = defaultdict(list)
+    for packet in packets:
+        if packet.point in active and math.isfinite(packet.ts) and packet.length > 0:
+            grouped[packet.point].append(packet)
+    for point, record in report.microbursts.items():
+        if point not in active:
+            continue
+        ordered = sorted(grouped[point], key=lambda packet: packet.ts)
+        if not ordered:
+            continue
+        origin = ordered[0].ts
+        quantum = max(1_000, round((record.get("ts_resolution") or 0) * _NS))
+        ticks = [round((packet.ts - origin) * _NS / quantum) * quantum for packet in ordered]
+        for event in record["events"]:
+            scale = max(quantum, round(event.get("scale_s", 0.0001) * _NS))
+            low = max(0, round((event["start"] - origin) * _NS) - 5 * scale)
+            high = min(ticks[-1] + quantum, round((event["end"] - origin) * _NS + window_ms * 1e6))
+            if high <= low:
+                logger.debug("add_microburst_profiles: épisode hors capture ignoré")
+                continue
+            width = max(scale, math.ceil((high - low) / (512 * quantum)) * quantum)
+            count = max(1, math.ceil((high - low) / width))
+            sizes = [0] * count
+            first, last = bisect_left(ticks, low), bisect_left(ticks, high)
+            for index in range(first, last):
+                sizes[(ticks[index] - low) // width] += ordered[index].length
+            durations = [min(width, high - low - i * width) / _NS for i in range(count)]
+            event["profile"] = {
+                "origin": origin,
+                "start_offset_s": low / _NS,
+                "bin_s": width / _NS,
+                "durations_s": durations,
+                "bytes": sizes,
+                "capture_limited": low == 0 or high == ticks[-1] + quantum,
+            }
+    logger.debug("add_microburst_profiles: sortie")
