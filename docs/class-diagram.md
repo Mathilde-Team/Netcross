@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-250 modules · 359 classes · 876 fonctions publiques de module.
+250 modules · 359 classes · 878 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -39,11 +39,11 @@ flowchart TD
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"34 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
-    netcross_gtk4 -->|"120 imports"| netcross_core
+    netcross_gtk4 -->|"121 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
     netcross_api -->|"25 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"67 imports"| netcross_core
+    netcross_api -->|"68 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"59 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
@@ -2243,6 +2243,8 @@ classDiagram
     class mod_netcross_core_redact["netcross_core.redact"] {
         <<module>>
         +scope_label(scope) str
+        +redact_diagnostic_events(events, redactor) None
+        +redact_client_group(client_group, redactor) dict
         +redact_packets(packets, scope) AddressRedactor
         +redaction_map_csv(entries) str
         +write_redaction_map_csv(redactor, path) None
@@ -5313,7 +5315,7 @@ classDiagram
     class AnalysesStore {
         +persistent() bool
         +create_pending(metadata) str
-        +complete(analysis_id, document, summary, report, report_obj, flows, findings, security_report_obj, tls_findings, quic_findings, all_packets, redaction_map) None
+        +complete(analysis_id, document, summary, report, report_obj, flows, findings, security_report_obj, tls_findings, quic_findings, all_packets, redaction_map, redactor) None
         +set_metadata(analysis_id, key, value) None
         +fail(analysis_id, error) None
         +get(analysis_id) dict?
@@ -5672,7 +5674,7 @@ classDiagram
     class mod_netcross_gtk4_client_compare_view["netcross_gtk4.client_compare_view"] {
         <<module>>
         +parse_client_groups(text) dict~str, set~str~~
-        +validate_client_settings(groups, reference, redact) list~str~
+        +validate_client_settings(groups, reference) list~str~
         +comparison_summary(comparison) str
     }
 

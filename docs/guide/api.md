@@ -67,7 +67,7 @@ nom dans la ligne de commande :
 |---|---|---|
 | `nat_tolerant`, `nat_window_ms` | Corrélation à travers un NAT, et fenêtre en ms (défaut : 200) | `--nat-tolerant`, `--nat-window-ms` |
 | `tls`, `quic` | Diagnostics TLS et QUIC | `--tls`, `--quic` |
-| `redact` | Anonymise les adresses IP/MAC et les noms DNS/HTTP/TLS/SIP, portée « tout » (le rapport de sécurité n'est alors pas calculé, et `redact` est refusé avec `tls` ou `quic`) | `--redact` |
+| `redact` | Anonymise les adresses IP/MAC et les noms DNS/HTTP/TLS/SIP, portée « tout » (le rapport de sécurité n'est alors pas calculé ; combinable avec `tls`/`quic` depuis l'issue #1155) | `--redact` |
 | `bucket_ms` | Fenêtre de mesure du débit en ms (défaut : 1000) | `--bucket-ms` |
 | `rtp_clock_rate` | Horloge RTP en Hz pour la gigue voix/vidéo (défaut : 8000) | `--rtp-clock-rate` |
 | `idle_timeout_seconds` | Seuil de coupure NAT/pare-feu silencieuse (défaut : 60 s) | `--idle-timeout-seconds` |

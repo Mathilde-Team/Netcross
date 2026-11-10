@@ -592,10 +592,10 @@ Options utiles :
   transmis à un tiers). Par défaut, les noms sont aussi anonymisés (noms
   DNS, cible HTTP, SAN/sujet/émetteur des certificats TLS, Call-ID/
   User-Agent/Server SIP) ; `--redact-scope adresses|noms|tout` restreint
-  la portée (issue #1153, voir `netcross_core/redact.py`). Mutuellement
-  exclusif avec `--tls`/`--quic`/`--client-group`, qui accèdent aux
-  adresses réelles indépendamment de cette anonymisation (relecture de
-  fichier ou argument direct). `--redact-map chemin.csv` conserve la
+  la portée (issue #1153, voir `netcross_core/redact.py`). Combinable
+  avec `--tls`/`--quic`/`--client-group` depuis l'issue #1155 : les
+  évènements TLS/QUIC et les adresses des groupes passent par la même
+  table de pseudonymes (relecture de fichier ou argument direct). `--redact-map chemin.csv` conserve la
   correspondance adresse réelle ↔ pseudonyme dans un fichier **local, à
   ne jamais transmettre avec le rapport** ; il porte aussi la table des
   noms (types `nom` et `domaine` : `host-N.domain-M.example.invalid`,
@@ -717,8 +717,9 @@ Options supplémentaires (parité avec `cross_capture_analyzer_cli.py`) :
   `cross_capture_analyzer_cli.py` (voir ci-dessus), avec **un seul
   mapping partagé entre baseline et courant** — une adresse réelle
   présente des deux côtés garde le même pseudonyme, sans quoi la
-  comparaison perdrait son sens. Même exclusion mutuelle avec
-  `--tls`/`--quic` (pas de `--client-group` sur ce CLI).
+  comparaison perdrait son sens. Combinable avec `--tls`/`--quic` depuis
+  l'issue #1155 (même table de pseudonymes ; pas de `--client-group` sur
+  ce CLI).
 - `--tls-keylog [NOM=]FICHIER` : même option que sur
   `cross_capture_analyzer_cli.py`, appliquée aux captures `--baseline` et
   `--current` (mêmes noms de points des deux côtés) ; refusée avec `--redact`.
@@ -816,8 +817,8 @@ désormais **les mêmes clés** que la CLI, objets enrichis compris
 (`flows`/`conversations`/`expert_events`/`diagnoses`/`compliance`/
 `wireshark_expert_events`), et l'export PDF de la GUI reçoit la même section
 « Expertise — objets enrichis » que `--pdf-report`), l'anonymisation des
-adresses (case "Anonymiser les adresses IP/MAC (--redact)", mutuellement
-exclusive avec les diagnostics TLS/QUIC des deux modes), et un **mode
+adresses (case "Anonymiser les adresses IP/MAC (--redact)", combinable avec
+les diagnostics TLS/QUIC des deux modes depuis l'issue #1155), et un **mode
 comparaison** (case à cocher en haut de la page Configuration) qui bascule
 sur deux listes de captures (Baseline/Courant) et reproduit
 `cross_capture_diff_cli.py` — export PDF, CSV et JSON des écarts inclus,
