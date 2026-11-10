@@ -14,7 +14,7 @@ ici fait donc échouer la CI.
 
 | Surface | Points d'entrée | Capacités |
 |---|---|---|
-| CLI | `cross_capture_analyzer_cli.py` (136 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
+| CLI | `cross_capture_analyzer_cli.py` (138 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 4 pages, 44 cases à cocher, 35 réglages numériques | Analyse interactive et exploration visuelle ; onglet « Incidents » : réglages du gel rétroactif et archives (issue #1095) |
 | API | 67 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) |
 
@@ -184,6 +184,7 @@ fenêtre « Outils de capture » (bouton de la barre de titre).
 | Conversion de format | onglet « Conversion » | `--convert`, `--convert-format` | `POST /tools/convert` : `file`, `format` |
 | Export d'un sous-ensemble filtré | onglet « Export filtre » | `--export-pcap`, `--export-bpf`, `--export-time-start`, `--export-time-end`, `--export-endpoints` | `POST /tools/export` : `file`, `bpf`, `time_start`, `time_end`, `endpoints`, `format` |
 | Recalage temporel | onglet « Recalage temporel » | `--adjust-time-output`, `--time-offset`, `--normalize-time`, `--align-to` | `POST /tools/adjust-time` : `file`, `time_offset`, `normalize`, `align_to`, `format` |
+| Extraits pcap de preuve par constat | non (fichiers du poste, comme l'export d'onglet « Export filtre » ; issue #1081) | `--evidence-pcaps DOSSIER`, `--evidence-pcaps-context N` : un pcapng par constat et par point (trames de contexte, commentaire de paquet sur la trame de preuve, sources pcap converties) | non (fichiers du poste ; issue #1081) |
 | Rejeu sur une interface | onglet « Rejeu » (confirmation « J'ai l'autorisation d'emettre sur cette interface », bouton « Arreter ») | `--replay`, `--replay-speed`, `--replay-loop` | `POST /tools/replay` : `file`, `interface`, `speed`, `loop` ; uniquement sur les interfaces de `NETCROSS_REPLAY_INTERFACES` (vide par défaut : 403) |
 
 ## Autres points d'entrée

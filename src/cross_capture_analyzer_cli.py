@@ -2170,6 +2170,27 @@ def main():
         "Issue #761.",
     )
     ap.add_argument(
+        "--evidence-pcaps",
+        metavar="DOSSIER",
+        help="Extraction des pcap de preuve (issue #1081) : ecrit dans "
+        "DOSSIER un pcapng par constat et par point de preuve, avec les "
+        "seules trames de preuve et leur contexte (voir --evidence-pcaps-"
+        "context) et un commentaire de paquet indiquant le constat. Les "
+        "points de capture a plusieurs fichiers (rotation) sont exclus : "
+        "leurs numeros de trames ne sont pas continus. Les extraits sont "
+        "referencees par --json-report (cle evidence_pcaps) sous forme de "
+        "liens relatifs. Voir aussi --evidence-pcaps-context.",
+    )
+    ap.add_argument(
+        "--evidence-pcaps-context",
+        metavar="N",
+        type=int,
+        default=3,
+        help="Fenetre de trames autour de chaque trame de preuve dans les "
+        "extraits --evidence-pcaps (defaut : 3, comme le contexte du "
+        "diagramme de preuve du rapport HTML).",
+    )
+    ap.add_argument(
         "--rule-engine",
         action="store_true",
         help="Active le moteur d'execution de regles declaratives "
@@ -3496,7 +3517,15 @@ def main():
     findings = None
     tls_findings = None
     quic_findings = None
-    if args.triage or args.pdf_report or args.json_report or args.md_report or args.history_db or args.expert_section:
+    if (
+        args.triage
+        or args.pdf_report
+        or args.json_report
+        or args.md_report
+        or args.history_db
+        or args.expert_section
+        or args.evidence_pcaps
+    ):
         # calcule dans tous les cas si --pdf-report/--json-report/--history-db :
         # les trois integrent desormais le meme classement en tete (voir
         # netcross_report.pdf / netcross_report.json_report / netcross_report.history)
@@ -3717,6 +3746,26 @@ def main():
             r.plugin_runs.append(run)
             print(f"Plugins : {run['line']}")
 
+    evidence_pcaps = None
+    if args.evidence_pcaps and findings:
+        # Extraction des pcap de preuve (issue #1081) : les points de capture
+        # a plusieurs fichiers (rotation) sont exclus, leurs numeros de
+        # trames ne sont pas continus d'un fichier a l'autre.
+        from netcross_core.extract.evidence_pcaps import extraire_preuves_pcaps
+
+        par_point: dict[str, list[str]] = {}
+        for _label, _chemin in captures:
+            par_point.setdefault(_label, []).append(_chemin)
+        evidence_pcaps = extraire_preuves_pcaps(
+            {point: chemins[0] for point, chemins in par_point.items() if len(chemins) == 1},
+            findings,
+            args.evidence_pcaps,
+            contexte=max(0, args.evidence_pcaps_context),
+        )
+        if evidence_pcaps:
+            n_fichiers = len({e["fichier"] for e in evidence_pcaps})
+            print(f"Extraits pcap de preuve : {n_fichiers} fichier(s) dans {args.evidence_pcaps}")
+
     if args.json_report:
         from netcross_report import generate_json_report
 
@@ -3733,6 +3782,7 @@ def main():
             rule_engine_findings=rule_engine_findings,
             meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
             names=names,
+            evidence_pcaps=evidence_pcaps,
             **session_objects.json_kwargs(),
         )
         print(f"Rapport JSON ecrit dans {args.json_report}")

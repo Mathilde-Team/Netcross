@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-235 modules · 335 classes · 857 fonctions publiques de module.
+236 modules · 335 classes · 858 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -34,7 +34,7 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"26 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"60 imports"| netcross_core
+    CLI -->|"61 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"34 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
@@ -2670,6 +2670,7 @@ classDiagram
 | `netcross_core.extract` | extraction et reconstruction de fichiers (issue #150). |
 | `netcross_core.extract.carver` | issue #150 (SCENARIO-4, parent #141) : extraction et reconstruction de fichiers depuis les traces réseau. |
 | `netcross_core.extract.contents` | issue #278 : extraction des contenus (audio, video, documents) a titre d'analyse qualitative, avec rappel de l'usage raisonne. |
+| `netcross_core.extract.evidence_pcaps` | Extraction des pcap de preuve par constat (issue #1081, sous-issue 5/6 du chantier #1000). |
 | `netcross_core.extract.media` | issue #278 : flux RTP audio/video. |
 
 ### Diagramme
@@ -2737,6 +2738,12 @@ classDiagram
         +run_extraction(captures, out_dir, kinds, read_capture, tshark_bin) ContentExtraction
         +write_manifest(result, out) None
         +format_extraction(result) list~str~
+    }
+
+    %% ===== netcross_core.extract.evidence_pcaps =====
+    class mod_netcross_core_extract_evidence_pcaps["netcross_core.extract.evidence_pcaps"] {
+        <<module>>
+        +extraire_preuves_pcaps(captures, constats, dossier, contexte) list~dict~
     }
 
     %% ===== netcross_core.extract.media =====
@@ -4317,7 +4324,7 @@ classDiagram
     %% ===== netcross_report.json_report =====
     class mod_netcross_report_json_report["netcross_report.json_report"] {
         <<module>>
-        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows, sequence_budget_octets) dict
+        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows, sequence_budget_octets, evidence_pcaps) dict
         +generate_json_report(r, output_path, title, kwargs) str
         +generate_json_diff(findings, baseline, current, output_path, title, meta, tls_findings_baseline, tls_findings_current, quic_findings_baseline, quic_findings_current, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, names) str
     }

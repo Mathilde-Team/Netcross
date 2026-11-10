@@ -523,6 +523,8 @@ _JS = """
   constats.appendChild(el("h2", {"id": "titre-constats"}, L.findings));
   var preuves = {};
   (doc.evidence_frames || []).forEach(function (p) { preuves[p.ref] = p; });
+  var extraitsPcap = {};
+  (doc.evidence_pcaps || []).forEach(function (p) { if (!extraitsPcap[p.ref]) { extraitsPcap[p.ref] = p.fichier; } });
   var panneauPreuve = el("div", {"id": "detail-preuve", "class": "detail-preuve", "aria-live": "polite"});
   function texteTrame(c) { return "#" + c.frame_number + " (" + fixe(c.rel_ms, 3) + " ms)"; }
   function montrerPreuve(ref, bouton) {
@@ -535,6 +537,10 @@ _JS = """
     boutonsPreuve.forEach(function (b) { b.setAttribute("aria-pressed", b === bouton ? "true" : "false"); });
     if (!p || !p.found) { panneauPreuve.appendChild(el("p", {"class": "vide"}, L.evidence_not_found)); return; }
     panneauPreuve.appendChild(el("p", null, p.summary));
+    if (extraitsPcap[ref]) {
+      var lienPcap = panneauPreuve.appendChild(el("p"));
+      lienPcap.appendChild(el("a", {"href": extraitsPcap[ref], "download": ""}, L.evidence_pcap));
+    }
     var zonePreuve = panneauPreuve.appendChild(el("div", {
       "class": "table-defilante", "role": "region", "aria-label": L.evidence_caption, "tabindex": "0"
     }));
@@ -738,6 +744,7 @@ def _labels() -> dict:
         ),
         "evidence_frame": _("Trame"),
         "evidence_absent": _("non vue"),
+        "evidence_pcap": _("Extrait pcap de la preuve"),
         "evidence_static": _("Preuves vues a chaque point"),
         "transit": _("Transit"),
         "transit_raw": _("non corrige du decalage d'horloge"),
@@ -899,8 +906,10 @@ def _static_sip(doc: dict, labels: dict) -> str:
     return "".join(blocs)
 
 
-def _static_evidence_links(finding: dict, ancres: dict) -> str:
-    """Preuves d'un constat (sans JS) : lien vers le diagramme statique s'il existe."""
+def _static_evidence_links(finding: dict, ancres: dict, extraits: dict | None = None) -> str:
+    """Preuves d'un constat (sans JS) : lien vers le diagramme statique
+    s'il existe, et vers l'extrait pcap de preuve (issue #1081) s'il y en
+    a un (lien relatif)."""
     logger.debug("_static_evidence_links: entrée")
     liens = []
     for e in finding.get("evidence") or []:
@@ -908,7 +917,11 @@ def _static_evidence_links(finding: dict, ancres: dict) -> str:
             continue
         texte = _e(f"{e['point']} #{e['frame_number']}")
         ancre = ancres.get(f"{e['point']}#{e['frame_number']}")
-        liens.append(f'<a href="#{_e(ancre)}">{texte}</a>' if ancre else texte)
+        lien = f'<a href="#{_e(ancre)}">{texte}</a>' if ancre else texte
+        extrait = (extraits or {}).get(f"{e['point']}#{e['frame_number']}")
+        if extrait:
+            lien += f' <a href="{_e(extrait)}">pcap</a>'
+        liens.append(lien)
     logger.debug("_static_evidence_links: retour {} preuve(s)", len(liens))
     return ", ".join(liens)
 
@@ -1016,6 +1029,9 @@ def _static_body(doc: dict, labels: dict) -> str:
         labels["no_triage"],
     )
     ancres = {p["ref"]: p["anchor"] for p in doc.get("evidence_frames") or [] if p.get("found")}
+    extraits_pcap = {}
+    for x in doc.get("evidence_pcaps") or []:
+        extraits_pcap.setdefault(x.get("ref"), x.get("fichier"))
     constats = _static_table(
         labels["findings_caption"],
         [
@@ -1034,7 +1050,7 @@ def _static_body(doc: dict, labels: dict) -> str:
                 _e(f.get("protocol") or finding_protocol(f.get("category"))),
                 _e(f.get("segment")),
                 _e(f.get("message")),
-                _static_evidence_links(f, ancres),
+                _static_evidence_links(f, ancres, extraits_pcap),
             ]
             for f in findings
         ],
@@ -1070,6 +1086,9 @@ def _static_evidence(doc: dict, labels: dict) -> str:
     trouvee, ancre ``preuve-<point>-<trame>`` comme le rendu JS."""
     logger.debug("_static_evidence: entrée")
     blocs = []
+    extraits = {}
+    for x in doc.get("evidence_pcaps") or []:
+        extraits.setdefault(x.get("ref"), x.get("fichier"))
     for p in doc.get("evidence_frames") or []:
         if not p.get("found"):
             continue
@@ -1102,8 +1121,10 @@ def _static_evidence(doc: dict, labels: dict) -> str:
             + "</li>"
             for t in p["transits"]
         )
+        extrait = extraits.get(p["ref"])
         blocs.append(
             f'<h3 id="{_e(p["anchor"])}">{_e(titre)}</h3>'
+            + (f'<p><a href="{_e(extrait)}">{_e(labels["evidence_pcap"])}</a></p>' if extrait else "")
             + _static_table(labels["evidence_caption"], [labels["evidence_frame"], *p["points"]], lignes, "")
             + (f"<ul>{transits}</ul>" if transits else "")
         )
