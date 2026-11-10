@@ -16,7 +16,7 @@ ici fait donc échouer la CI.
 |---|---|---|
 | CLI | `cross_capture_analyzer_cli.py` (143 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 4 pages, 44 cases à cocher, 35 réglages numériques | Analyse interactive et exploration visuelle ; onglet « Incidents » : réglages du gel rétroactif et archives (issue #1095) |
-| API | 68 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) |
+| API | 69 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) ; enrôlement des sondes `POST /probe/v1/enrollments` (mTLS, #1101) |
 
 
 Légende : **oui** = disponible ; **non** = absent ; **auto** = toujours

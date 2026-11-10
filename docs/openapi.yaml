@@ -3200,6 +3200,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /probe/v1/enrollments:
+    post:
+      tags:
+      - probe
+      summary: Enroller Sonde
+      description: 'Inscription d''une sonde : jeton à usage unique + CSR, le
+
+        collecteur signe le certificat client (SAN URI netcross).'
+      operationId: enroller_sonde_probe_v1_enrollments_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '201':
+          description: Sonde inscrite, certificat client signé.
+        '400':
+          description: Requête ou CSR invalide.
+        '401':
+          description: Jeton inconnu, consommé ou sonde révoquée.
+        '409':
+          description: Nom de sonde déjà inscrit.
+        '426':
+          description: Aucune version de contrat commune.
   /gel/config:
     get:
       tags:
