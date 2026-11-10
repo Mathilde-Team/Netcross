@@ -12,6 +12,12 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   conteneur chargent `ghcr.io/mathilde-team/netcross-ci:26.04` avec lecture
   seule du registre ; les installations apt ne tournent que si un paquet
   requis manque. Node.js est inclus et contrôlé dans l'image.
+- Comparaison audio multi-points (#1127) : WAV G.711 mono de même origine
+  RTP et durée par point, puis stéréo premier/dernier point selon l'ordre
+  physique. Les pertes deviennent du silence, y compris aux bords ; NAT/SBC
+  et passages à zéro réutilisent l'appariement existant. Le manifeste décrit
+  les canaux et SHA-256 ; export privé, exclusif et sans troncature.
+  Aucun déchiffrement SRTP ni délai physique réseau n'est affirmé.
 - Orchestration automatique de la chaîne d'incident (#1001) : `netcross_core.incident_chain.ChaineIncidents`,
   branchée sur `LiveDiffEngine(gel=chaine)` à la place du `GelManager` nu, enchaîne à chaque alarme le gel
   rétroactif (#1087), l'attente effective de la fin de fenêtre (calculée depuis l'horodatage du dernier paquet vu,

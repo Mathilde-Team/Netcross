@@ -113,14 +113,16 @@ def test_extraction_de_contenus_sans_repertoire_de_sortie(monkeypatch, capsys):
 
     appels = []
     monkeypatch.setattr(
-        contents, "run_extraction", lambda captures, out_dir, kinds: appels.append((out_dir, kinds)) or "R"
+        contents,
+        "run_extraction",
+        lambda captures, out_dir, kinds, points_order=None: appels.append((out_dir, kinds, points_order)) or "R",
     )
     monkeypatch.setattr(contents, "format_extraction", lambda result: [f"resultat={result}"])
 
     cli._run_content_extraction([("A", "a.pcap")], None, ("audio",))
 
     captured = capsys.readouterr()
-    assert appels == [(None, ())]
+    assert appels == [(None, (), None)]
     assert "resultat=R" in captured.out
     assert contents.USAGE_REMINDER not in captured.err
 
