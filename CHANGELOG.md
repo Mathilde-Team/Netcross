@@ -8,6 +8,24 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Tableau de bord Grafana d'exemple (#1118, sous-issue 5/5 de l'export observabilité #1003) :
+  `docs/grafana/netcross-segments.json` (score de santé, pertes et délais par segment via `$segment`,
+  triage, constats, paquets/flux perdus/retransmissions par point — variables `$run` et `$segment`)
+  et guide `docs/grafana-dashboard.md` : exposition (textfile node_exporter ou route `/metrics`),
+  import, lecture des panneaux et exemples d'alertes Prometheus (perte de segment, délai p95,
+  santé basse, flux perdus au point). Le test `test_grafana_dashboard.py` vérifie que le JSON
+  est valide et que chaque métrique référencée existe dans le catalogue figé.
+- Sonde `netcross-probe` (#1099, sous-issue 2/6 du chantier sondes distribuées #1002) :
+  agent léger de capture locale en tampon circulaire (tshark/dumpcap,
+  `ring_recorder_args`), qui extrait à la demande une fenêtre [t1, t2] filtrée BPF
+  et la livre en pcapng avec son SHA-256 et son intervalle réellement couvert
+  (contrat v1, `docs/probe-api-v1.yaml`). Le filtre BPF est appliqué par libpcap
+  elle-même en relecture (tshark interdit `-f` avec `-r`, dumpcap ne filtre pas un
+  tube) via `netcross_probe.bpf` (ctypes, aucune dépendance ajoutée) ; la fenêtre
+  est découpée par editcap, fusionnée par mergecap, convertie en pcapng. CLI
+  `python3 -m netcross_probe` (`capture`, `fenetre`). La sécurité mTLS (#1101),
+  les métadonnées pertes/horloge (#1103) et le collecteur (#1105) viendront se
+  brancher sur `AgentProbe`. Voir docs/probe-agent.md.
 - Image CI préconstruite effectivement utilisée (#968) : les cinq jobs en
   conteneur chargent `ghcr.io/mathilde-team/netcross-ci:26.04` avec lecture
   seule du registre ; les installations apt ne tournent que si un paquet
@@ -135,6 +153,18 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   sécurité) et à la demande. `ci.yml` basculera dessus dans une seconde PR, une fois l'image publiée.
 
 ### Modifié
+- Levée de l'exclusion `--redact` avec `--tls`/`--quic`/`--client-group`
+  (#1155, sous-issue 3/5 du chantier anonymisation #1007) : les évènements
+  TLS/QUIC des pipelines indépendants sont rédigés par
+  `redact_diagnostic_events()` (adresses src/dst et SNI via la table commune
+  aux paquets) et les adresses `--client-group` sont traduites avant usage par
+  `redact_client_group()` — un run combiné ne laisse filtrer aucune adresse
+  réelle. Branché sur les deux CLI (analyseur et diff), l'API
+  (`redact` + `tls`/`quic` autorisés ; route `client-diff` traduite par la
+  table du run, conservée en mémoire dans l'analyse) et la GUI (cases
+  combinables, seuls le rapport de sécurité et `--tls-keylog` restent
+  refusés avec l'anonymisation). Tests `test_redact_tls_quic.py` et
+  couverture CLI/API/GUI du run combiné.
 - Licence (#986) : passage de MIT à **GPL-3.0-or-later** — texte officiel
   GPLv3 dans `LICENSE`, déclaration `license = "GPL-3.0-or-later"` dans
   `pyproject.toml`, en-têtes `SPDX-License-Identifier` sur tous les

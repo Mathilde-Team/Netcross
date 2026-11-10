@@ -176,16 +176,17 @@ def test_on_run_analysis_desactive_les_boutons_et_bascule_la_page(window, record
     assert _log_text(window) == ""
 
 
-def test_on_run_analysis_redact_incompatible_avec_tls_ne_lance_rien(window, recorded_threads):
+def test_on_run_analysis_redact_avec_tls_lance_l_analyse(window, recorded_threads):
+    """Issue #1155 : --redact + Diagnostic TLS est autorisé -- l'analyse
+    part (les évènements TLS passent par la même table de pseudonymes)."""
     window.add_capture_row("/tmp/c.pcap", "C")
     window.redact_check.set_active(True)
     window.tls_check.set_active(True)
 
     window.on_run_analysis(None)
 
-    assert recorded_threads == []
-    assert "redact" in _log_text(window)
-    assert "TLS" in _log_text(window) or "QUIC" in _log_text(window)
+    assert recorded_threads != []
+    assert "analyse non lancee" not in _log_text(window)
 
 
 def test_on_run_analysis_mode_live_delegue_selon_letat_de_capture(window, monkeypatch):

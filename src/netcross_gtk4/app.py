@@ -1100,9 +1100,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.redact_check.set_tooltip_text(
             "Remplace les adresses IP (plages RFC 5737/3849) et MAC (OUI localement "
             "administre) par des pseudonymes coherents avant l'analyse -- pour "
-            "partager un rapport sans exposer l'adressage reel. Mutuellement "
-            "exclusif avec Diagnostic TLS/QUIC (pipelines independants qui "
-            "accedent aux adresses reelles, voir netcross_core.redact)."
+            "partager un rapport sans exposer l'adressage reel. Combinable avec "
+            "Diagnostic TLS/QUIC depuis l'issue #1155 : les evenements passes "
+            "par ces pipelines sont anonymises avec la meme table."
         )
         self.redact_check.connect("toggled", self._on_redact_toggled)
         options.attach(self.redact_check, 0, 5, 4, 1)
@@ -1578,16 +1578,13 @@ class MainWindow(Gtk.ApplicationWindow):
         return nat_window_ms, idle_timeout_seconds
 
     def _on_redact_toggled(self, _btn):
-        """--redact n'est pas disponible avec TLS/QUIC (pipelines independants
-        qui accedent aux adresses reelles, voir netcross_core.redact et
-        cross_capture_analyzer_cli.py) -- meme contrainte appliquee aux deux
-        modes (simple et comparaison), verifiee aussi a l'execution dans
-        on_run_analysis (au cas ou l'ordre de coches inverse ait ete utilise)."""
+        """Issue #1155 : --redact se combine desormais avec TLS/QUIC
+        (meme table de pseudonymes, voir netcross_core.redact) -- seule la
+        case rapport de securite reste desactivee (issue #357 : charge
+        utile brute, meme refus que --security-report --redact)."""
         redact = self.redact_check.get_active()
         logger.debug("_on_redact_toggled: redact={}", redact)
-        # issue #357 : le rapport de securite aussi (charge utile brute,
-        # meme refus que --security-report --redact)
-        for check in (self.tls_check, self.quic_check, self.diff_tls_check, self.diff_quic_check, self.security_check):
+        for check in (self.security_check,):
             check.set_sensitive(not redact)
             if redact:
                 check.set_active(False)
@@ -2339,22 +2336,8 @@ class MainWindow(Gtk.ApplicationWindow):
         redact = self.redact_check.get_active()
         nat_window_ms, idle_timeout_seconds = self._fine_settings()
 
-        if redact and (
-            self.tls_check.get_active()
-            or self.quic_check.get_active()
-            or self.diff_tls_check.get_active()
-            or self.diff_quic_check.get_active()
-        ):
-            # Filet de securite (voir _on_redact_toggled pour le cas normal,
-            # deja empeche via la sensibilite des cases) -- ne devrait pas
-            # arriver en pratique, mais mieux vaut refuser explicitement
-            # qu'anonymiser partiellement le rapport sans le signaler.
-            self.stack.set_visible_child_name("log")
-            self._log("--redact n'est pas disponible avec Diagnostic TLS/QUIC (voir netcross_core.redact).")
-            logger.debug(
-                "MainWindow.on_run_analysis: si redact and (self.tls_check.get_active() or self.quic_check.… -> retour"
-            )
-            return
+        # Issue #1155 : --redact + Diagnostic TLS/QUIC est autorise (meme
+        # table de pseudonymes) -- plus de filet de securite ici.
 
         notify = None
         ai = None
@@ -2394,7 +2377,7 @@ class MainWindow(Gtk.ApplicationWindow):
             try:
                 client_groups = parse_client_groups(self.client_groups_entry.get_text())
                 client_reference = self.client_reference_entry.get_text().strip() or None
-                client_errors = validate_client_settings(client_groups, client_reference, redact)
+                client_errors = validate_client_settings(client_groups, client_reference)
             except ClientGroupError as exc:
                 logger.debug("MainWindow.on_run_analysis: groupes de postes invalides ({})", exc)
                 client_errors = [str(exc)]
