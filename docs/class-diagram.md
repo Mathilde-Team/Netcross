@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-250 modules · 358 classes · 875 fonctions publiques de module.
+250 modules · 359 classes · 876 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -45,7 +45,7 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"67 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"58 imports"| netcross_core
+    netcross_report -->|"59 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"27 imports"| pcap_parser
     netcross_probe -->|"3 imports"| pcap_parser
@@ -752,7 +752,7 @@ classDiagram
     %% ===== netcross_core.analysis =====
     class mod_netcross_core_analysis["netcross_core.analysis"] {
         <<module>>
-        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds, collect_active_evidence)
+        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds, collect_active_evidence, microburst_window_ms)
     }
 
     %% ===== netcross_core.annotations =====
@@ -898,8 +898,14 @@ classDiagram
     }
 
     %% ===== netcross_core.causality =====
+    class MicroburstCorrelator {
+        +add_loss(a, b, packet)
+        +add_retransmissions(per_point)
+        +results() list~dict~
+    }
     class mod_netcross_core_causality["netcross_core.causality"] {
         <<module>>
+        +format_microburst_correlation(record) str
         +correlate_event_causes(events) list~ExpertEvent~
         +correlate_diagnosis_causes(diagnoses) list~Diagnosis~
     }
@@ -2076,6 +2082,7 @@ classDiagram
         +list~dict~ capture_infos
         +dict~str, dict~ link_speeds
         +dict~str, dict~ microbursts
+        +list~dict~ microburst_correlations
         +dict~str, dict~str, dict~str, int~~~ dechiffrement
         +list~str~ points_keylog
         +list~ChecksumError~ checksum_errors

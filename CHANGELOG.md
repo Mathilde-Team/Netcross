@@ -31,6 +31,12 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   partagés (gel_settings) au moteur live. Un gel sans fichier protégé est signalé sans archiver ; un échec à une
   étape est journalisé sans interrompre le moteur ni les autres incidents. Voir docs/incidents-gel.md
   (« L'orchestration automatique »).
+- Corrélation temporelle des microrafales et impacts aval (#1137) : pertes
+  localisées et copies TCP supplémentaires, fenêtre de 50 ms configurable
+  par `NETCROSS_MICROBURST_WINDOW_MS` pour CLI/API/GTK4 et par argument Python.
+  Encadrement par paquets communs, correction de dérive et incertitude des
+  retransmissions ; dix preuves au maximum par épisode et segment. Les constats
+  et le JSON distinguent association temporelle et congestion physique prouvée.
 - Qualité de transport RTP/SRTP par segment (#1123) : pertes supplémentaires
   entre paquets communs, gigue RFC 3550, délai corrigé avec incertitude d'horloge
   et note indicative de transport, avec constat localisé. Réutilise l'appariement

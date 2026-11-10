@@ -88,6 +88,7 @@ celui que produit `tableau_markdown()`.
 | `detect_extracted_files` | phase | fenetre_bornee | charges utiles en cours de réassemblage par flux | durée du transfert de l'objet | `extracted_files` |  |
 | `application_transactions` | phase | fenetre_bornee | requêtes HTTP/DNS en attente de réponse | seuil de réponse du protocole ; « réponse manquante » décidée à l'expiration | `application_transactions` |  |
 | `clock_sync` | phase | seconde_passe | échanges SYN / SYN-ACK et copies d'un même paquet entre paires de points | capture entière | `clock_offset_estimate`, `clock_offset_samples` | estimateur robuste (Theil-Sen, #996) calculé avant la boucle des flux : la latence par segment est corrigée au temps de chaque paquet |
+| `microburst_causality` | phase | seconde_passe | épisodes de rafale et impacts localisés, dix preuves maximum par épisode et segment | 50 ms après la fin de l'épisode par défaut, configurable | `microburst_correlations` | paquets communs encadrants ; horloge corrigée et incertitude pour les retransmissions aval |
 | `pmtud` | phase | fenetre_bornee | segments retransmis en amont, par flux ; drapeau « ICMP trop grand vu » par point | durée des retransmissions d'un segment | `pmtud_blackhole` | l'absence d'ICMP « sur toute la capture » est un drapeau par point, finalisé en fin de capture |
 | `idle_timeout` | phase | fenetre_bornee | plus long silence et reprise par connexion TCP (5-tuple orienté) | vie de la connexion, potentiellement toute la capture | `idle_timeout_dropped` | connexions longues : candidat au débordement sur disque (#1024) |
 | `arp_ip_conflict` | phase | incremental | adresses MAC revendiquées par IP, par point | aucune | `arp_ip_conflict` |  |
@@ -145,7 +146,7 @@ celui que produit `tableau_markdown()`.
 | `quic_diagnostics` | diagnostic | seconde_passe | paquets QUIC Initial de chaque point | capture entière |  | --quic : relit les fichiers avec tshark |
 | `greffons` | greffon | seconde_passe | DetectorContext : tous les paquets et le rapport, en lecture seule | capture entière |  | contrat de netcross_core.plugins.api ; un mode en flux devra proposer un contrat incrémental |
 
-Total : 62 détecteurs -- incremental : 28, fenetre_bornee : 27, seconde_passe : 7.
+Total : 63 détecteurs -- incremental : 28, fenetre_bornee : 27, seconde_passe : 8.
 
 <!-- inventaire-detecteurs:fin -->
 
@@ -215,6 +216,55 @@ Le tri, les médianes et l'attribution des émetteurs nécessitent actuellement
 la capture du point : le détecteur est honnêtement classé `seconde_passe`,
 pas présenté comme compatible en flux. Les tranches sont conservées dans
 une table creuse : un silence très long n'alloue pas une case par quantum.
+
+## Corrélation des microrafales et impacts aval
+
+L'analyse associe les épisodes aux pertes déjà localisées au premier point
+aval, après exclusion des flux hors chemin. Elle compare aussi, pour chaque
+empreinte de paquet TCP de données, les nombres de copies entre points :
+une retransmission observée dans les deux captures n'est pas un nouvel impact
+du segment. Une copie supplémentaire aval doit porter un indicateur de
+retransmission TShark et ne pas être marquée comme doublon de capture.
+
+Le chemin doit être explicitement ordonné (`--order` en CLI, ordre correspondant
+dans l'API et GTK4). L'impact doit être strictement encadré par des paquets
+communs avant et après sur le segment ; les bords de capture ne sont pas des
+preuves de pertes. Le temps d'une perte inférée reste celui du paquet amont,
+donc aucune synchronisation inter-sondes n'est requise pour cette association.
+Pour une copie supplémentaire aval, l'analyse inverse le modèle affine de
+décalage et dérive d'horloge ; tout l'intervalle d'incertitude à 95 % doit tenir
+dans la fenêtre. Sans horloge exploitable, aucun constat de retransmission
+aval n'est produit.
+
+La fenêtre va de la fin de l'épisode à sa fin plus **50 ms** par défaut,
+bornes incluses. Une perte pendant la rafale n'est pas associée par cette
+règle. La variable d'environnement `NETCROSS_MICROBURST_WINDOW_MS` configure
+la même valeur dans les processus CLI, API et GTK4 :
+
+```bash
+NETCROSS_MICROBURST_WINDOW_MS=20 python3 src/cross_capture_analyzer_cli.py \
+  --capture LAN=lan.pcap --capture WAN=wan.pcap --order LAN,WAN
+```
+
+L'argument Python `analyse(..., microburst_window_ms=20)` est prioritaire sur
+l'environnement. La valeur doit être numérique, finie et strictement positive ;
+une valeur invalide provoque une erreur explicite, jamais un repli silencieux.
+L'API lancée comme service doit recevoir cette variable au démarrage de son
+processus. Aucun nouveau contrôle GUI ou champ HTTP n'est ajouté.
+
+`Report.microburst_correlations` et la clé JSON homonyme exposent les bornes de
+l'épisode, le segment, la fenêtre et les compteurs exacts. Chaque association
+conserve au maximum dix preuves : point et trame observés, horodatage original,
+temps ramené à l'horloge amont et incertitude. Pour une perte, la preuve désigne
+le paquet observé **en amont**, pas une trame fictive au point où il manque.
+Les constats partagés entre rapports, API et GTK4 utilisent la règle stable
+`microburst_downstream_impact`.
+
+Le résultat établit une **association temporelle**, pas une causalité physique :
+`association="temporal"` et `physical_cause_proven=false`. Une capture perdue,
+une duplication, un rejeu ou un incident indépendant peuvent expliquer ces
+observations. Vérifier les compteurs de files et la qualité de capture avant
+d'attribuer les pertes à la rafale ; aucun essai matériel n'est implicite.
 
 ## Voir aussi
 
