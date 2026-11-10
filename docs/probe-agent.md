@@ -54,7 +54,13 @@ PYTHONPATH=src python3 -m netcross_probe fenetre \
    aucune dépendance Python ajoutée) puis convertit le résultat en pcapng
    (editcap) ;
 4. calcul du SHA-256, de la taille et de l'intervalle réellement couvert
-   (premier/dernier paquet, via capinfos).
+   (premier/dernier paquet, via capinfos) ;
+5. lecture des pertes de capture **déclarées** (somme des ISB des fichiers
+   du tampon utilisés : `ifdrop` + `osdrop`, distinctes des pertes réseau
+   estimées par l'analyse) et de l'horloge **annoncée** (chrony
+   `tracking` puis systemd-timesyncd, source/décalage/dispersion ;
+   `unknown` si aucun des deux ne répond, jamais inventée) — clés
+   `capture_loss` et `clock` du JSON de sortie (#1103).
 
 La sortie standard décrit la fenêtre en JSON (miroir de l'objet `Window`
 du contrat v1) : `window_id`, `requested`, `covered` (plus court que la

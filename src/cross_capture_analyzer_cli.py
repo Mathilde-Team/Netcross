@@ -115,6 +115,7 @@ besoin explicite et maitrise d'un rejeu sur un segment reel) :
 
 import argparse
 import atexit
+import json
 import os
 import re
 import shutil
@@ -1613,6 +1614,42 @@ def _run_ai(args, ai_options, report, all_packets) -> None:
     logger.debug("_run_ai: fin")
 
 
+def _charger_sondes_meta(specifications, points):
+    """Lit les fichiers ``--sonde-meta POINT=JSON`` (#1103) et renvoie
+    (pertes par point, horloges par point). Refuse (exit 1) un point
+    inconnu ou un JSON illisible : une métadonnée de sonde silencieusement
+    ignorée laisserait croire que la sonde n'a rien perdu."""
+    logger.debug("_charger_sondes_meta: entrée ({} spécification(s))", len(specifications))
+    pertes: dict[str, dict] = {}
+    horloges: dict[str, dict] = {}
+    for spec in specifications:
+        if "=" not in spec:
+            print(f"--sonde-meta : format attendu POINT=JSON, reçu {spec!r}", file=sys.stderr)
+            sys.exit(1)
+        point, chemin = spec.split("=", 1)
+        if point not in points:
+            print(
+                f"--sonde-meta : point {point!r} inconnu (points : {', '.join(points)})",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        try:
+            with open(chemin, encoding="utf-8") as fh:
+                document = json.load(fh)
+        except (OSError, json.JSONDecodeError) as erreur:
+            logger.error("--sonde-meta {} : {} illisible ({})", point, chemin, erreur)
+            print(f"--sonde-meta {point} : {chemin} illisible ({erreur})", file=sys.stderr)
+            sys.exit(1)
+        # Les schémas capture_loss/clock figurent au premier niveau de la
+        # fenêtre (Window) comme de la santé (Health) du contrat v1.
+        if document.get("capture_loss"):
+            pertes[point] = document["capture_loss"]
+        if document.get("clock"):
+            horloges[point] = document["clock"]
+    logger.debug("_charger_sondes_meta: retour ({} point(s))", len(pertes))
+    return pertes, horloges
+
+
 def main():
     # `netcross lua-doc ...` : documentation hors ligne de l'API Lua Wireshark (issue #388)
     logger.debug("main: entrée")
@@ -2500,6 +2537,17 @@ def main():
         default=0.0,
         help="Avec --redact-pcap : décalage uniforme des horodatages (les "
         "différences inter-points restent exactes). Défaut : 0 (conservés).",
+    )
+    ap.add_argument(
+        "--sonde-meta",
+        metavar="POINT=JSON",
+        action="append",
+        help="Métadonnées de sonde (#1103) pour un point : fichier JSON "
+        "décrit par la sonde (sortie `python3 -m netcross_probe fenetre`, "
+        "schémas capture_loss/clock du contrat v1). Le rapport distingue "
+        "alors « le réseau a perdu » de « la sonde a perdu » (pertes "
+        "déclarées ifdrop/osdrop) et affiche l'état d'horloge annoncé. "
+        "Répétable, un par point.",
     )
     ap.add_argument(
         "--support-ticket",
@@ -3502,6 +3550,14 @@ def main():
         r.capture_comments = read_capture_comments(captures)
         r.capture_infos = read_capture_infos(captures)
         r.points_keylog = sorted(tls_keylogs)
+    # Issue #1103 : métadonnées de sonde par point (pertes de capture
+    # DÉCLARÉES par les ISB, état d'horloge ANNONCÉ) -- lues des fichiers
+    # JSON décrits par les sondes (sortie `netcross_probe fenetre` ou
+    # santé du contrat v1, mêmes clés capture_loss/clock). Comme
+    # capture_comments, c'est une métadonnée de fichier, pas un résultat
+    # de l'analyse : remplie par l'appelant, jamais par analyse().
+    if args.sonde_meta:
+        r.pertes_sondes, r.horloges_sondes = _charger_sondes_meta(args.sonde_meta, r.points)
     # Report.truncated/truncation_note (issue #283, Etape 3) : ecrit ici, pas
     # dans analyse() -- meme discipline que capture_comments/capture_infos
     # ci-dessus, la troncature est une decision de l'appelant (CLI), pas un

@@ -168,6 +168,9 @@ def _commande_fenetre(args: argparse.Namespace) -> int:
                 "bytes": resultat.octets,
                 "sha256": resultat.sha256,
                 "chemin": resultat.chemin,
+                # Issue #1103 : pertes déclarées et état d'horloge (contrat v1).
+                "capture_loss": resultat.pertes.vers_dict() if resultat.pertes is not None else None,
+                "clock": resultat.horloge.vers_dict() if resultat.horloge is not None else None,
             },
             ensure_ascii=False,
             indent=2,
