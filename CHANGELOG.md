@@ -8,6 +8,13 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Tableau de bord Grafana d'exemple (#1118, sous-issue 5/5 de l'export observabilité #1003) :
+  `docs/grafana/netcross-segments.json` (score de santé, pertes et délais par segment via `$segment`,
+  triage, constats, paquets/flux perdus/retransmissions par point — variables `$run` et `$segment`)
+  et guide `docs/grafana-dashboard.md` : exposition (textfile node_exporter ou route `/metrics`),
+  import, lecture des panneaux et exemples d'alertes Prometheus (perte de segment, délai p95,
+  santé basse, flux perdus au point). Le test `test_grafana_dashboard.py` vérifie que le JSON
+  est valide et que chaque métrique référencée existe dans le catalogue figé.
 - Sonde `netcross-probe` (#1099, sous-issue 2/6 du chantier sondes distribuées #1002) :
   agent léger de capture locale en tampon circulaire (tshark/dumpcap,
   `ring_recorder_args`), qui extrait à la demande une fenêtre [t1, t2] filtrée BPF
