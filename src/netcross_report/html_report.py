@@ -1029,7 +1029,7 @@ def _static_body(doc: dict, labels: dict) -> str:
         labels["no_triage"],
     )
     ancres = {p["ref"]: p["anchor"] for p in doc.get("evidence_frames") or [] if p.get("found")}
-    extraits_pcap = {}
+    extraits_pcap: dict[str, str] = {}
     for x in doc.get("evidence_pcaps") or []:
         extraits_pcap.setdefault(x.get("ref"), x.get("fichier"))
     constats = _static_table(
@@ -1086,7 +1086,7 @@ def _static_evidence(doc: dict, labels: dict) -> str:
     trouvee, ancre ``preuve-<point>-<trame>`` comme le rendu JS."""
     logger.debug("_static_evidence: entrée")
     blocs = []
-    extraits = {}
+    extraits: dict[str, str] = {}
     for x in doc.get("evidence_pcaps") or []:
         extraits.setdefault(x.get("ref"), x.get("fichier"))
     for p in doc.get("evidence_frames") or []:
