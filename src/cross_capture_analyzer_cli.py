@@ -3383,6 +3383,9 @@ def main():
             security_detections.extend(detections)
 
     redactor = None
+    # Issue #1159 : encart « Anonymisation » du rapport -- périmètre appliqué.
+    redaction_info = None
+    pcapng_produits: list[Path] = []
     if args.redact:
         redactor = redact_packets(all_packets, args.redact_scope)
         print(
@@ -3409,6 +3412,7 @@ def main():
                     garder_payload=args.redact_pcap_keep_payload,
                     decalage=args.redact_pcap_decalage,
                 )
+                pcapng_produits.append(chemin_sortie)
                 print(f"Capture anonymisee ecrite dans {chemin_sortie} (point {label}).")
         if args.redact_map:
             write_redaction_map_csv(redactor, args.redact_map)
@@ -3421,6 +3425,17 @@ def main():
         # comme les paquets deja rediges.
         if client_group:
             client_group = redact_client_group(client_group, redactor)
+        # Issue #1159 : l'encart du rapport certifie le périmètre appliqué
+        # (portée, compteurs, pcapng produits, table).
+        from netcross_report.redaction_note import build_redaction_info
+
+        redaction_info = build_redaction_info(
+            redactor,
+            args.redact_scope,
+            redact_map=args.redact_map,
+            pcapng=pcapng_produits,
+            garder_payload=args.redact_pcap_keep_payload,
+        )
 
     # --max-packets/--sample (issue #283, Etape 3) : appliques ici, sur
     # all_packets DEJA CHARGE en entier (voir _apply_packet_limits pour la
@@ -3821,6 +3836,7 @@ def main():
             session_objects=session_objects,
             sequence_views=sequence_views,
             meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
+            redaction=redaction_info,
         )
         print(f"Rapport PDF ecrit dans {args.pdf_report}")
 
@@ -3838,6 +3854,7 @@ def main():
             rule_engine_findings=rule_engine_findings,
             names=names,
             meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
+            redaction=redaction_info,
         )
         print(f"Rapport Markdown ecrit dans {args.md_report}")
 
@@ -3868,6 +3885,7 @@ def main():
             quic_findings=quic_findings,
             rule_engine_findings=rule_engine_findings,
             meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
+            redaction=redaction_info,
             names=names,
             **session_objects.json_kwargs(),
         )

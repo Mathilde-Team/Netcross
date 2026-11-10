@@ -280,6 +280,7 @@ def build_json_report_document(
     security_report=None,
     packet_flows=None,
     sequence_budget_octets=None,
+    redaction=None,
 ) -> dict:
     """
     Document de ``--json-report``, sans l'ecrire : servi tel quel par
@@ -324,7 +325,8 @@ def build_json_report_document(
     logger.debug(
         "build_json_report_document: r={} title={} meta={} findings={} tls_findings={} "
         "quic_findings={} flows={} conversations={} expert_events={} diagnoses={} compliance={} "
-        "wireshark_expert_events={} rule_engine_findings={} names={} security_report={}",
+        "wireshark_expert_events={} rule_engine_findings={} names={} security_report={} "
+        "redaction={}",
         summarize(r, "r"),
         summarize(title, "title"),
         summarize(meta, "meta"),
@@ -340,6 +342,7 @@ def build_json_report_document(
         summarize(rule_engine_findings, "rule_engine_findings"),
         summarize(names, "names"),
         summarize(security_report, "security_report"),
+        summarize(redaction, "redaction"),
     )
     if findings is None:
         findings = build_findings(r)
@@ -378,6 +381,9 @@ def build_json_report_document(
         # vide sans paire de points).
         "path_metrics": [_path_segment_dict(m) for m in build_path_metrics(r)],
         "meta": dict(meta) if meta else {},
+        # Issue #1159 : encart « Anonymisation » -- certifie le périmètre
+        # appliqué (portée, compteurs, pcapng, table). Absent sans --redact.
+        "redaction": dict(redaction) if redaction else None,
         "findings": [_finding_dict(f) for f in findings],
         "microbursts": r.microbursts,
         "microburst_correlations": r.microburst_correlations,

@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-251 modules · 361 classes · 879 fonctions publiques de module.
+252 modules · 361 classes · 882 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -33,7 +33,7 @@ flowchart TD
     netcross_core["netcross_core"]
     netcross_probe["netcross_probe"]
     pcap_parser["pcap_parser"]
-    CLI -->|"27 imports"| netcross_report
+    CLI -->|"28 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
     CLI -->|"64 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
@@ -41,11 +41,11 @@ flowchart TD
     netcross_gtk4 -->|"4 imports"| netcross_ai
     netcross_gtk4 -->|"121 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
-    netcross_api -->|"25 imports"| netcross_report
+    netcross_api -->|"26 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"68 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"59 imports"| netcross_core
+    netcross_report -->|"61 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"27 imports"| pcap_parser
     netcross_probe -->|"3 imports"| pcap_parser
@@ -4386,6 +4386,7 @@ classDiagram
 | `netcross_report.metrics_export` | catalogue des metriques Prometheus / OpenMetrics de Netcross et production des series depuis un rapport (issue #1110, sous-issue 1/5 du chantier #1003). |
 | `netcross_report.path_metrics` | metriques de qualite par segment du chemin observe (Job 16/issue #12, FEATURES.md section 6.7). |
 | `netcross_report.pdf` | assemble le rapport PDF final (synthese, graphiques, tableaux de detail) a partir d'un Report netcross_core, avec reportlab. |
+| `netcross_report.redaction_note` | encart « Anonymisation » des rapports (issue #1159, sous-issue 5/5 du chantier #1007). |
 | `netcross_report.rule_engine` | premier PILOTE du moteur d'EXECUTION evoque comme premier chantier ouvert par CLAUDE.md/`Prochaine feature` depuis la Session 54 (bibliotheque de regles §6.2 complete, 41 regles) : faire evaluer une… |
 | `netcross_report.security_html` | rendu HTML du rapport de securite (issue #218, troisieme sortie apres le texte et le JSON). |
 | `netcross_report.security_report` | rapport de securite consolide et tableau de bord (CVE-5, issue #139, parent #133). |
@@ -4559,7 +4560,7 @@ classDiagram
     %% ===== netcross_report.json_report =====
     class mod_netcross_report_json_report["netcross_report.json_report"] {
         <<module>>
-        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows, sequence_budget_octets) dict
+        +build_json_report_document(r, title, meta, findings, tls_findings, quic_findings, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, rule_engine_findings, names, security_report, packet_flows, sequence_budget_octets, redaction) dict
         +generate_json_report(r, output_path, title, kwargs) str
         +generate_json_diff(findings, baseline, current, output_path, title, meta, tls_findings_baseline, tls_findings_current, quic_findings_baseline, quic_findings_current, flows, conversations, expert_events, diagnoses, compliance, wireshark_expert_events, names) str
     }
@@ -4589,7 +4590,7 @@ classDiagram
     %% ===== netcross_report.markdown_report =====
     class mod_netcross_report_markdown_report["netcross_report.markdown_report"] {
         <<module>>
-        +build_markdown_report_document(r, title, meta, findings, tls_findings, quic_findings, session_objects, security_report, rule_engine_findings, names) str
+        +build_markdown_report_document(r, title, meta, findings, tls_findings, quic_findings, session_objects, security_report, rule_engine_findings, names, redaction) str
         +generate_markdown_report(r, output_path, title, kwargs) str
     }
 
@@ -4706,8 +4707,16 @@ classDiagram
         +sequence_section_story(views, styles, chart_paths)
         +expert_section_story(session_objects, styles, top_n)
         +security_section_story(security_report, styles)
-        +generate_pdf(r, output_path, title, meta, findings, tls_findings, quic_findings, session_objects, sequence_views, security_report)
+        +generate_pdf(r, output_path, title, meta, findings, tls_findings, quic_findings, session_objects, sequence_views, security_report, redaction)
         +generate_diff_pdf(findings, baseline, current, output_path, title, meta, tls_findings_baseline, tls_findings_current, quic_findings_baseline, quic_findings_current)
+    }
+
+    %% ===== netcross_report.redaction_note =====
+    class mod_netcross_report_redaction_note["netcross_report.redaction_note"] {
+        <<module>>
+        +build_redaction_info(redactor, scope, redact_map, pcapng, garder_payload) dict
+        +lignes_encart_markdown(info) list~str~
+        +lignes_encart_texte(info) list~str~
     }
 
     %% ===== netcross_report.rule_engine =====
