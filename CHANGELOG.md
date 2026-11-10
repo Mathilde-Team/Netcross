@@ -8,6 +8,21 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Sonde `netcross-probe` (#1099, sous-issue 2/6 du chantier sondes distribuées #1002) :
+  agent léger de capture locale en tampon circulaire (tshark/dumpcap,
+  `ring_recorder_args`), qui extrait à la demande une fenêtre [t1, t2] filtrée BPF
+  et la livre en pcapng avec son SHA-256 et son intervalle réellement couvert
+  (contrat v1, `docs/probe-api-v1.yaml`). Le filtre BPF est appliqué par libpcap
+  elle-même en relecture (tshark interdit `-f` avec `-r`, dumpcap ne filtre pas un
+  tube) via `netcross_probe.bpf` (ctypes, aucune dépendance ajoutée) ; la fenêtre
+  est découpée par editcap, fusionnée par mergecap, convertie en pcapng. CLI
+  `python3 -m netcross_probe` (`capture`, `fenetre`). La sécurité mTLS (#1101),
+  les métadonnées pertes/horloge (#1103) et le collecteur (#1105) viendront se
+  brancher sur `AgentProbe`. Voir docs/probe-agent.md.
+- Image CI préconstruite effectivement utilisée (#968) : les cinq jobs en
+  conteneur chargent `ghcr.io/mathilde-team/netcross-ci:26.04` avec lecture
+  seule du registre ; les installations apt ne tournent que si un paquet
+  requis manque. Node.js est inclus et contrôlé dans l'image.
 - Orchestration automatique de la chaîne d'incident (#1001) : `netcross_core.incident_chain.ChaineIncidents`,
   branchée sur `LiveDiffEngine(gel=chaine)` à la place du `GelManager` nu, enchaîne à chaque alarme le gel
   rétroactif (#1087), l'attente effective de la fin de fenêtre (calculée depuis l'horodatage du dernier paquet vu,
@@ -16,6 +31,12 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   partagés (gel_settings) au moteur live. Un gel sans fichier protégé est signalé sans archiver ; un échec à une
   étape est journalisé sans interrompre le moteur ni les autres incidents. Voir docs/incidents-gel.md
   (« L'orchestration automatique »).
+- Corrélation temporelle des microrafales et impacts aval (#1137) : pertes
+  localisées et copies TCP supplémentaires, fenêtre de 50 ms configurable
+  par `NETCROSS_MICROBURST_WINDOW_MS` pour CLI/API/GTK4 et par argument Python.
+  Encadrement par paquets communs, correction de dérive et incertitude des
+  retransmissions ; dix preuves au maximum par épisode et segment. Les constats
+  et le JSON distinguent association temporelle et congestion physique prouvée.
 - Qualité de transport RTP/SRTP par segment (#1123) : pertes supplémentaires
   entre paquets communs, gigue RFC 3550, délai corrigé avec incertitude d'horloge
   et note indicative de transport, avec constat localisé. Réutilise l'appariement

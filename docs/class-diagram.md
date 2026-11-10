@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-244 modules · 346 classes · 869 fonctions publiques de module.
+250 modules · 359 classes · 876 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -31,6 +31,7 @@ flowchart TD
     netcross_report["netcross_report"]
     netcross_ai["netcross_ai"]
     netcross_core["netcross_core"]
+    netcross_probe["netcross_probe"]
     pcap_parser["pcap_parser"]
     CLI -->|"27 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
@@ -44,9 +45,10 @@ flowchart TD
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"67 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
-    netcross_report -->|"58 imports"| netcross_core
+    netcross_report -->|"59 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"27 imports"| pcap_parser
+    netcross_probe -->|"3 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -82,6 +84,7 @@ flowchart LR
     ExpertiseExports["netcross_gtk4.expertise_view.ExpertiseExports"]
     ExpertiseSettings["netcross_gtk4.expertise_view.ExpertiseSettings"]
     Exporter["netcross_core.plugins.api.Exporter"]
+    FenetreResultat["netcross_probe.fenetres.FenetreResultat"]
     Finding["netcross_report.synthesis.Finding"]
     FiveTuple["netcross_core.active.planner.FiveTuple"]
     FlowView["netcross_core.flow_view.FlowView"]
@@ -106,6 +109,7 @@ flowchart LR
     SegmentScore["netcross_report.triage.SegmentScore"]
     StreamQuality["netcross_core.extract.media.StreamQuality"]
     _Detector["netcross_core.exploit_signatures._Detector"]
+    _FenetreMemoire["netcross_probe.agent._FenetreMemoire"]
     netcross_core_security_expert_correlation__FlowState["netcross_core.security.expert_correlation._FlowState"]
     AnalysisOptions -->|advanced| AdvancedSettings
     AnalysisOptions -->|expertise| ExpertiseSettings
@@ -140,6 +144,7 @@ flowchart LR
     ResultatParis -->|flux| FiveTuple
     SegmentScore -->|findings| Finding
     _Detector -->|run| netcross_core_security_expert_correlation__FlowState
+    _FenetreMemoire -->|resultat| FenetreResultat
 ```
 
 ## `pcap_parser`
@@ -528,6 +533,108 @@ classDiagram
     RawPacket --> RadioInfo : radio
 ```
 
+## `netcross_probe`
+
+| Module | Rôle |
+|---|---|
+| `netcross_probe` | Sonde distribuée ``netcross-probe`` (chantier #1002, sous-issue #1099). |
+| `netcross_probe.__main__` | Point d'entrée de la sonde : ``python3 -m netcross_probe`` (issue #1099). |
+| `netcross_probe.agent` | L'agent ``netcross-probe`` : capture locale + extraction de fenêtres. |
+| `netcross_probe.bpf` | Filtrage BPF (syntaxe pcap-filter) en relecture d'un fichier de capture. |
+| `netcross_probe.capture` | Capture locale de la sonde ``netcross-probe`` en tampon circulaire. |
+| `netcross_probe.fenetres` | Extraction d'une fenêtre [t1, t2] filtrée du tampon circulaire de la sonde. |
+
+### Diagramme
+
+```mermaid
+classDiagram
+    direction LR
+
+    %% ===== netcross_probe.__main__ =====
+    class mod_netcross_probe___main__["netcross_probe.__main__"] {
+        <<module>>
+        +construire_parseur() argparse.ArgumentParser
+        +extraire_fenetre_depuis_args(args)
+        +main(argv) int
+    }
+
+    %% ===== netcross_probe.agent =====
+    class _FenetreMemoire {
+        <<dataclass>>
+        +FenetreResultat resultat
+        +float expire_a
+    }
+    class AgentProbe {
+        +extraire(debut, fin, filtre_bpf, inclure_inconnus, max_octets) FenetreResultat
+        +fenetre(identifiant) FenetreResultat?
+        +liberer(identifiant) bool
+    }
+
+    %% ===== netcross_probe.bpf =====
+    class LibpcapIndisponibleError {
+        <<RuntimeError>>
+    }
+    class FiltreBpfInvalideError {
+        <<ValueError>>
+    }
+    class _BpfProgramme {
+        <<ctypes.Structure>>
+    }
+    class _EnTetePaquet {
+        <<ctypes.Structure>>
+    }
+    class mod_netcross_probe_bpf["netcross_probe.bpf"] {
+        <<module>>
+        +valider_filtre(filtre) None
+        +filtrer_capture(chemin_in, chemin_out, filtre_bpf) int
+    }
+
+    %% ===== netcross_probe.capture =====
+    class ReglagesCapture {
+        <<dataclass, frozen>>
+        +str interface
+        +str dossier
+        +int nb_fichiers
+        +float duree_par_fichier
+        +str prefixe
+        +str? filtre_bpf
+    }
+    class AgentCapture {
+        +en_cours() bool
+        +demarrer() None
+        +arreter() str
+        +inventaire() list~RingFile~
+    }
+
+    %% ===== netcross_probe.fenetres =====
+    class FenetreInvalideError {
+        <<ValueError>>
+    }
+    class FenetreVideError {
+        <<RuntimeError>>
+    }
+    class FenetreTropGrandeError {
+        <<RuntimeError>>
+    }
+    class FenetreResultat {
+        <<dataclass, frozen>>
+        +str identifiant
+        +tuple~float, float~ demande
+        +tuple~float, float~? couvert
+        +int nb_paquets
+        +int octets
+        +str sha256
+        +str chemin
+    }
+    class mod_netcross_probe_fenetres["netcross_probe.fenetres"] {
+        <<module>>
+        +extraire_fenetre(dossier_tampon, debut, fin, prefixe, filtre_bpf, inclure_inconnus, dossier_sortie, max_octets) FenetreResultat
+    }
+
+    %% ===== relations =====
+    _FenetreMemoire --> FenetreResultat : resultat
+```
+
 ## `netcross_core`
 
 | Module | Rôle |
@@ -645,7 +752,7 @@ classDiagram
     %% ===== netcross_core.analysis =====
     class mod_netcross_core_analysis["netcross_core.analysis"] {
         <<module>>
-        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds, collect_active_evidence)
+        +analyse(flows, points_order, all_packets, bucket_seconds, nat_tolerant, rtp_clock_rate, topn, idle_timeout_seconds, exclude_duplicates, duplicate_counts, clock_offsets, link_speeds, collect_active_evidence, microburst_window_ms)
     }
 
     %% ===== netcross_core.annotations =====
@@ -791,8 +898,14 @@ classDiagram
     }
 
     %% ===== netcross_core.causality =====
+    class MicroburstCorrelator {
+        +add_loss(a, b, packet)
+        +add_retransmissions(per_point)
+        +results() list~dict~
+    }
     class mod_netcross_core_causality["netcross_core.causality"] {
         <<module>>
+        +format_microburst_correlation(record) str
         +correlate_event_causes(events) list~ExpertEvent~
         +correlate_diagnosis_causes(diagnoses) list~Diagnosis~
     }
@@ -1969,6 +2082,7 @@ classDiagram
         +list~dict~ capture_infos
         +dict~str, dict~ link_speeds
         +dict~str, dict~ microbursts
+        +list~dict~ microburst_correlations
         +dict~str, dict~str, dict~str, int~~~ dechiffrement
         +list~str~ points_keylog
         +list~ChecksumError~ checksum_errors

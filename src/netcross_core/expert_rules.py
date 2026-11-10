@@ -467,6 +467,21 @@ _RULE_CATALOG: tuple[Rule, ...] = (
         ),
         thresholds={"min_peak_median_ratio": 4.0, "min_utilisation_pct": 80.0, "min_window_packets": 2.0},
     ),
+    Rule(
+        id="microburst_downstream_impact",
+        domain="Microrafales",
+        preconditions="Rafale suivie de pertes localisées ou de copies TCP supplémentaires sur le segment aval.",
+        required_metrics=("Report.microbursts", "Report.microburst_correlations"),
+        time_window="50 ms après la fin de l'épisode par défaut ; NETCROSS_MICROBURST_WINDOW_MS configurable.",
+        required_context="Ordre explicite, paquets communs encadrants ; horloge exploitable pour les copies aval.",
+        severity="a_surveiller",
+        confidence=0.6,
+        explanation=(
+            "Association temporelle établie, compatible avec une congestion mais sans preuve de cause physique."
+        ),
+        verification_leads="Vérifier les pertes de capture et les compteurs de files du segment concerné.",
+        thresholds={},
+    ),
     # -- pertes par segment -- analysis.py::analyse() (boucle principale,
     # Report.loss_count) + synthesis.py::build_findings() ("-- pertes --")
     Rule(
