@@ -8,6 +8,23 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Réécriture pcapng anonymisée `--redact-pcap DOSSIER` (#1157, sous-issue 4/5 du
+  chantier anonymisation #1007, dépend de #1153) : avec `--redact`, l'analyseur
+  écrit en plus un pcapng anonymisé par point de capture (un fichier par
+  label, fusion des plusieurs fichiers d'un même point). Les trames sont
+  relues via libpcap (ctypes, aucune dépendance ajoutée) et réécrites avec la
+  table du run — mêmes pseudonymes que les constats (un même hôte garde le
+  même pseudonyme sur chaque pcap produit) — adresses MAC/IPv4/IPv6 et ARP
+  traduites, sommes de contrôle IPv4/TCP/UDP/ICMP recalculées (RFC 1071, aucun
+  « bad checksum » ajouté), fragments IPv4 et charges utiles applicatives
+  zéroées par défaut (`--redact-pcap-keep-payload` pour les conserver, longueurs
+  conservées dans tous les cas). Les horodatages sont conservés à la µs, ou
+  décalés uniformément via `--redact-pcap-decalage SECONDES`. L'analyse du pcap
+  anonymisé (tshark) donne les mêmes constats réseau que l'original —
+  protocoles, ports, longueurs, séquences — pseudonymes mis à part. Écrit avant
+  la table `--redact-map` pour que la correspondance couvre aussi les adresses
+  découvertes dans les trames brutes. Implémentation `netcross_core.redact_pcap`,
+  tests `test_redact_pcap.py`.
 - Tableau de bord Grafana d'exemple (#1118, sous-issue 5/5 de l'export observabilité #1003) :
   `docs/grafana/netcross-segments.json` (score de santé, pertes et délais par segment via `$segment`,
   triage, constats, paquets/flux perdus/retransmissions par point — variables `$run` et `$segment`)
