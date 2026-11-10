@@ -595,7 +595,17 @@ Options utiles :
   la portée (issue #1153, voir `netcross_core/redact.py`). Combinable
   avec `--tls`/`--quic`/`--client-group` depuis l'issue #1155 : les
   évènements TLS/QUIC et les adresses des groupes passent par la même
-  table de pseudonymes (relecture de fichier ou argument direct). `--redact-map chemin.csv` conserve la
+  table de pseudonymes (relecture de fichier ou argument direct). Le
+  rapport (PDF, Markdown, JSON, API) ouvre par un encart « Anonymisation —
+  périmètre appliqué » qui certifie ce qui a été masqué : portée
+  (`--redact-scope`), nombre d'adresses et de noms anonymisés, pcapng
+  anonymisés produits et traitement de leurs charges utiles, table de
+  correspondance (issue #1159). `--redact-pcap DOSSIER` écrit en plus un
+  pcapng anonymisé par point de capture (mêmes pseudonymes que le run,
+  sommes de contrôle recalculées, charges utiles zéroées par défaut —
+  `--redact-pcap-keep-payload` pour les conserver, horodatages conservés
+  ou décalés uniformément via `--redact-pcap-decalage`, issue #1157).
+  `--redact-map chemin.csv` conserve la
   correspondance adresse réelle ↔ pseudonyme dans un fichier **local, à
   ne jamais transmettre avec le rapport** ; il porte aussi la table des
   noms (types `nom` et `domaine` : `host-N.domain-M.example.invalid`,
@@ -1199,12 +1209,16 @@ avant un déploiement en production.
   l'émetteur des certificats TLS, `Call-ID`, `User-Agent` et `Server`
   SIP). Les autres champs texte (corps HTTP, en-têtes non listés, SNI lu
   par `--tls`) ne sont pas couverts ; avec `--redact-scope adresses`,
-  les noms restent identifiants. De plus,
-  `--redact` est refusé en combinaison avec `--tls`/`--quic`/
-  `--client-group` : ces trois options accèdent aux adresses réelles
-  indépendamment de la liste de paquets anonymisée (relecture de fichier
-  pour `--tls`/`--quic`, argument direct pour `--client-group`) — les
-  combiner aurait laissé filtrer des adresses réelles sans le signaler.
+  les noms restent identifiants. Depuis l'issue #1155, `--redact` est
+  combinable avec `--tls`/`--quic`/`--client-group` : évènements et
+  adresses passent par la même table de pseudonymes (les combinaisons
+  restent refusées pour `--tls-keylog` et le rapport de sécurité).
+  Depuis #1157/#1159, le rapport ouvre par un encart « Anonymisation —
+  périmètre appliqué » (portée, compteurs, pcapng, table) et
+  `--redact-pcap` produit une capture pcapng anonymisée partageable —
+  charges utiles zéroées par défaut : les contenus applicatifs n'y
+  passent pas, seuls protocoles, ports, longueurs et horodatages sont
+  conservés.
   Câblé sur l'interface graphique GTK4 depuis une passe ultérieure (case
   dédiée, même garde-fou mutuellement exclusif avec TLS/QUIC) — voir
   "Interface graphique" ci-dessus (la GUI reste toutefois non couverte

@@ -837,6 +837,12 @@ def _analyse_captures(
         meta = {"Source": "API REST"}
         if options.redact:
             meta["Anonymisation"] = "adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (redact)"
+        # Issue #1159 : encart « Anonymisation » -- même périmètre que la CLI.
+        redaction_info = None
+        if options.redact and redactor is not None:
+            from netcross_report.redaction_note import build_redaction_info
+
+            redaction_info = build_redaction_info(redactor, redactor.scope)
         # Issue #673 : sections d'expertise (équiv. --rule-engine,
         # --expert-section, --media-quality, --tshark-stats, --flow-timeline)
         rule_engine_findings = None
@@ -864,6 +870,7 @@ def _analyse_captures(
             quic_findings=quic_findings,
             rule_engine_findings=rule_engine_findings,
             meta=meta,
+            redaction=redaction_info,
         )
         if session_objects is not None:
             structured["session_objects"] = session_objects
