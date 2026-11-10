@@ -65,6 +65,7 @@ from netcross_core.i18n import _
 from netcross_core.logging_config import get_logger, summarize
 from netcross_core.notify.request import NotifySettings, send_notifications
 from netcross_core.notify.request import validate_settings as validate_notify
+from netcross_core.redact import redact_client_group, redact_diagnostic_events
 from netcross_core.security.findings import apply_security_findings, scan_capture_exploits
 from netcross_core.tls_keylog import (
     TlsKeylogError,
@@ -98,7 +99,8 @@ _QUIC_FORM = Form(default=False, description="true : diagnostic QUIC/HTTP3 (équ
 _REDACT_FORM = Form(
     default=False,
     description="true : anonymise les adresses IP/MAC avant analyse (équivalent de --redact) ; "
-    "incompatible avec tls/quic, et le rapport de sécurité n'est alors pas calculé",
+    "combinable avec tls/quic (issue #1155, même table de pseudonymes), et le rapport de sécurité "
+    "n'est alors pas calculé",
 )
 # Issue #672 : options d'analyse avancées (équivalents CLI)
 _MAX_PACKETS_FORM = Form(
@@ -446,8 +448,9 @@ def _options(
     history_label: str | None = None,
     plugins: str | None = None,
 ) -> ApiAnalysisOptions:
-    """Valide les options comme la CLI : ``redact`` exclut ``tls``/``quic``,
-    qui relisent les fichiers d'origine (adresses réelles).
+    """Valide les options comme la CLI : ``redact`` se combine avec
+    ``tls``/``quic`` depuis l'issue #1155 (les évènements TLS/QUIC passent
+    par la même table de pseudonymes que les paquets).
 
     Issue #672 : validation de ``sample`` (format 1/N) comme la CLI
     (``_parse_sample_spec``).
@@ -461,13 +464,7 @@ def _options(
             status_code=403,
             detail=_("Confirmation active désactivée sur le serveur (NETCROSS_API_ACTIVE=1 requis)."),
         )
-    if redact and (tls or quic):
-        logger.debug("_options: si redact and (tls or quic) -> levée HTTPException")
-        raise HTTPException(
-            status_code=400,
-            detail="redact n'est pas disponible avec tls/quic : ces diagnostics relisent les fichiers "
-            "d'origine, avec les adresses réelles (même règle que la CLI)",
-        )
+    # Issue #1155 : redact + tls/quic autorisé (même table de pseudonymes).
     sample_n: int | None = None
     if sample:
         import re
@@ -588,17 +585,25 @@ def _collect_tshark_stats_api(captures: list[tuple[str, str]]) -> dict:
 
 
 def _tls_quic_findings(
-    captures: list[tuple[str, str]], points: list[str], options: ApiAnalysisOptions
+    captures: list[tuple[str, str]],
+    points: list[str],
+    options: ApiAnalysisOptions,
+    redactor: Any = None,
 ) -> tuple[list | None, list | None]:
     """Diagnostics TLS / QUIC demandés, relus sur les fichiers comme
-    ``--tls`` / ``--quic`` ; ``None`` pour un diagnostic non demandé."""
+    ``--tls`` / ``--quic`` ; ``None`` pour un diagnostic non demandé.
+    Issue #1155 : avec ``redact``, les évènements passent par la même
+    table de pseudonymes que les paquets (``redact_diagnostic_events``)."""
     tls_findings = quic_findings = None
     if options.tls:
         from netcross_core.tls_diagnostics import build_handshake_status, diagnose_tls, parse_tls_capture
 
         tls_events = []
         for label, path in captures:
-            tls_events.extend(parse_tls_capture(label, path))
+            events = parse_tls_capture(label, path)
+            if redactor is not None:
+                redact_diagnostic_events(events, redactor)
+            tls_events.extend(events)
         tls_findings = diagnose_tls(build_handshake_status(tls_events), points)
     if options.quic:
         try:
@@ -608,7 +613,10 @@ def _tls_quic_findings(
             raise AnalysisError("quic nécessite le paquet cryptography (pip install cryptography)") from exc
         quic_events = []
         for label, path in captures:
-            quic_events.extend(parse_quic_capture(label, path, **options_lecture(dict(options.tls_keylogs), label)))
+            quic_found = parse_quic_capture(label, path, **options_lecture(dict(options.tls_keylogs), label))
+            if redactor is not None:
+                redact_diagnostic_events(quic_found, redactor)
+            quic_events.extend(quic_found)
         quic_findings = diagnose_quic(quic_events, points)
     logger.debug(
         "_tls_quic_findings: retour tls={} quic={}",
@@ -810,7 +818,7 @@ def _analyse_captures(
                 # Issue #875 : trace de chaque canal dans le rapport de
                 # sécurité (section « Notifications », clé `notifications`)
                 security_report.notifications = send_notifications(report, security_report, options.notify)
-        tls_findings, quic_findings = _tls_quic_findings(captures, list(report.points), options)
+        tls_findings, quic_findings = _tls_quic_findings(captures, list(report.points), options, redactor)
         # Issue #330 : même document que `netcross --json-report
         # --security-report` (constats, triage, score de santé).
         # Issue #670 : findings calculés une fois, partagés entre le JSON
@@ -991,6 +999,7 @@ def _run_job(
             quic_findings=quic_findings,
             all_packets=all_packets,
             redaction_map=redactor.entries() if redactor is not None else None,
+            redactor=redactor if options and options.redact else None,
         )
     finally:
         for _label, path in captures:
@@ -2537,6 +2546,12 @@ async def client_comparison(
     client_groups: dict[str, set[str]] = {}
     for name, ips in groups.items():
         client_groups[name] = set(ips)
+    # Issue #1155 : si l'analyse est anonymisée, les groupes fournis en IP
+    # réelles sont traduits par la table du run (mêmes pseudonymes que les
+    # paquets) -- sinon la comparaison ne trouverait aucun paquet.
+    redactor = entry.get("redactor")
+    if redactor is not None:
+        client_groups = redact_client_group(client_groups, redactor)
     comparison = compare_clients(all_packets, client_groups, reference=reference)
     payload = {
         "analysis_id": analysis_id,

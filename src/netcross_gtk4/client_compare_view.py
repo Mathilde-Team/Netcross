@@ -48,9 +48,10 @@ def parse_client_groups(text: str) -> dict[str, set[str]]:
     return groups
 
 
-def validate_client_settings(groups: dict[str, set[str]], reference: str | None, redact: bool) -> list[str]:
+def validate_client_settings(groups: dict[str, set[str]], reference: str | None) -> list[str]:
     """Erreurs bloquantes avant le lancement (liste vide = valide), avec
-    les memes regles que la CLI."""
+    les memes regles que la CLI. Issue #1155 : --redact + comparaison de
+    postes est autorisé (adresses traduites par la table commune)."""
     errors: list[str] = []
     if not groups:
         if reference:
@@ -63,8 +64,6 @@ def validate_client_settings(groups: dict[str, set[str]], reference: str | None,
         )
     if reference and reference not in groups:
         errors.append(f"reference {reference!r} absente des groupes (postes disponibles : {', '.join(sorted(groups))})")
-    if redact:
-        errors.append("comparaison de postes indisponible avec l'anonymisation (les groupes portent des IP reelles)")
     logger.debug("validate_client_settings: {} erreur(s)", len(errors))
     return errors
 

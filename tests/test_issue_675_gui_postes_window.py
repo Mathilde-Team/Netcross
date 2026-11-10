@@ -103,7 +103,9 @@ def test_sans_groupes_rien_transmis(window, threads):
         ("OK", "", False, "groupe invalide"),
         ("OK=10.0.0.5", "", False, "au moins 2 postes"),
         ("OK=10.0.0.5; KO=10.0.0.12", "Z", False, "absente des groupes"),
-        ("OK=10.0.0.5; KO=10.0.0.12", "", True, "anonymisation"),
+        # Issue #1155 : redact + comparaison de postes est desormais
+        # autorise (adresses traduites par la table commune) -- plus de cas
+        # de refus "anonymisation" ici.
     ],
 )
 def test_saisie_invalide_bloque_le_lancement(window, threads, groupes, reference, redact, motif):

@@ -187,7 +187,9 @@ def test_cle_api_exigee(actif, recorder):
         (_corps(points_order=["LAN", "ZZZ"]), 400, "ZZZ"),
         (_corps(options={"inconnue": 1}), 422, "inconnue"),
         (_corps(options={"split_interfaces": True}), 422, "split_interfaces"),
-        (_corps(options={"redact": True, "tls": True}), 400, "redact"),
+        # Issue #1155 : redact + tls n'est plus refuse (meme table de
+        # pseudonymes) -- la validation de cette combinaison est couverte
+        # par tests/test_api_options.py.
         (_corps(duration=0), 422, None),
     ],
 )

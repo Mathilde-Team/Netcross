@@ -92,7 +92,7 @@ from netcross_core import (
 )
 from netcross_core.baseline_diff import diff_reports, print_diff_report, write_diff_csv
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
-from netcross_core.redact import SCOPE_ALL, scope_label
+from netcross_core.redact import SCOPE_ALL, redact_diagnostic_events, scope_label
 from netcross_core.tls_keylog import (
     TlsKeylogError,
     options_lecture,
@@ -539,9 +539,9 @@ def main():
         "entre baseline et courant, pour qu'une meme adresse reelle presente "
         "des deux cotes garde le meme pseudonyme (sinon le diff perdrait son "
         "sens). Ne couvre que les adresses (pas les noms DNS/HTTP/SAN TLS/"
-        "SIP, voir netcross_core.redact). Mutuellement exclusif avec "
-        "--tls/--quic, qui relisent les fichiers independamment de cette "
-        "redaction.",
+        "SIP, voir netcross_core.redact). Combinable avec --tls/--quic "
+        "(issue #1155) : les evenements TLS/QUIC sont rediges par la meme "
+        "table de pseudonymes.",
     )
     ap.add_argument(
         "--tls-keylog",
@@ -626,18 +626,9 @@ def main():
     if args.redact_map and not args.redact:
         print("--redact-map necessite --redact.", file=sys.stderr)
         sys.exit(1)
-    if args.redact and (args.tls or args.quic):
-        print(
-            "--redact n'est pas disponible avec --tls/--quic : ces deux "
-            "options relisent les fichiers passes a --baseline/--current "
-            "avec leur propre pipeline, independamment des paquets "
-            "anonymises par --redact -- les combiner laisserait filtrer des "
-            "adresses reelles dans les sections TLS/QUIC du rapport sans le "
-            "signaler. Voir netcross_core.redact pour le detail.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
+    # Issue #1155 : --redact + --tls/--quic est AUTORISE -- les evenements
+    # TLS/QUIC (baseline ET courant) passent par la meme table de
+    # pseudonymes que les paquets (redact_diagnostic_events).
     if (args.history_label or args.history_show is not None) and not args.history_db:
         print("--history-label/--history-show necessitent --history-db.", file=sys.stderr)
         sys.exit(1)
@@ -730,6 +721,9 @@ def main():
             events = []
             for label, path in captures:
                 found = parse_tls_capture(label, path)
+                # Issue #1155 : memes pseudonymes que les paquets rediges.
+                if redactor is not None:
+                    redact_diagnostic_events(found, redactor)
                 print(f"[{scenario_name}/{label}] {len(found)} evenements TLS trouves dans {path}")
                 events.extend(found)
             logger.debug("main._tls_findings: retour diagnose_tls(…)")
@@ -761,6 +755,9 @@ def main():
             events = []
             for label, path in captures:
                 found = parse_quic_capture(label, path)
+                # Issue #1155 : memes pseudonymes que les paquets rediges.
+                if redactor is not None:
+                    redact_diagnostic_events(found, redactor)
                 print(f"[{scenario_name}/{label}] {len(found)} paquets QUIC Initial trouves dans {path}")
                 events.extend(found)
             logger.debug("main._quic_findings: retour diagnose_quic(…)")

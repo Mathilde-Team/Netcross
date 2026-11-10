@@ -133,24 +133,28 @@ def test_redact_map_sans_redact_refuse(monkeypatch, capsys):
     assert "--redact-map necessite --redact" in capsys.readouterr().err
 
 
-def test_redact_avec_tls_refuse(monkeypatch, capsys):
-    """--redact + --tls : refuse (lignes 542-552)."""
-    code = _run_main(
-        monkeypatch,
-        ["--baseline", "A=x.pcap", "--current", "A=y.pcap", "--redact", "--tls"],
+def test_redact_avec_tls_autorise(monkeypatch, capsys):
+    """Issue #1155 : --redact + --tls n'est plus refuse -- le run continue
+    (echec de lecture des fichiers absents, pas de la combinaison)."""
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["cross_capture_diff_cli.py", "--baseline", "A=x.pcap", "--current", "A=y.pcap", "--redact", "--tls"],
     )
-    assert code == 1
-    assert "--redact n'est pas disponible avec --tls/--quic" in capsys.readouterr().err
+    cli.main()  # ne doit plus refuser la combinaison
+    assert "--redact n'est pas disponible avec --tls/--quic" not in capsys.readouterr().err
 
 
-def test_redact_avec_quic_refuse(monkeypatch, capsys):
-    """--redact + --quic : refuse (lignes 542-552)."""
-    code = _run_main(
-        monkeypatch,
-        ["--baseline", "A=x.pcap", "--current", "A=y.pcap", "--redact", "--quic"],
+def test_redact_avec_quic_autorise(monkeypatch, capsys):
+    """Issue #1155 : --redact + --quic n'est plus refuse -- le run continue
+    (echec de lecture des fichiers absents, pas de la combinaison)."""
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["cross_capture_diff_cli.py", "--baseline", "A=x.pcap", "--current", "A=y.pcap", "--redact", "--quic"],
     )
-    assert code == 1
-    assert "--redact n'est pas disponible avec --tls/--quic" in capsys.readouterr().err
+    cli.main()  # ne doit plus refuser la combinaison
+    assert "--redact n'est pas disponible avec --tls/--quic" not in capsys.readouterr().err
 
 
 def test_history_label_sans_history_db_refuse(monkeypatch, capsys):

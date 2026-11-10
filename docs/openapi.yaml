@@ -3634,8 +3634,8 @@ components:
           type: boolean
           title: Redact
           description: 'true : anonymise les adresses IP/MAC avant analyse (équivalent
-            de --redact) ; incompatible avec tls/quic, et le rapport de sécurité n''est
-            alors pas calculé'
+            de --redact) ; combinable avec tls/quic (issue #1155, même table de pseudonymes),
+            et le rapport de sécurité n''est alors pas calculé'
           default: false
         loss_threshold_pp:
           type: number
@@ -3932,8 +3932,8 @@ components:
           type: boolean
           title: Redact
           description: 'true : anonymise les adresses IP/MAC avant analyse (équivalent
-            de --redact) ; incompatible avec tls/quic, et le rapport de sécurité n''est
-            alors pas calculé'
+            de --redact) ; combinable avec tls/quic (issue #1155, même table de pseudonymes),
+            et le rapport de sécurité n''est alors pas calculé'
           default: false
         max_packets:
           anyOf:
@@ -4194,8 +4194,8 @@ components:
           type: boolean
           title: Redact
           description: 'true : anonymise les adresses IP/MAC avant analyse (équivalent
-            de --redact) ; incompatible avec tls/quic, et le rapport de sécurité n''est
-            alors pas calculé'
+            de --redact) ; combinable avec tls/quic (issue #1155, même table de pseudonymes),
+            et le rapport de sécurité n''est alors pas calculé'
           default: false
         max_packets:
           anyOf:
