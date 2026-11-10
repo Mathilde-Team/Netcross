@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-250 modules · 359 classes · 876 fonctions publiques de module.
+250 modules · 359 classes · 879 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -1743,6 +1743,7 @@ classDiagram
         <<module>>
         +detect_microbursts(packets, link_speeds) dict~str, dict~
         +format_microburst(event) str
+        +add_microburst_profiles(report, packets, window_ms) None
     }
 
     %% ===== relations =====
@@ -4607,6 +4608,7 @@ classDiagram
     }
     class mod_netcross_report_metric_charts["netcross_report.metric_charts"] {
         <<module>>
+        +render_microburst(event, correlations, path) str?
         +render_line(series, path) str?
         +render_area(series, path) str?
         +render_bars(series, path) str?
@@ -4683,6 +4685,7 @@ classDiagram
     %% ===== netcross_report.pdf =====
     class mod_netcross_report_pdf["netcross_report.pdf"] {
         <<module>>
+        +microburst_section_story(report, styles, tmpdir)
         +path_section_story(metrics, styles, chart_path)
         +sip_ladder_section_story(ladders, styles)
         +sequence_section_story(views, styles, chart_paths)

@@ -35,7 +35,7 @@ from netcross_core.dechiffrement import compter_sessions
 from netcross_core.extract.carver import detect_extracted_files
 from netcross_core.forensic import detect_sequence_gaps, validate_checksums
 from netcross_core.logging_config import get_logger, summarize
-from netcross_core.microburst import detect_microbursts
+from netcross_core.microburst import add_microburst_profiles, detect_microbursts
 from netcross_core.models import Pkt, Report
 from netcross_core.parsing import compute_mos
 from netcross_core.security.exfiltration import detect_exfiltration
@@ -425,6 +425,7 @@ def analyse(
 
     with _phase("microburst_causality"):
         r.microburst_correlations = microburst_correlator.results()
+        add_microburst_profiles(r, all_packets, microburst_correlator.window_ms)
     with _phase("pmtud"):
         _analyse_pmtud(r, flows, pairs)
     # idle_timeout_seconds=None (defaut) -> _IDLE_TIMEOUT_SECONDS via le

@@ -32,6 +32,7 @@ from netcross_report.charts import (
     chart_severity_summary,
     generate_all_charts,
 )
+from netcross_report.metric_charts import render_microburst
 from netcross_report.path_metrics import build_path_metrics, degradation_summary, rank_path_segments
 from netcross_report.synthesis import build_findings
 from netcross_report.triage import HEALTH_LABELS, health_label, health_score, rank_segments
@@ -79,6 +80,46 @@ HEALTH_BADGE_COLORS = {
 # sous le tableau plutot que de laisser croire a une liste exhaustive.
 MAX_SECURITY_ROWS = 40
 MAX_PDF_READABLE_LEN = 90
+
+
+def microburst_section_story(report, styles, tmpdir):
+    """Un zoom par épisode, sans fabriquer de courbe pour les anciens rapports."""
+    logger.debug("microburst_section_story: entrée")
+    story = []
+    for record in report.microbursts.values():
+        for event in record["events"]:
+            path = render_microburst(event, report.microburst_correlations, f"{tmpdir}/microburst_{len(story)}.png")
+            if path is None:
+                continue
+            if not story:
+                story.append(Paragraph("Microrafales et pertes aval", styles["H1b"]))
+                story.append(
+                    Paragraph(
+                        "Debits moyens calcules depuis les paquets, pas une interpolation de la crete glissante. "
+                        "Les croix situent les preuves de pertes inferees sur l'horloge amont "
+                        "(au plus dix preuves d'impacts par segment et episode, compteurs exhaustifs). "
+                        "Association temporelle uniquement : la cause physique n'est pas prouvee.",
+                        styles["Normal"],
+                    )
+                )
+            story.append(
+                Paragraph(
+                    f"Point {_xml_escape(str(event['point']))}, debut {event['start']:.6f} s. "
+                    f"Crete glissante : {event['peak_bps'] / 1e6:.3f} Mbit/s "
+                    f"sur {event['scale_s'] * 1e6:g} us.",
+                    styles["H2b"],
+                )
+            )
+            if event["profile"]["capture_limited"]:
+                story.append(
+                    Paragraph(
+                        "Contexte tronque aux bornes de la capture, hors capture non represente.", styles["Small"]
+                    )
+                )
+            story.append(_scaled_image(path, 16 * cm, 12 * cm))
+            story.append(Spacer(1, 0.3 * cm))
+    logger.debug("microburst_section_story: sortie {} elements", len(story))
+    return story
 
 
 def _styles():
@@ -1259,6 +1300,10 @@ def generate_pdf(
             story.append(PageBreak())
 
         # -- detail par module --
+        burst_story = microburst_section_story(r, styles, tmpdir)
+        if burst_story:
+            story.extend(burst_story)
+            story.append(PageBreak())
         story.append(Paragraph("Detail par module", styles["H1b"]))
 
         story.append(Paragraph("Sauts de routeur (delta TTL)", styles["H2b"]))
