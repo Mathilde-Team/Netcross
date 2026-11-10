@@ -290,6 +290,7 @@ def build_json_report_document(
     security_report=None,
     packet_flows=None,
     sequence_budget_octets=None,
+    evidence_pcaps=None,
     redaction=None,
 ) -> dict:
     """
@@ -330,7 +331,14 @@ def build_json_report_document(
     des constats vue a chaque point (``netcross_report.evidence_frames``) ;
     les cles ``sequence_diagrams`` (flux principaux NON TRONQUES,
     echantillonnes au-dela d'un budget de poids, issue #1079) et ``comm_map``
-    (carte des communications, issue #909) en sont deduites ; absentes sinon.
+    (carte des communications, issue #909) en sont deduitees ; absentes sinon.
+
+    evidence_pcaps (issue #1081) : liste produite par
+    ``netcross_core.extract.evidence_pcaps.extraire_preuves_pcaps()``
+    (une entree par preuve, ``ref``/``point``/``frame_number``/
+    ``fichier``), reportee telle quelle sous la cle ``evidence_pcaps``
+    pour que le HTML reference les extraits par des liens relatifs ;
+    absente sinon (rien n'est extrait par ce module).
     """
     logger.debug(
         "build_json_report_document: r={} title={} meta={} findings={} tls_findings={} "
@@ -547,6 +555,12 @@ def build_json_report_document(
             packet_flows, budget_octets=sequence_budget_octets or BUDGET_DONNEES_DEFAUT
         )
         doc["comm_map"] = build_comm_map_dict(packet_flows)
+
+    # Extraits pcap de preuve par constat (issue #1081) : liste produite par
+    # netcross_core.extract.evidence_pcaps.extraire_preuves_pcaps(), pas
+    # calculee ici -- netcross_report ne relit pas les fichiers de capture.
+    if evidence_pcaps:
+        doc["evidence_pcaps"] = evidence_pcaps
 
     logger.debug("build_json_report_document: retour doc={}", summarize(doc, "doc"))
     return doc
