@@ -207,7 +207,9 @@ la CLI qui changent le résultat :
 | `history` | `false` | `--history-db` (base du serveur `NETCROSS_HISTORY_DB`, issue #890) |
 | `history_label` | — | `--history-label` (avec `history`) |
 
-Mêmes règles que la CLI : `redact` avec `tls` ou `quic` est refusé (400),
+Mêmes règles que la CLI : `redact` se combine avec `tls`/`quic` depuis
+l'issue #1155 (même table de pseudonymes, aucune adresse réelle dans les
+constats),
 car ces diagnostics relisent les fichiers d'origine avec les adresses
 réelles ; avec `redact`, le rapport de sécurité n'est pas calculé
 (`security_report_absent` l'indique). Les options retenues sont

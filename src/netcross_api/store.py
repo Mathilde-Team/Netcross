@@ -147,6 +147,7 @@ class AnalysesStore:
         quic_findings: Any = None,
         all_packets: Any = None,
         redaction_map: Any = None,
+        redactor: Any = None,
     ) -> None:
         """Passe l'analyse en ``completed`` avec son document brut, son
         résumé et son rapport structuré (celui de ``--json-report``).
@@ -175,6 +176,9 @@ class AnalysesStore:
             all_packets=all_packets,
             # Issue #876 : table d'anonymisation, en mémoire seulement
             redaction_map=redaction_map,
+            # Issue #1155 : redacteur vivant, pour traduire les adresses
+            # --client-group (client-diff) avec la meme table -- en mémoire
+            redactor=redactor,
         )
         logger.debug("AnalysesStore.complete: fin")
 

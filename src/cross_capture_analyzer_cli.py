@@ -159,7 +159,7 @@ from netcross_core.logging_config import add_debug_argument, apply_debug_argumen
 from netcross_core.profiling import creer_mesures, marquer
 from netcross_core.redact import SCOPE_ALL as REDACT_SCOPE_ALL
 from netcross_core.redact import SCOPES as REDACT_SCOPES
-from netcross_core.redact import scope_label
+from netcross_core.redact import redact_client_group, redact_diagnostic_events, scope_label
 from netcross_core.report_text import load_capture_annotations, print_capture_annotations
 from netcross_core.security import close_db, connect_cve_db
 from netcross_core.security import findings as security_findings
@@ -2442,9 +2442,9 @@ def main():
         "coherent sur tout le run, pour partager un rapport ou une capture "
         "sans exposer l'adressage reel (support vendeur, ticket externe). "
         "Couvre aussi les noms DNS/HTTP/SAN TLS/SIP selon --redact-scope (voir "
-        "netcross_core.redact). Mutuellement exclusif avec --tls/--quic/"
-        "--client-group, qui relisent des fichiers ou des IP fournies "
-        "independamment de cette redaction.",
+        "netcross_core.redact). Combinable avec --tls/--quic/--client-group "
+        "(issue #1155) : evenements TLS/QUIC rediges et adresses --client-group "
+        "traduites par la meme table de pseudonymes.",
     )
     ap.add_argument(
         "--tls-keylog",
@@ -3140,18 +3140,10 @@ def main():
     _check_dashboard_args(args)
     _check_stats_args(args)
     _check_comm_map_args(args)
-    if args.redact and (args.tls or args.quic or args.client_group):
-        print(
-            "--redact n'est pas disponible avec --tls/--quic/--client-group : ces "
-            "trois options relisent les fichiers passes a --capture avec leur "
-            "propre pipeline (--tls/--quic), ou recoivent des adresses IP reelles "
-            "directement en argument (--client-group), independamment des "
-            "paquets anonymises par --redact -- les combiner laisserait filtrer "
-            "des adresses reelles dans une partie du rapport sans le signaler. "
-            "Voir netcross_core.redact pour le detail.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    # Issue #1155 : --redact + --tls/--quic/--client-group est AUTORISE --
+    # evenements TLS/QUIC rediges et adresses --client-group traduites via
+    # la table commune (redact_diagnostic_events/redact_client_group),
+    # apres creation du redacteur.
 
     if (args.history_label or args.history_show is not None) and not args.history_db:
         print("--history-label/--history-show necessitent --history-db.", file=sys.stderr)
@@ -3370,6 +3362,11 @@ def main():
                 f"Correspondance adresse reelle <-> pseudonyme ecrite dans {args.redact_map} "
                 "(a conserver en prive, ne pas transmettre avec le rapport)."
             )
+        # Issue #1155 : les adresses --client-group sont traduites AVANT
+        # usage -- la comparaison client vs client cherche des pseudonymes,
+        # comme les paquets deja rediges.
+        if client_group:
+            client_group = redact_client_group(client_group, redactor)
 
     # --max-packets/--sample (issue #283, Etape 3) : appliques ici, sur
     # all_packets DEJA CHARGE en entier (voir _apply_packet_limits pour la
@@ -3611,6 +3608,9 @@ def main():
         tls_events = []
         for label, path in captures:
             events = parse_tls_capture(label, path)
+            # Issue #1155 : memes pseudonymes que les paquets rediges.
+            if redactor is not None:
+                redact_diagnostic_events(events, redactor)
             print(f"[{label}] {len(events)} evenements TLS trouves dans {path}")
             tls_events.extend(events)
         status_by_point = build_handshake_status(tls_events)
@@ -3634,6 +3634,9 @@ def main():
         quic_events = []
         for label, path in captures:
             events = parse_quic_capture(label, path, **options_lecture(tls_keylogs, label))
+            # Issue #1155 : memes pseudonymes que les paquets rediges.
+            if redactor is not None:
+                redact_diagnostic_events(events, redactor)
             print(f"[{label}] {len(events)} paquets QUIC trouves dans {path}")
             quic_events.extend(events)
         quic_findings = diagnose_quic(quic_events, r.points)

@@ -60,7 +60,7 @@ actif, non réglable.
 | Limiter ou échantillonner les paquets | oui (« Paquets max. », « Echantillonnage 1/N » en analyse simple, troncature annoncée dans le rapport ; issue #672) | `--max-packets`, `--sample` | `max_packets`, `sample` (issue #672) |
 | Noms logiques des hôtes | oui (« Table des noms... », exports CSV détaillé et JSON) | `--names` | `names` (fichier joint, issue #672) |
 | Plages TEST-NET traitées comme externes | oui (case « Plages TEST-NET externes », avec « Rapport de securite » ; issue #672) | `--test-net-external` | `test_net_external` (issue #672) |
-| Anonymisation IP/MAC et noms (portée « tout » hors CLI) | oui (« Anonymiser les adresses IP/MAC », table : « Table d'anonymisation (--redact-map)... » des Résultats, issue #876) | `--redact`, `--redact-scope`, `--redact-map` | `redact` (sans sécurité, refusé avec `tls`/`quic`, comme la CLI) ; table : `GET /analyses/{analysis_id}/redact-map` (issue #876) |
+| Anonymisation IP/MAC et noms (portée « tout » hors CLI) | oui (« Anonymiser les adresses IP/MAC », table : « Table d'anonymisation (--redact-map)... » des Résultats, issue #876) | `--redact`, `--redact-scope`, `--redact-map` | `redact` (sans sécurité, combinable avec `tls`/`quic` depuis l'issue #1155) ; table : `GET /analyses/{analysis_id}/redact-map` (issue #876) |
 
 ## Diagnostics et triage
 
