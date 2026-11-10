@@ -71,6 +71,7 @@ nav:
       - Mode batch: batch-mode.md
       - Capture distante: capture-distante.md
       - Métriques Prometheus: metriques-prometheus.md
+      - Tableau de bord Grafana: grafana-dashboard.md
       - API des sondes distribuées: probe-api.md
       - Sonde netcross-probe: probe-agent.md
   - Analyses:
