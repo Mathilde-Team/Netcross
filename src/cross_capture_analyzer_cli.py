@@ -124,6 +124,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 from netcross_core import (
     adjust_timestamps,
@@ -2475,6 +2476,32 @@ def main():
         "par un tiers).",
     )
     ap.add_argument(
+        "--redact-pcap",
+        metavar="DOSSIER",
+        help="Avec --redact : ecrit dans DOSSIER un pcapng anonymise PAR POINT "
+        "(<point>.pcapng), memes pseudonymes que le rapport -- pour partager "
+        "les captures elles-memes. Charges utiles zéroées par défaut "
+        "(--redact-pcap-keep-payload pour les conserver), sommes de contrôle "
+        "recalculées, horodatages conservés (--redact-pcap-decalage pour un "
+        "décalage uniforme). Issue #1157.",
+    )
+    ap.add_argument(
+        "--redact-pcap-keep-payload",
+        action="store_true",
+        help="Avec --redact-pcap : conserve les charges utiles applicatives "
+        "telles quelles (par défaut : remplacées par des zéros, longueurs "
+        "conservées). Déconseillé si la capture contient des données "
+        "sensibles.",
+    )
+    ap.add_argument(
+        "--redact-pcap-decalage",
+        metavar="SECONDES",
+        type=float,
+        default=0.0,
+        help="Avec --redact-pcap : décalage uniforme des horodatages (les "
+        "différences inter-points restent exactes). Défaut : 0 (conservés).",
+    )
+    ap.add_argument(
         "--support-ticket",
         metavar="CHEMIN",
         help="Ecrit un ticket de support ANONYMISE (JSON) : contexte technique, "
@@ -3131,6 +3158,12 @@ def main():
     if args.redact_map and not args.redact:
         print("--redact-map necessite --redact.", file=sys.stderr)
         sys.exit(1)
+    if args.redact_pcap and not args.redact:
+        print("--redact-pcap necessite --redact.", file=sys.stderr)
+        sys.exit(1)
+    if (args.redact_pcap_keep_payload or args.redact_pcap_decalage) and not args.redact_pcap:
+        print("--redact-pcap-keep-payload/--redact-pcap-decalage necessitent --redact-pcap.", file=sys.stderr)
+        sys.exit(1)
     if args.redact_scope and not args.redact:
         print("--redact-scope necessite --redact.", file=sys.stderr)
         sys.exit(1)
@@ -3356,6 +3389,27 @@ def main():
             f"\n{len(redactor)} adresse(s) (IP/MAC) et {len(redactor.names)} nom(s) anonymise(s) "
             f"avant analyse (--redact-scope {args.redact_scope})."
         )
+        # Issue #1157 : pcapng anonymise par point, memes pseudonymes que le
+        # run (ecrit AVANT le --redact-map pour que la table exportee
+        # couvre aussi les adresses decouvertes dans les trames brutes).
+        if args.redact_pcap:
+            from netcross_core.redact_pcap import ecrire_pcapng_anonymise
+
+            captures_par_point: dict[str, list[str]] = {}
+            for label, chemin in captures:
+                captures_par_point.setdefault(label, []).append(chemin)
+            dossier = Path(args.redact_pcap)
+            for label, chemins in captures_par_point.items():
+                nom_fichier = re.sub(r"[^A-Za-z0-9._-]", "_", label) or "point"
+                chemin_sortie = ecrire_pcapng_anonymise(
+                    label,
+                    chemins,
+                    redactor,
+                    dossier / f"{nom_fichier}.pcapng",
+                    garder_payload=args.redact_pcap_keep_payload,
+                    decalage=args.redact_pcap_decalage,
+                )
+                print(f"Capture anonymisee ecrite dans {chemin_sortie} (point {label}).")
         if args.redact_map:
             write_redaction_map_csv(redactor, args.redact_map)
             print(

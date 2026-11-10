@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-250 modules · 359 classes · 878 fonctions publiques de module.
+251 modules · 361 classes · 879 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -35,7 +35,7 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"27 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"63 imports"| netcross_core
+    CLI -->|"64 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
     netcross_gtk4 -->|"34 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
@@ -571,7 +571,7 @@ classDiagram
     }
 
     %% ===== netcross_probe.bpf =====
-    class LibpcapIndisponibleError {
+    class netcross_probe_bpf_LibpcapIndisponibleError["netcross_probe.bpf.LibpcapIndisponibleError"] {
         <<RuntimeError>>
     }
     class FiltreBpfInvalideError {
@@ -580,7 +580,7 @@ classDiagram
     class _BpfProgramme {
         <<ctypes.Structure>>
     }
-    class _EnTetePaquet {
+    class netcross_probe_bpf__EnTetePaquet["netcross_probe.bpf._EnTetePaquet"] {
         <<ctypes.Structure>>
     }
     class mod_netcross_probe_bpf["netcross_probe.bpf"] {
@@ -689,6 +689,7 @@ classDiagram
 | `netcross_core.pseudonyms` | Module commun de pseudonymisation : adresses et noms (issue #1151). |
 | `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial v1 et v2 (RFC 9000/9001/9369), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP… |
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
+| `netcross_core.redact_pcap` | réécriture pcapng anonymisée multi-points. |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
@@ -2248,6 +2249,18 @@ classDiagram
         +redact_packets(packets, scope) AddressRedactor
         +redaction_map_csv(entries) str
         +write_redaction_map_csv(redactor, path) None
+    }
+
+    %% ===== netcross_core.redact_pcap =====
+    class netcross_core_redact_pcap_LibpcapIndisponibleError["netcross_core.redact_pcap.LibpcapIndisponibleError"] {
+        <<RuntimeError>>
+    }
+    class netcross_core_redact_pcap__EnTetePaquet["netcross_core.redact_pcap._EnTetePaquet"] {
+        <<ctypes.Structure>>
+    }
+    class mod_netcross_core_redact_pcap["netcross_core.redact_pcap"] {
+        <<module>>
+        +ecrire_pcapng_anonymise(label, chemins, redactor, sortie, garder_payload, decalage) Path
     }
 
     %% ===== netcross_core.report_text =====
