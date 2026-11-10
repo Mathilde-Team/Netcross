@@ -73,6 +73,7 @@ nav:
       - Métriques Prometheus: metriques-prometheus.md
       - Tableau de bord Grafana: grafana-dashboard.md
       - API des sondes distribuées: probe-api.md
+      - Sonde netcross-probe: probe-agent.md
   - Analyses:
       - Estimation d'horloge: estimation-horloge.md
       - Débit crête multi-échelle: fenetres-multi-echelles.md
