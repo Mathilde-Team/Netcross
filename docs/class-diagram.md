@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-254 modules · 363 classes · 885 fonctions publiques de module.
+254 modules · 363 classes · 888 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -33,17 +33,17 @@ flowchart TD
     netcross_core["netcross_core"]
     netcross_probe["netcross_probe"]
     pcap_parser["pcap_parser"]
-    CLI -->|"28 imports"| netcross_report
+    CLI -->|"29 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
     CLI -->|"65 imports"| netcross_core
     CLI -->|"8 imports"| pcap_parser
-    netcross_gtk4 -->|"34 imports"| netcross_report
+    netcross_gtk4 -->|"36 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
-    netcross_gtk4 -->|"121 imports"| netcross_core
+    netcross_gtk4 -->|"122 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
-    netcross_api -->|"26 imports"| netcross_report
+    netcross_api -->|"31 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"68 imports"| netcross_core
+    netcross_api -->|"69 imports"| netcross_core
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"61 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
@@ -2296,6 +2296,7 @@ classDiagram
     }
     class mod_netcross_core_redact_pcap["netcross_core.redact_pcap"] {
         <<module>>
+        +recrire_trame_anonymisee(trame, linktype, redactor, garder_payload) bytes
         +ecrire_pcapng_anonymise(label, chemins, redactor, sortie, garder_payload, decalage) Path
     }
 
@@ -3010,7 +3011,7 @@ classDiagram
     %% ===== netcross_core.extract.evidence_pcaps =====
     class mod_netcross_core_extract_evidence_pcaps["netcross_core.extract.evidence_pcaps"] {
         <<module>>
-        +extraire_preuves_pcaps(captures, constats, dossier, contexte) list~dict~
+        +extraire_preuves_pcaps(captures, constats, dossier, contexte, redactor) list~dict~
     }
 
     %% ===== netcross_core.extract.media =====
@@ -5119,6 +5120,8 @@ classDiagram
         +float duplicate_threshold_ms
         +bool history
         +str? history_label
+        +bool evidence_pcaps
+        +int evidence_pcaps_context
         +tuple~str, ...~ plugins
         +tuple~tuple~str, str~, ...~ tls_keylogs
     }
@@ -5128,14 +5131,16 @@ classDiagram
     class mod_netcross_api_app["netcross_api.app"] {
         <<module>>
         +health() HealthResponse
-        +upload_capture(file, label, nat_tolerant, nat_window_ms, tls, quic, redact, max_packets, sample, test_net_external, parallel_workers, notify_on, notify_webhook, notify_slack, notify_email, notify_detail, names, known_destinations, known_hosts, extra_files, tls_keylog, tls_keylog_labels, split_interfaces, confirm_active, active_dry_run, rule_engine, expert_section, media_quality, tshark_stats, flow_timeline, flow_timeline_window, bucket_ms, rtp_clock_rate, idle_timeout_seconds, detect_duplicates, exclude_duplicates, duplicate_threshold_ms, history, history_label, plugins, wait, _auth) JSONResponse
+        +upload_capture(file, label, nat_tolerant, nat_window_ms, tls, quic, redact, max_packets, sample, test_net_external, parallel_workers, notify_on, notify_webhook, notify_slack, notify_email, notify_detail, names, known_destinations, known_hosts, extra_files, tls_keylog, tls_keylog_labels, split_interfaces, confirm_active, active_dry_run, rule_engine, expert_section, media_quality, tshark_stats, flow_timeline, flow_timeline_window, bucket_ms, rtp_clock_rate, idle_timeout_seconds, detect_duplicates, exclude_duplicates, duplicate_threshold_ms, history, history_label, evidence_pcaps, evidence_pcaps_context, plugins, wait, _auth) JSONResponse
         +segment_losses(report) list~SegmentLoss~
-        +upload_multi_capture(files, labels, points_order, nat_tolerant, nat_window_ms, tls, quic, redact, max_packets, sample, test_net_external, parallel_workers, notify_on, notify_webhook, notify_slack, notify_email, notify_detail, names, known_destinations, known_hosts, tls_keylog, tls_keylog_labels, split_interfaces, confirm_active, active_dry_run, rule_engine, expert_section, media_quality, tshark_stats, flow_timeline, flow_timeline_window, bucket_ms, rtp_clock_rate, idle_timeout_seconds, detect_duplicates, exclude_duplicates, duplicate_threshold_ms, history, history_label, plugins, wait, _auth) JSONResponse
+        +upload_multi_capture(files, labels, points_order, nat_tolerant, nat_window_ms, tls, quic, redact, max_packets, sample, test_net_external, parallel_workers, notify_on, notify_webhook, notify_slack, notify_email, notify_detail, names, known_destinations, known_hosts, tls_keylog, tls_keylog_labels, split_interfaces, confirm_active, active_dry_run, rule_engine, expert_section, media_quality, tshark_stats, flow_timeline, flow_timeline_window, bucket_ms, rtp_clock_rate, idle_timeout_seconds, detect_duplicates, exclude_duplicates, duplicate_threshold_ms, history, history_label, evidence_pcaps, evidence_pcaps_context, plugins, wait, _auth) JSONResponse
         +get_analysis(analysis_id, _auth) JSONResponse
         +get_analysis_report(analysis_id, _auth) JSONResponse
         +get_security_report(analysis_id, _auth) SecurityReport
         +get_analysis_text(analysis_id, _auth) PlainTextResponse
         +get_analysis_markdown(analysis_id, _auth) PlainTextResponse
+        +get_analysis_html(analysis_id, _auth) HTMLResponse
+        +get_analysis_evidence_pcaps(analysis_id, _auth) Response
         +get_analysis_pdf(analysis_id, topn, _auth) StreamingResponse
         +get_analysis_csv(analysis_id, _auth) PlainTextResponse
         +get_analysis_sequence(analysis_id, max_flows, _auth) JSONResponse
@@ -5380,7 +5385,7 @@ classDiagram
     class AnalysesStore {
         +persistent() bool
         +create_pending(metadata) str
-        +complete(analysis_id, document, summary, report, report_obj, flows, findings, security_report_obj, tls_findings, quic_findings, all_packets, redaction_map, redactor) None
+        +complete(analysis_id, document, summary, report, report_obj, flows, findings, security_report_obj, tls_findings, quic_findings, all_packets, redaction_map, redactor, evidence_pcaps, evidence_dir) None
         +set_metadata(analysis_id, key, value) None
         +fail(analysis_id, error) None
         +get(analysis_id) dict?
@@ -5552,6 +5557,7 @@ classDiagram
         +ExpertiseExports? expertise
         +ReportContext? report_context
         +dict? ai
+        +Any redactor
     }
     class mod_netcross_gtk4_analysis_pipeline["netcross_gtk4.analysis_pipeline"] {
         <<module>>
@@ -5643,6 +5649,10 @@ classDiagram
         +export_pdf_to(path)
         +on_export_json(_btn)
         +on_export_markdown(_btn)
+        +on_export_html(_btn)
+        +export_html_to(path)
+        +on_extraire_pcaps_preuve(_btn)
+        +extraire_pcaps_preuve_dans(dossier)
         +export_markdown_to(path)
         +export_json_to(path)
         +on_export_security(suffix)
@@ -6128,6 +6138,7 @@ classDiagram
         +Any wireshark_expert_events
         +Any security_report
         +Any rule_engine
+        +Any evidence_pcaps
         +Any diff_findings
         +Any baseline_report
         +Any current_report
@@ -6144,7 +6155,7 @@ classDiagram
     class mod_netcross_gtk4_run_outcome["netcross_gtk4.run_outcome"] {
         <<module>>
         +build_flow_objects(flows) Any
-        +analysis_outcome(mode, report, flows, findings, text, tls_findings, quic_findings, wireshark_expert_events, security_report, rule_engine) RunOutcome
+        +analysis_outcome(mode, report, flows, findings, text, tls_findings, quic_findings, wireshark_expert_events, security_report, rule_engine, evidence_pcaps) RunOutcome
         +diff_status_text(findings) str
         +diff_outcome(findings, baseline_report, current_report, text, tls_findings_baseline, tls_findings_current, quic_findings_baseline, quic_findings_current) RunOutcome
     }

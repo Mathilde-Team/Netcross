@@ -253,6 +253,108 @@ def test_nom_de_fichier_slugifie(tmp_path):
     assert extraits[0]["fichier"] == "constat-001-Point_amont_1.pcapng"
 
 
+# -- anonymisation des extraits (issue #1083) ---------------------------------
+
+
+def _trame_ethernet_ipv4(src_ip: str, dst_ip: str, marqueur: bytes = b"") -> bytes:
+    """Trame Ethernet + IPv4 minimaliste (proto TCP) avec les adresses
+    donnees -- les octets MAC/IP reels sont ce que la table de pseudonymes
+    doit remplacer."""
+    entete_ip = struct.pack(
+        "!BBHHHBBH4s4s",
+        0x45,
+        0,
+        20 + len(marqueur),
+        1,
+        0,
+        64,
+        6,
+        0,
+        bytes(int(x) for x in src_ip.split(".")),
+        bytes(int(x) for x in dst_ip.split(".")),
+    )
+    # MAC reelles (f8:1e:...): hors de la plage des pseudonymes MAC
+    # (02:00:00:00:00:XX), pour distinguer les deux dans les assertions.
+    return bytes.fromhex("f81e34abcd01") + bytes.fromhex("f81e34abcd02") + b"\x08\x00" + entete_ip + marqueur
+
+
+def _pcap_ethernet(chemin: Path, trames: list[bytes]) -> Path:
+    with open(chemin, "wb") as f:
+        f.write(struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1))
+        for i, trame in enumerate(trames, 1):
+            f.write(struct.pack("<IIII", 1700000000 + i, i * 1000, len(trame), len(trame)))
+            f.write(trame)
+    return chemin
+
+
+def test_redact_les_adresses_des_extraits_sont_pseudonymisees(tmp_path):
+    """Issue #1083 : avec --redact, aucune adresse reelle (IP ou MAC) ne
+    doit figurer dans les extraits -- memes pseudonymes que le rapport."""
+    import socket
+
+    from netcross_core.redact import AddressRedactor
+
+    source = _pcap_ethernet(
+        tmp_path / "lan.pcap",
+        [_trame_ethernet_ipv4("192.168.1.10", "192.168.1.11", b"preuve") for _ in range(4)],
+    )
+    redactor = AddressRedactor()
+    redactor.redact([])
+    extraits = extraire_preuves_pcaps(
+        {"LAN": str(source)},
+        [_constat("LAN", 3)],
+        str(tmp_path / "preuves"),
+        redactor=redactor,
+    )
+    assert extraits
+    for epb in _lire_epb(tmp_path / "preuves" / "constat-001-LAN.pcapng"):
+        assert socket.inet_aton("192.168.1.10") not in epb["data"]
+        assert socket.inet_aton("192.168.1.11") not in epb["data"]
+        assert bytes.fromhex("f81e34abcd01") not in epb["data"]
+        assert bytes.fromhex("f81e34abcd02") not in epb["data"]
+        # des adresses de pseudonymes (plages RFC 5737) y figurent
+        assert socket.inet_aton("192.0.2.1") in epb["data"] or socket.inet_aton("192.0.2.2") in epb["data"]
+    # la charge utile (marqueur) est conservee : elle fait partie de la preuve
+    trames = [e["data"] for e in _lire_epb(tmp_path / "preuves" / "constat-001-LAN.pcapng")]
+    assert any(b"preuve" in t for t in trames)
+
+
+def test_redact_portee_noms_les_adresses_restant_reelles(tmp_path):
+    """--redact-scope noms : la table ne touche pas les adresses, les
+    extraits gardent les adresses reelles (meme perimetre que le rapport)."""
+    import socket
+
+    from netcross_core.redact import SCOPE_NAMES, AddressRedactor
+
+    trames = [_trame_ethernet_ipv4("192.168.1.10", "192.168.1.11", b"preuve") for _ in range(4)]
+    source = _pcap_ethernet(tmp_path / "lan.pcap", trames)
+    extraits = extraire_preuves_pcaps(
+        {"LAN": str(source)},
+        [_constat("LAN", 3)],
+        str(tmp_path / "preuves"),
+        redactor=AddressRedactor(scope=SCOPE_NAMES),
+    )
+    assert extraits
+    for epb in _lire_epb(tmp_path / "preuves" / "constat-001-LAN.pcapng"):
+        assert socket.inet_aton("192.168.1.10") in epb["data"]  # inchangée : portée « noms »
+
+
+def test_sans_redact_les_extraits_sont_copies_telles_quelles(tmp_path):
+    """Sans table (defaut), les trames sont recopies telles quelles."""
+    import socket
+
+    trames = [_trame_ethernet_ipv4("192.168.1.10", "192.168.1.11", b"preuve") for _ in range(4)]
+    source = _pcap_ethernet(tmp_path / "lan.pcap", trames)
+    extraits = extraire_preuves_pcaps(
+        {"LAN": str(source)},
+        [_constat("LAN", 3)],
+        str(tmp_path / "preuves"),
+    )
+    assert extraits
+    for epb in _lire_epb(tmp_path / "preuves" / "constat-001-LAN.pcapng"):
+        assert socket.inet_aton("192.168.1.10") in epb["data"]
+
+
 # -- integration rapport JSON / HTML ------------------------------------------
 
 

@@ -22,6 +22,11 @@ Fichiers produits : ``constat-<n>-<point>.pcapng`` (``n`` = rang du constat
 dans le rapport, point slugifie), un par constat ET par point. Le HTML
 reference ces extraits par des liens relatifs (cle ``evidence_pcaps`` du
 rapport JSON : ``ref``/``point``/``frame_number``/``fichier``).
+
+Issue #1083 : avec une table d'anonymisation (``redactor``), les trames
+ecrites sont reecrites -- adresses IP/MAC remplacees par les pseudonymes
+du run (meme table que le rapport), charge utile conservee -- pour
+qu'aucune adresse reelle ne figure dans les extraits.
 """
 
 from __future__ import annotations
@@ -321,6 +326,32 @@ def _references(constat) -> list[tuple[str, int]]:
     return refs
 
 
+def _anonymiser_bloc(bloc: bytes, linktype: int, redactor) -> bytes:
+    """EPB dont la trame est anonymisee (issue #1083) : adresses IP/MAC
+    remplacees par les pseudonymes de la table du run (meme table que le
+    rapport), charge utile conservee. Portee ``noms`` seule : la table ne
+    touche pas les adresses, le bloc est rendu tel quel."""
+    logger.debug("_anonymiser_bloc: entrée (linktype={})", linktype)
+    if not getattr(redactor, "addresses", True):
+        logger.debug("_anonymiser_bloc: portée sans adresses -> retour inchangé")
+        return bloc
+    from netcross_core.redact_pcap import recrire_trame_anonymisee
+
+    _type, _total = struct.unpack_from("<II", bloc, 0)
+    corps = bloc[8:-4]
+    if_id, ts_haut, ts_bas, caplen = struct.unpack_from("<IIII", corps, 0)
+    donnees = corps[16 : 16 + caplen]
+    conservees = _options_brutes([(code, valeur) for code, valeur in _options(corps[16 + caplen :])])
+    epb = _epb(
+        if_id,
+        ts_haut * (1 << 32) + ts_bas,
+        recrire_trame_anonymisee(donnees, linktype, redactor),
+        conservees,
+    )
+    logger.debug("_anonymiser_bloc: retour {} octet(s)", len(epb))
+    return epb
+
+
 def _texte_constat(constat) -> str:
     """Commentaire de paquet : identite du constat, tronquee a 240 octets."""
     logger.debug("_texte_constat: entrée")
@@ -340,6 +371,7 @@ def extraire_preuves_pcaps(
     constats: Iterable,
     dossier: str,
     contexte: int = CONTEXTE_DEFAUT,
+    redactor=None,
 ) -> list[dict]:
     """Ecrit un pcapng par constat et par point de preuve dans ``dossier``
     et renvoie les references pour le rapport (cle ``evidence_pcaps``) :
@@ -349,8 +381,14 @@ def extraire_preuves_pcaps(
     ``constats`` : findings (dicts JSON ou Finding). Seules les preuves dont
     le point a un fichier lisible sont extraites : une preuve sans fichier
     source reste sans extrait (jamais inventee), journalisee en debug.
+
+    ``redactor`` (issue #1083) : table d'anonymisation du run -- avec
+    ``--redact``, les trames des extraits sont reecrites avec les memes
+    pseudonymes que le reste du rapport (adresses IP/MAC, charges utiles
+    conservees : elles font partie de la preuve), pour qu'aucune adresse
+    reelle ne figure dans les fichiers produits.
     """
-    logger.debug("extraire_preuves_pcaps: entrée (contexte={})", contexte)
+    logger.debug("extraire_preuves_pcaps: entrée (contexte={}, anonymisation={})", contexte, redactor is not None)
     fichiers: Mapping[str, str] = dict(captures)
     os.makedirs(dossier, exist_ok=True)
     # par point : numeros de trames a lire ; par constat : preuves regroupees
@@ -377,13 +415,16 @@ def extraire_preuves_pcaps(
             if point not in lus:
                 continue
             _linktype, blocs = lus[point]
-            contenu = [_bloc_shb(), _bloc_idb(_linktype if _linktype is not None else 1)]
+            linktype = _linktype if _linktype is not None else 1
+            contenu = [_bloc_shb(), _bloc_idb(linktype)]
             voulues: set[int] = set()
             for numero in numeros:
                 if numero in blocs:
                     voulues.update(range(max(1, numero - contexte), numero + contexte + 1))
             for numero in sorted(voulues & set(blocs)):
                 bloc = blocs[numero]
+                if redactor is not None:
+                    bloc = _anonymiser_bloc(bloc, linktype, redactor)
                 if numero in numeros:
                     bloc = _avec_commentaire(bloc, texte)
                 contenu.append(bloc)

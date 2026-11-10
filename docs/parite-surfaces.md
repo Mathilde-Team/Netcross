@@ -14,9 +14,9 @@ ici fait donc échouer la CI.
 
 | Surface | Points d'entrée | Capacités |
 |---|---|---|
-| CLI | `cross_capture_analyzer_cli.py` (146 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
+| CLI | `cross_capture_analyzer_cli.py` (147 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 4 pages, 44 cases à cocher, 35 réglages numériques | Analyse interactive et exploration visuelle ; onglet « Incidents » : réglages du gel rétroactif et archives (issue #1095) |
-| API | 68 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) |
+| API | 70 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) |
 
 
 Légende : **oui** = disponible ; **non** = absent ; **auto** = toujours
@@ -95,6 +95,7 @@ actif, non réglable.
 | PDF | oui (« Exporter en PDF ») | `--pdf-report` | `GET /analyses/{id}/pdf?topn=N` (issue #670) |
 | JSON structuré | oui (« Exporter en JSON », mêmes clés que la CLI) | `--json-report` | `GET /analyses/{analysis_id}/report` (mêmes clés) ; `GET /analyses/{analysis_id}` sert le format brut, voir ci-dessous |
 | Markdown | oui (« Exporter en Markdown », analyse simple, même document ; issue #864) | `--md-report` | `GET /analyses/{analysis_id}/markdown` (issue #864) |
+| Rapport HTML autonome | oui (« Exporter en HTML », analyse simple, même document, fichier unique sans ressource externe ; issue #1083) | `--html-report CHEMIN` | `GET /analyses/{analysis_id}/report/html` (issue #1083) |
 | CSV du détail par flux | oui (« Exporter en CSV ») | `--detail-csv` | `GET /analyses/{id}/detail.csv` (issue #670) |
 | Graphiques Top-N du PDF | oui (« Top-N graphiques ») | `--topn-charts` | `topn` de `GET /analyses/{analysis_id}/pdf` (issue #865) |
 | Rapport de sécurité HTML / JSON | oui (section Sécurité, 2 boutons) | `--security-html` ; clé `security_report` de `--json-report` | `GET /analyses/{analysis_id}/security` (liste simplifiée) |
@@ -188,7 +189,7 @@ fenêtre « Outils de capture » (bouton de la barre de titre).
 | Conversion de format | onglet « Conversion » | `--convert`, `--convert-format` | `POST /tools/convert` : `file`, `format` |
 | Export d'un sous-ensemble filtré | onglet « Export filtre » | `--export-pcap`, `--export-bpf`, `--export-time-start`, `--export-time-end`, `--export-endpoints` | `POST /tools/export` : `file`, `bpf`, `time_start`, `time_end`, `endpoints`, `format` |
 | Recalage temporel | onglet « Recalage temporel » | `--adjust-time-output`, `--time-offset`, `--normalize-time`, `--align-to` | `POST /tools/adjust-time` : `file`, `time_offset`, `normalize`, `align_to`, `format` |
-| Extraits pcap de preuve par constat | non (fichiers du poste, comme l'export d'onglet « Export filtre » ; issue #1081) | `--evidence-pcaps DOSSIER`, `--evidence-pcaps-context N` : un pcapng par constat et par point (trames de contexte, commentaire de paquet sur la trame de preuve, sources pcap converties) | non (fichiers du poste ; issue #1081) |
+| Extraits pcap de preuve par constat | oui (« Extraire les pcaps de preuve », analyse simple, un dossier du poste, anonymisés si l'analyse a été faite avec anonymisation ; issue #1083) | `--evidence-pcaps DOSSIER`, `--evidence-pcaps-context N` : un pcapng par constat et par point (trames de contexte, commentaire de paquet sur la trame de preuve, sources pcap converties) | oui : `evidence_pcaps`/`evidence_pcaps_context` de `POST /captures` et `/captures/multi`, archive zip `GET /analyses/{analysis_id}/evidence-pcaps` (extraits produits pendant le run, anonymisés si `redact=true` ; issue #1083) |
 | Rejeu sur une interface | onglet « Rejeu » (confirmation « J'ai l'autorisation d'emettre sur cette interface », bouton « Arreter ») | `--replay`, `--replay-speed`, `--replay-loop` | `POST /tools/replay` : `file`, `interface`, `speed`, `loop` ; uniquement sur les interfaces de `NETCROSS_REPLAY_INTERFACES` (vide par défaut : 403) |
 
 ## Autres points d'entrée

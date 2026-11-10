@@ -2272,6 +2272,14 @@ def main():
         "Issue #761.",
     )
     ap.add_argument(
+        "--html-report",
+        help="Chemin de sortie pour un rapport HTML autonome (issue #1083) : "
+        "fichier unique, aucune ressource externe, diagrammes et preuves "
+        "cliquables (meme document que --json-report, rendu HTML). Les "
+        "extraits --evidence-pcaps y sont references par des liens relatifs. "
+        "Aucune dependance supplementaire.",
+    )
+    ap.add_argument(
         "--evidence-pcaps",
         metavar="DOSSIER",
         help="Extraction des pcap de preuve (issue #1081) : ecrit dans "
@@ -2280,8 +2288,10 @@ def main():
         "context) et un commentaire de paquet indiquant le constat. Les "
         "points de capture a plusieurs fichiers (rotation) sont exclus : "
         "leurs numeros de trames ne sont pas continus. Les extraits sont "
-        "referencees par --json-report (cle evidence_pcaps) sous forme de "
-        "liens relatifs. Voir aussi --evidence-pcaps-context.",
+        "referencees par --json-report/--html-report (cle evidence_pcaps) "
+        "sous forme de liens relatifs. Avec --redact (issue #1083) : les "
+        "trames ecrites sont anonymisees avec la meme table que le rapport. "
+        "Voir aussi --evidence-pcaps-context.",
     )
     ap.add_argument(
         "--evidence-pcaps-context",
@@ -3723,6 +3733,7 @@ def main():
         or args.pdf_report
         or args.json_report
         or args.md_report
+        or args.html_report
         or args.history_db
         or args.expert_section
         or args.evidence_pcaps
@@ -3876,7 +3887,7 @@ def main():
     # voir netcross_report.session_objects pour l'extraction (meme
     # sequence d'appels, aucun calcul nouveau).
     session_objects = None
-    if args.expert_section or args.pdf_report or args.json_report or args.md_report:
+    if args.expert_section or args.pdf_report or args.json_report or args.md_report or args.html_report:
         from netcross_report.session_objects import build_session_objects, print_session_objects
 
         session_objects = build_session_objects(r, findings, flows, all_packets)
@@ -3970,6 +3981,7 @@ def main():
             findings,
             args.evidence_pcaps,
             contexte=max(0, args.evidence_pcaps_context),
+            redactor=redactor,
         )
         if evidence_pcaps:
             n_fichiers = len({e["fichier"] for e in evidence_pcaps})
@@ -3996,6 +4008,28 @@ def main():
             **session_objects.json_kwargs(),
         )
         print(f"Rapport JSON ecrit dans {args.json_report}")
+
+    if args.html_report:
+        from netcross_report.html_report import generate_html_report
+
+        # Issue #1083 : meme document que --json-report, rendu HTML autonome
+        # (fichier unique, aucune ressource externe). Les extraits
+        # --evidence-pcaps y sont references par des liens relatifs.
+        generate_html_report(
+            r,
+            args.html_report,
+            findings=findings,
+            security_report=security_report_obj,
+            tls_findings=tls_findings,
+            quic_findings=quic_findings,
+            rule_engine_findings=rule_engine_findings,
+            meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
+            redaction=redaction_info,
+            names=names,
+            evidence_pcaps=evidence_pcaps,
+            **session_objects.json_kwargs(),
+        )
+        print(f"Rapport HTML ecrit dans {args.html_report}")
 
     # Issues #359/#360/#361 : sorties JSON d'analyse avancee
     if args.flow_timeline:
