@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 from netcross_probe.bpf import filtrer_capture
+from netcross_probe.etat import EtatHorloge, PertesCapture, lire_etat_horloge, lire_pertes_capture
 from pcap_parser.capinfos_source import read_capture_info
 from pcap_parser.capture import RingFile, cut_capture_window, ring_inventory, select_ring_files
 
@@ -68,6 +69,11 @@ class FenetreResultat:
     octets: int
     sha256: str
     chemin: str
+    # Issue #1103 : pertes déclarées par les ISB des fichiers du tampon
+    # couvrant la fenêtre (None = aucune statistique lue), et état
+    # d'horloge de la sonde au moment de l'extraction.
+    pertes: PertesCapture | None = None
+    horloge: EtatHorloge | None = None
 
 
 def _outil_wireshark(nom: str) -> str:
@@ -155,6 +161,7 @@ def extraire_fenetre(
     inclure_inconnus: bool = False,
     dossier_sortie: str,
     max_octets: int | None = None,
+    lire_horloge=lire_etat_horloge,
 ) -> FenetreResultat:
     """Extrait la fenêtre [debut, fin] (epoch, bornes incluses) du tampon circulaire.
 
@@ -169,6 +176,9 @@ def extraire_fenetre(
     4. calcul du SHA-256, de la taille et de l'intervalle réellement couvert
        (premier/dernier paquet via capinfos).
 
+    Issue #1103 : les métadonnées de la fenêtre sont lues en même temps --
+    pertes déclarées (somme des ISB des fichiers sélectionnés) et état
+    d'horloge de la sonde (``lire_horloge``, injectable pour les tests).
     ``max_octets`` : si le pcapng final dépasse cette taille, il est
     supprimé et :class:`FenetreTropGrandeError` est levée (contrat v1 : 413).
     """
@@ -180,6 +190,9 @@ def extraire_fenetre(
     if not selection:
         logger.debug("extraire_fenetre: tampon vide pour cette fenêtre -> levée FenetreVideError")
         raise FenetreVideError(f"aucun fichier du tampon {dossier_tampon!r} ne couvre [{debut}, {fin}]")
+    # Issue #1103 : pertes déclarées par les fichiers du tampon retenus.
+    pertes = lire_pertes_capture([fichier.path for fichier in selection])
+    horloge = lire_horloge()
 
     os.makedirs(dossier_sortie, exist_ok=True)
     identifiant = uuid.uuid4().hex[:16]
@@ -231,6 +244,8 @@ def extraire_fenetre(
         octets=octets,
         sha256=_sha256_fichier(chemin_final),
         chemin=chemin_final,
+        pertes=pertes,
+        horloge=horloge,
     )
     logger.debug(
         "extraire_fenetre: retour fenêtre {} ({} paquet(s), {} o, couvert {})",

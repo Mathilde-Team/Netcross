@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-252 modules · 361 classes · 882 fonctions publiques de module.
+253 modules · 363 classes · 884 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -48,7 +48,7 @@ flowchart TD
     netcross_report -->|"61 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
     netcross_core -->|"27 imports"| pcap_parser
-    netcross_probe -->|"3 imports"| pcap_parser
+    netcross_probe -->|"4 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -79,6 +79,7 @@ flowchart LR
     DiffFinding["netcross_core.baseline_diff.DiffFinding"]
     EchantillonHorloge["netcross_core.clock_sync.EchantillonHorloge"]
     EstimationHorloge["netcross_core.clock_sync.EstimationHorloge"]
+    EtatHorloge["netcross_probe.etat.EtatHorloge"]
     EvidenceLink["netcross_core.expert_model.EvidenceLink"]
     ExpertEvent["netcross_core.expert_model.ExpertEvent"]
     ExpertiseExports["netcross_gtk4.expertise_view.ExpertiseExports"]
@@ -98,6 +99,7 @@ flowchart LR
     NotifySettings["netcross_core.notify.request.NotifySettings"]
     OsGuess["netcross_core.discovery.os_detect.OsGuess"]
     PacketAnnotation["netcross_core.models.PacketAnnotation"]
+    PertesCapture["netcross_probe.etat.PertesCapture"]
     Pkt["netcross_core.models.Pkt"]
     PointDeGel["netcross_core.retro_capture.PointDeGel"]
     RadioInfo["pcap_parser.radio.RadioInfo"]
@@ -127,6 +129,8 @@ flowchart LR
     CveSeed -->|entries| CveEntry
     DemandeSauvegarde -->|filtre| BPFFilter
     DiffFinding -->|evidence| EvidenceLink
+    FenetreResultat -->|horloge| EtatHorloge
+    FenetreResultat -->|pertes| PertesCapture
     Finding -->|event| ExpertEvent
     Finding -->|evidence| EvidenceLink
     FlowView -->|events| ExpertEvent
@@ -542,6 +546,7 @@ classDiagram
 | `netcross_probe.agent` | L'agent ``netcross-probe`` : capture locale + extraction de fenêtres. |
 | `netcross_probe.bpf` | Filtrage BPF (syntaxe pcap-filter) en relecture d'un fichier de capture. |
 | `netcross_probe.capture` | Capture locale de la sonde ``netcross-probe`` en tampon circulaire. |
+| `netcross_probe.etat` | pertes de capture et état d'horloge de la sonde (issue #1103, sous-issue 4/6 du chantier #1002). |
 | `netcross_probe.fenetres` | Extraction d'une fenêtre [t1, t2] filtrée du tampon circulaire de la sonde. |
 
 ### Diagramme
@@ -606,6 +611,31 @@ classDiagram
         +inventaire() list~RingFile~
     }
 
+    %% ===== netcross_probe.etat =====
+    class PertesCapture {
+        <<dataclass, frozen>>
+        +int packets_received
+        +int ifdrop
+        +int osdrop
+        +packets_dropped() int
+        +vers_dict() dict
+    }
+    class EtatHorloge {
+        <<dataclass, frozen>>
+        +str source
+        +bool synchronized
+        +float? offset_ms
+        +float? dispersion_ms
+        +str? reference
+        +float measured_at
+        +vers_dict() dict
+    }
+    class mod_netcross_probe_etat["netcross_probe.etat"] {
+        <<module>>
+        +lire_pertes_capture(chemins) PertesCapture?
+        +lire_etat_horloge(lancer) EtatHorloge
+    }
+
     %% ===== netcross_probe.fenetres =====
     class FenetreInvalideError {
         <<ValueError>>
@@ -625,14 +655,18 @@ classDiagram
         +int octets
         +str sha256
         +str chemin
+        +PertesCapture? pertes
+        +EtatHorloge? horloge
     }
     class mod_netcross_probe_fenetres["netcross_probe.fenetres"] {
         <<module>>
-        +extraire_fenetre(dossier_tampon, debut, fin, prefixe, filtre_bpf, inclure_inconnus, dossier_sortie, max_octets) FenetreResultat
+        +extraire_fenetre(dossier_tampon, debut, fin, prefixe, filtre_bpf, inclure_inconnus, dossier_sortie, max_octets, lire_horloge) FenetreResultat
     }
 
     %% ===== relations =====
     _FenetreMemoire --> FenetreResultat : resultat
+    FenetreResultat --> EtatHorloge : horloge
+    FenetreResultat --> PertesCapture : pertes
 ```
 
 ## `netcross_core`
@@ -2007,6 +2041,8 @@ classDiagram
         +list~dict~ exploit_suspicion_flows
         +dict~tuple~str, str~, list~EchantillonHorloge~~ clock_offset_samples
         +dict~tuple~str, str~, EstimationHorloge~ clock_offset_estimate
+        +dict~str, dict~ pertes_sondes
+        +dict~str, dict~ horloges_sondes
         +dict~str, set~int~~ vlan_seen
         +dict~tuple~str, str~, int~ vlan_change
         +dict~tuple~str, str~, dict~str, int~~ vlan_tag_flip
