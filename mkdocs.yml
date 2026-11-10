@@ -71,7 +71,9 @@ nav:
       - Mode batch: batch-mode.md
       - Capture distante: capture-distante.md
       - Métriques Prometheus: metriques-prometheus.md
+      - Tableau de bord Grafana: grafana-dashboard.md
       - API des sondes distribuées: probe-api.md
+      - Sonde netcross-probe: probe-agent.md
   - Analyses:
       - Estimation d'horloge: estimation-horloge.md
       - Débit crête multi-échelle: fenetres-multi-echelles.md
@@ -89,9 +91,11 @@ nav:
       - Module IA local: module-ia.md
       - Rule engine: architecture-rule-engine.md
       - Mesures actives: mesures-actives.md
+      - Confirmation active (CLI et API): confirmation-active.md
       - Échelle SIP multi-points: echelle-sip.md
       - Constats filtrables et preuves: preuves-cliquables.md
       - Appariement RTP entre points: appariement-rtp.md
+      - Transport RTP par segment: rtp-segments.md
   - Architecture:
       - Diagramme de classes: class-diagram.md
       - Internationalisation: i18n.md
@@ -99,6 +103,9 @@ nav:
       - Non-fuite des secrets de déchiffrement: non-fuite-secrets.md
       - Empreinte de paquet: empreinte-paquet.md
       - Corrélation en flux: correlation-en-flux.md
+      - État par flux: etat-flux.md
+      - Débordement sur disque des flux longs: debordement-flux.md
+      - Seconde passe en flux (topologie): seconde-passe.md
       - Décisions d'architecture: adr/netflow-sflow-architecture.md
       - Qualité: quality/anonymization-plan.md
       - Couverture de la GUI: quality/gui-app-coverage.md

@@ -24,6 +24,7 @@ from reportlab.platypus import (
 )
 
 from netcross_core.dechiffrement import lignes as lignes_dechiffrement
+from netcross_core.i18n import _
 from netcross_core.logging_config import get_logger, summarize
 from netcross_report.charts import (
     DIFF_SEVERITY_SCHEME,
@@ -1065,6 +1066,7 @@ def generate_pdf(
     session_objects=None,
     sequence_views=None,
     security_report=None,
+    redaction=None,
 ):
     """
     r : objet Report (netcross_core.analyse). output_path : chemin du PDF.
@@ -1103,7 +1105,7 @@ def generate_pdf(
     """
     logger.debug(
         "generate_pdf: r={} output_path={} title={} meta={} findings={} tls_findings={} "
-        "quic_findings={} session_objects={} sequence_views={} security_report={}",
+        "quic_findings={} session_objects={} sequence_views={} security_report={} redaction={}",
         summarize(r, "r"),
         summarize(output_path, "output_path"),
         summarize(title, "title"),
@@ -1114,6 +1116,7 @@ def generate_pdf(
         summarize(session_objects, "session_objects"),
         summarize(sequence_views, "sequence_views"),
         summarize(security_report, "security_report"),
+        summarize(redaction, "redaction"),
     )
     if findings is None:
         findings = build_findings(r)
@@ -1134,7 +1137,41 @@ def generate_pdf(
             seen_keys = {k for k, _ in info_rows}
             info_rows += [(k, v) for k, v in meta.items() if k not in seen_keys]
         story.append(_kv_table(info_rows, styles))
+        # Issue #1159 : encart « Anonymisation » en page de garde -- certifie
+        # le périmètre appliqué (portée, compteurs, pcapng, table).
+        if redaction:
+            from netcross_report.redaction_note import lignes_encart_texte
+
+            lignes_encart = lignes_encart_texte(redaction)
+            encart = Table(
+                [[Paragraph(_xml_escape(ligne), styles["BodyText"])] for ligne in lignes_encart],
+                colWidths=[15 * cm],
+            )
+            encart.setStyle(
+                TableStyle(
+                    [
+                        ("FONTSIZE", (0, 0), (-1, -1), 9),
+                        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#9ca3af")),
+                        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f9fafb")),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                        ("TOPPADDING", (0, 0), (-1, -1), 3),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                    ]
+                )
+            )
+            story.append(Spacer(1, 0.5 * cm))
+            story.append(encart)
         story.append(PageBreak())
+
+        if getattr(r, "active_confirmation", None):
+            from netcross_report.active_confirmation import lignes_confirmation
+
+            story.append(Paragraph(_("Confirmation active"), styles["H1b"]))
+            story.extend(
+                Paragraph(_xml_escape(ligne), styles["BodyText"])
+                for ligne in lignes_confirmation(r.active_confirmation)
+            )
+            story.append(PageBreak())
 
         # -- par ou commencer (triage) --
         story.append(Paragraph("Par ou commencer", styles["H1b"]))

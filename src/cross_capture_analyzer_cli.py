@@ -115,6 +115,7 @@ besoin explicite et maitrise d'un rejeu sur un segment reel) :
 
 import argparse
 import atexit
+import json
 import os
 import re
 import shutil
@@ -124,6 +125,7 @@ import tempfile
 import threading
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 from netcross_core import (
     adjust_timestamps,
@@ -151,13 +153,15 @@ from netcross_core import (
 )
 from netcross_core.capture_tools import split_label_dir
 from netcross_core.discovery import load_baseline_hosts
+from netcross_core.flow_state import FlowTable, parse_flow_timeouts
 from netcross_core.flow_timeline import build_flow_timelines
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
+from netcross_core.i18n import _
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
 from netcross_core.profiling import creer_mesures, marquer
 from netcross_core.redact import SCOPE_ALL as REDACT_SCOPE_ALL
 from netcross_core.redact import SCOPES as REDACT_SCOPES
-from netcross_core.redact import scope_label
+from netcross_core.redact import redact_client_group, redact_diagnostic_events, scope_label
 from netcross_core.report_text import load_capture_annotations, print_capture_annotations
 from netcross_core.security import close_db, connect_cve_db
 from netcross_core.security import findings as security_findings
@@ -166,7 +170,12 @@ from netcross_core.stats import EXPORT_FORMATS as STATS_EXPORT_FORMATS
 from netcross_core.stats import GROUP_BY as STATS_GROUP_BY
 from netcross_core.stats import SORT_BY as STATS_SORT_BY
 from netcross_core.stats import explore_stats, render_stats, stats_format_for
-from netcross_core.streaming import DEFAULT_WINDOW_SECONDS, correlate_streaming, sources_by_point
+from netcross_core.streaming import (
+    DEFAULT_WINDOW_SECONDS,
+    correlate_streaming,
+    merge_points,
+    sources_by_point,
+)
 from netcross_core.support import (
     SCOPES as SUPPORT_SCOPES,
 )
@@ -1341,11 +1350,13 @@ def _check_extraction_args(args) -> tuple[str, ...]:
 
 
 def _run_streaming(args, all_packets, points_order, r) -> None:
-    """--streaming (issue #1022) : correlation en flux, affichee et posee
-    sur ``r.streaming`` pour --json-report."""
+    """--streaming (issues #1022 et #1023) : correlation en flux puis etat
+    par flux avec expiration, affiches et poses sur ``r.streaming`` pour
+    --json-report (cles ``streaming`` et ``streaming.flow_state``)."""
     logger.debug("_run_streaming: entrée")
+    sources = sources_by_point(all_packets)
     resultat = correlate_streaming(
-        sources_by_point(all_packets),
+        sources,
         points_order,
         window_seconds=args.streaming_window,
         nat_tolerant=args.nat_tolerant,
@@ -1353,7 +1364,33 @@ def _run_streaming(args, all_packets, points_order, r) -> None:
         exclude_duplicates=args.exclude_duplicates,
     )
     print("\n" + "\n".join(resultat.summary_lines()))
-    r.streaming = resultat.to_dict()
+    # etat par flux (#1023) puis seconde passe ciblée (#1025) : memes
+    # sources fusionnées, alimentés ensemble en une seule passe k-voies
+    from netcross_core.seconde_passe import SecondePasse
+
+    points = list(points_order) if points_order else sorted(sources)
+    table = FlowTable(
+        points,
+        timeouts=parse_flow_timeouts(getattr(args, "flow_timeouts", None)),
+        spill_seuil=getattr(args, "spill_seuil", None),
+    )
+    passe = SecondePasse(
+        points,
+        nat_tolerant=args.nat_tolerant,
+        nat_window_ms=args.nat_window_ms,
+        exclude_duplicates=args.exclude_duplicates,
+        spill_seuil=getattr(args, "spill_seuil", None),
+    )
+    for pk in merge_points(sources_by_point(all_packets).values()):
+        table.feed(pk)
+        passe.feed(pk)
+    table.finish()
+    passe.finish()
+    print("\n".join(table.summary_lines()))
+    doc = resultat.to_dict()
+    doc["flow_state"] = table.to_dict()
+    doc["seconde_passe"] = passe.to_dict()
+    r.streaming = doc
     logger.debug("_run_streaming: retour None")
 
 
@@ -1577,6 +1614,42 @@ def _run_ai(args, ai_options, report, all_packets) -> None:
     logger.debug("_run_ai: fin")
 
 
+def _charger_sondes_meta(specifications, points):
+    """Lit les fichiers ``--sonde-meta POINT=JSON`` (#1103) et renvoie
+    (pertes par point, horloges par point). Refuse (exit 1) un point
+    inconnu ou un JSON illisible : une métadonnée de sonde silencieusement
+    ignorée laisserait croire que la sonde n'a rien perdu."""
+    logger.debug("_charger_sondes_meta: entrée ({} spécification(s))", len(specifications))
+    pertes: dict[str, dict] = {}
+    horloges: dict[str, dict] = {}
+    for spec in specifications:
+        if "=" not in spec:
+            print(f"--sonde-meta : format attendu POINT=JSON, reçu {spec!r}", file=sys.stderr)
+            sys.exit(1)
+        point, chemin = spec.split("=", 1)
+        if point not in points:
+            print(
+                f"--sonde-meta : point {point!r} inconnu (points : {', '.join(points)})",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        try:
+            with open(chemin, encoding="utf-8") as fh:
+                document = json.load(fh)
+        except (OSError, json.JSONDecodeError) as erreur:
+            logger.error("--sonde-meta {} : {} illisible ({})", point, chemin, erreur)
+            print(f"--sonde-meta {point} : {chemin} illisible ({erreur})", file=sys.stderr)
+            sys.exit(1)
+        # Les schémas capture_loss/clock figurent au premier niveau de la
+        # fenêtre (Window) comme de la santé (Health) du contrat v1.
+        if document.get("capture_loss"):
+            pertes[point] = document["capture_loss"]
+        if document.get("clock"):
+            horloges[point] = document["clock"]
+    logger.debug("_charger_sondes_meta: retour ({} point(s))", len(pertes))
+    return pertes, horloges
+
+
 def main():
     # `netcross lua-doc ...` : documentation hors ligne de l'API Lua Wireshark (issue #388)
     logger.debug("main: entrée")
@@ -1770,6 +1843,16 @@ def main():
             " desactive l'estimation pour cette paire (repetable)"
         ),
     )
+    ap.add_argument(
+        "--confirm-active",
+        action="store_true",
+        help=_("Autorise explicitement les sondes actives vers les flux prouvés des constats (8 mesures maximum)."),
+    )
+    ap.add_argument(
+        "--active-dry-run",
+        action="store_true",
+        help=_("Affiche les commandes de confirmation active sans aucune émission, même avec --confirm-active."),
+    )
     ap.add_argument("--detail-csv", help="Chemin de sortie pour le detail par flux (CSV)")
     # Issue #911 : dashboard analytique (vue GUI « Dashboard »)
     ap.add_argument(
@@ -1866,6 +1949,25 @@ def main():
         metavar="SECONDES",
         help=f"Largeur de la fenetre de --streaming (defaut : {DEFAULT_WINDOW_SECONDS:g} s) : au moins le "
         "transit le plus long entre deux points, plus le delai de retransmission a rattacher.",
+    )
+    ap.add_argument(
+        "--flow-timeouts",
+        default=None,
+        metavar="SPEC",
+        help="Delais d'expiration par protocole de l'etat par flux de --streaming (issue #1023), "
+        "au format « TCP=3600,UDP=60,ICMP=60,AUTRE=60 » (defauts a la Zeek ; AUTRE couvre les autres "
+        "protocoles). Un flux inactif depuis son delai ferme son etat ; le compte des coupures "
+        "NAT/pare-feu silencieuses y est incrementale. Voir docs/etat-flux.md.",
+    )
+    ap.add_argument(
+        "--spill-seuil",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Seuil de debordement sur disque de l'etat par flux de --streaming (issue #1024) : "
+        "au plus N resumes TCP sont gardes dans un cache LRU. L'historique exact reste sur disque "
+        "temporaire prive, supprime en fin d'analyse (resultats identiques). Defaut : pas de cache "
+        "Python, jamais tout l'historique en RAM. Voir docs/debordement-flux.md.",
     )
     ap.add_argument(
         "--detect-duplicates",
@@ -2399,9 +2501,9 @@ def main():
         "coherent sur tout le run, pour partager un rapport ou une capture "
         "sans exposer l'adressage reel (support vendeur, ticket externe). "
         "Couvre aussi les noms DNS/HTTP/SAN TLS/SIP selon --redact-scope (voir "
-        "netcross_core.redact). Mutuellement exclusif avec --tls/--quic/"
-        "--client-group, qui relisent des fichiers ou des IP fournies "
-        "independamment de cette redaction.",
+        "netcross_core.redact). Combinable avec --tls/--quic/--client-group "
+        "(issue #1155) : evenements TLS/QUIC rediges et adresses --client-group "
+        "traduites par la meme table de pseudonymes.",
     )
     ap.add_argument(
         "--tls-keylog",
@@ -2430,6 +2532,43 @@ def main():
         "transmettre avec le rapport/la capture redigee -- utile pour "
         "retrouver plus tard a quelle machine correspond un pseudonyme cite "
         "par un tiers).",
+    )
+    ap.add_argument(
+        "--redact-pcap",
+        metavar="DOSSIER",
+        help="Avec --redact : ecrit dans DOSSIER un pcapng anonymise PAR POINT "
+        "(<point>.pcapng), memes pseudonymes que le rapport -- pour partager "
+        "les captures elles-memes. Charges utiles zéroées par défaut "
+        "(--redact-pcap-keep-payload pour les conserver), sommes de contrôle "
+        "recalculées, horodatages conservés (--redact-pcap-decalage pour un "
+        "décalage uniforme). Issue #1157.",
+    )
+    ap.add_argument(
+        "--redact-pcap-keep-payload",
+        action="store_true",
+        help="Avec --redact-pcap : conserve les charges utiles applicatives "
+        "telles quelles (par défaut : remplacées par des zéros, longueurs "
+        "conservées). Déconseillé si la capture contient des données "
+        "sensibles.",
+    )
+    ap.add_argument(
+        "--redact-pcap-decalage",
+        metavar="SECONDES",
+        type=float,
+        default=0.0,
+        help="Avec --redact-pcap : décalage uniforme des horodatages (les "
+        "différences inter-points restent exactes). Défaut : 0 (conservés).",
+    )
+    ap.add_argument(
+        "--sonde-meta",
+        metavar="POINT=JSON",
+        action="append",
+        help="Métadonnées de sonde (#1103) pour un point : fichier JSON "
+        "décrit par la sonde (sortie `python3 -m netcross_probe fenetre`, "
+        "schémas capture_loss/clock du contrat v1). Le rapport distingue "
+        "alors « le réseau a perdu » de « la sonde a perdu » (pertes "
+        "déclarées ifdrop/osdrop) et affiche l'état d'horloge annoncé. "
+        "Répétable, un par point.",
     )
     ap.add_argument(
         "--support-ticket",
@@ -2597,6 +2736,8 @@ def main():
     add_debug_argument(ap)
     args = ap.parse_args()
     apply_debug_argument(args)
+    if args.redact and (args.confirm_active or args.active_dry_run):
+        ap.error(_("--confirm-active/--active-dry-run incompatibles avec --redact : cibles anonymisées"))
     if args.profile_tracemalloc and not args.profile_steps:
         logger.debug("main: --profile-tracemalloc sans --profile-steps -> levée SystemExit")
         ap.error("--profile-tracemalloc necessite --profile-steps")
@@ -3086,6 +3227,12 @@ def main():
     if args.redact_map and not args.redact:
         print("--redact-map necessite --redact.", file=sys.stderr)
         sys.exit(1)
+    if args.redact_pcap and not args.redact:
+        print("--redact-pcap necessite --redact.", file=sys.stderr)
+        sys.exit(1)
+    if (args.redact_pcap_keep_payload or args.redact_pcap_decalage) and not args.redact_pcap:
+        print("--redact-pcap-keep-payload/--redact-pcap-decalage necessitent --redact-pcap.", file=sys.stderr)
+        sys.exit(1)
     if args.redact_scope and not args.redact:
         print("--redact-scope necessite --redact.", file=sys.stderr)
         sys.exit(1)
@@ -3095,18 +3242,10 @@ def main():
     _check_dashboard_args(args)
     _check_stats_args(args)
     _check_comm_map_args(args)
-    if args.redact and (args.tls or args.quic or args.client_group):
-        print(
-            "--redact n'est pas disponible avec --tls/--quic/--client-group : ces "
-            "trois options relisent les fichiers passes a --capture avec leur "
-            "propre pipeline (--tls/--quic), ou recoivent des adresses IP reelles "
-            "directement en argument (--client-group), independamment des "
-            "paquets anonymises par --redact -- les combiner laisserait filtrer "
-            "des adresses reelles dans une partie du rapport sans le signaler. "
-            "Voir netcross_core.redact pour le detail.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    # Issue #1155 : --redact + --tls/--quic/--client-group est AUTORISE --
+    # evenements TLS/QUIC rediges et adresses --client-group traduites via
+    # la table commune (redact_diagnostic_events/redact_client_group),
+    # apres creation du redacteur.
 
     if (args.history_label or args.history_show is not None) and not args.history_db:
         print("--history-label/--history-show necessitent --history-db.", file=sys.stderr)
@@ -3313,18 +3452,59 @@ def main():
             security_detections.extend(detections)
 
     redactor = None
+    # Issue #1159 : encart « Anonymisation » du rapport -- périmètre appliqué.
+    redaction_info = None
+    pcapng_produits: list[Path] = []
     if args.redact:
         redactor = redact_packets(all_packets, args.redact_scope)
         print(
             f"\n{len(redactor)} adresse(s) (IP/MAC) et {len(redactor.names)} nom(s) anonymise(s) "
             f"avant analyse (--redact-scope {args.redact_scope})."
         )
+        # Issue #1157 : pcapng anonymise par point, memes pseudonymes que le
+        # run (ecrit AVANT le --redact-map pour que la table exportee
+        # couvre aussi les adresses decouvertes dans les trames brutes).
+        if args.redact_pcap:
+            from netcross_core.redact_pcap import ecrire_pcapng_anonymise
+
+            captures_par_point: dict[str, list[str]] = {}
+            for label, chemin in captures:
+                captures_par_point.setdefault(label, []).append(chemin)
+            dossier = Path(args.redact_pcap)
+            for label, chemins in captures_par_point.items():
+                nom_fichier = re.sub(r"[^A-Za-z0-9._-]", "_", label) or "point"
+                chemin_sortie = ecrire_pcapng_anonymise(
+                    label,
+                    chemins,
+                    redactor,
+                    dossier / f"{nom_fichier}.pcapng",
+                    garder_payload=args.redact_pcap_keep_payload,
+                    decalage=args.redact_pcap_decalage,
+                )
+                pcapng_produits.append(chemin_sortie)
+                print(f"Capture anonymisee ecrite dans {chemin_sortie} (point {label}).")
         if args.redact_map:
             write_redaction_map_csv(redactor, args.redact_map)
             print(
                 f"Correspondance adresse reelle <-> pseudonyme ecrite dans {args.redact_map} "
                 "(a conserver en prive, ne pas transmettre avec le rapport)."
             )
+        # Issue #1155 : les adresses --client-group sont traduites AVANT
+        # usage -- la comparaison client vs client cherche des pseudonymes,
+        # comme les paquets deja rediges.
+        if client_group:
+            client_group = redact_client_group(client_group, redactor)
+        # Issue #1159 : l'encart du rapport certifie le périmètre appliqué
+        # (portée, compteurs, pcapng produits, table).
+        from netcross_report.redaction_note import build_redaction_info
+
+        redaction_info = build_redaction_info(
+            redactor,
+            args.redact_scope,
+            redact_map=args.redact_map,
+            pcapng=pcapng_produits,
+            garder_payload=args.redact_pcap_keep_payload,
+        )
 
     # --max-packets/--sample (issue #283, Etape 3) : appliques ici, sur
     # all_packets DEJA CHARGE en entier (voir _apply_packet_limits pour la
@@ -3380,6 +3560,7 @@ def main():
         duplicate_counts=duplicate_counts,
         clock_offsets=args.clock_offset,
         link_speeds=resolved_link_speeds,
+        collect_active_evidence=args.confirm_active or args.active_dry_run,
     )
     # Commentaires de SECTION pcapng (Job 39/issue #159) -- lus ici, au
     # dernier moment avant le rendu : metadonnee de fichier, pas de paquet,
@@ -3390,6 +3571,14 @@ def main():
         r.capture_comments = read_capture_comments(captures)
         r.capture_infos = read_capture_infos(captures)
         r.points_keylog = sorted(tls_keylogs)
+    # Issue #1103 : métadonnées de sonde par point (pertes de capture
+    # DÉCLARÉES par les ISB, état d'horloge ANNONCÉ) -- lues des fichiers
+    # JSON décrits par les sondes (sortie `netcross_probe fenetre` ou
+    # santé du contrat v1, mêmes clés capture_loss/clock). Comme
+    # capture_comments, c'est une métadonnée de fichier, pas un résultat
+    # de l'analyse : remplie par l'appelant, jamais par analyse().
+    if args.sonde_meta:
+        r.pertes_sondes, r.horloges_sondes = _charger_sondes_meta(args.sonde_meta, r.points)
     # Report.truncated/truncation_note (issue #283, Etape 3) : ecrit ici, pas
     # dans analyse() -- meme discipline que capture_comments/capture_infos
     # ci-dessus, la troncature est une decision de l'appelant (CLI), pas un
@@ -3401,6 +3590,18 @@ def main():
         r.truncation_note = truncation_note
     if args.streaming:
         _run_streaming(args, all_packets, points_order, r)
+    if args.confirm_active or args.active_dry_run:
+        from netcross_report.active_confirmation import confirmer_rapport, lignes_confirmation
+
+        confirmation = confirmer_rapport(
+            r,
+            flows,
+            enabled=args.confirm_active,
+            dry_run=args.active_dry_run,
+            redact=args.redact,
+        )
+        print("\n" + _("Confirmation active"))
+        print("\n".join(lignes_confirmation(confirmation)))
     marquer(mesures, "rapport")
     print_report(r)
     # Issue #910 : annotations des sidecars (GUI ou `netcross annotations`)
@@ -3561,6 +3762,9 @@ def main():
         tls_events = []
         for label, path in captures:
             events = parse_tls_capture(label, path)
+            # Issue #1155 : memes pseudonymes que les paquets rediges.
+            if redactor is not None:
+                redact_diagnostic_events(events, redactor)
             print(f"[{label}] {len(events)} evenements TLS trouves dans {path}")
             tls_events.extend(events)
         status_by_point = build_handshake_status(tls_events)
@@ -3584,6 +3788,9 @@ def main():
         quic_events = []
         for label, path in captures:
             events = parse_quic_capture(label, path, **options_lecture(tls_keylogs, label))
+            # Issue #1155 : memes pseudonymes que les paquets rediges.
+            if redactor is not None:
+                redact_diagnostic_events(events, redactor)
             print(f"[{label}] {len(events)} paquets QUIC trouves dans {path}")
             quic_events.extend(events)
         quic_findings = diagnose_quic(quic_events, r.points)
@@ -3714,6 +3921,7 @@ def main():
             session_objects=session_objects,
             sequence_views=sequence_views,
             meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
+            redaction=redaction_info,
         )
         print(f"Rapport PDF ecrit dans {args.pdf_report}")
 
@@ -3731,6 +3939,7 @@ def main():
             rule_engine_findings=rule_engine_findings,
             names=names,
             meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
+            redaction=redaction_info,
         )
         print(f"Rapport Markdown ecrit dans {args.md_report}")
 
@@ -3781,6 +3990,7 @@ def main():
             quic_findings=quic_findings,
             rule_engine_findings=rule_engine_findings,
             meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
+            redaction=redaction_info,
             names=names,
             evidence_pcaps=evidence_pcaps,
             **session_objects.json_kwargs(),

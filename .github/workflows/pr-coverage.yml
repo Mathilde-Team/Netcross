@@ -43,6 +43,34 @@ jobs:
       - name: Installation de Python
         run: uv python install 3.14
 
+      - name: Lecture réelle des PDF (pdftotext requis)
+        # #1068 : le contrôle du contenu PDF ne doit pas être sauté. Les
+        # jobs ci.yml installent déjà poppler-utils ; ce runner hors
+        # conteneur doit disposer du même outil pour la PR et la base.
+        run: |
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            as_root=()
+            if [ "$(id -u)" -ne 0 ]; then as_root=(sudo); fi
+            "${as_root[@]}" apt-get update -qq
+            "${as_root[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq poppler-utils
+          fi
+          pdftotext -v 2>&1 | sed -n 1p
+
+      - name: Décodage réel des PCAP (TShark requis)
+        # #1123 : les essais à trois points ne doivent pas être sautés.
+        # Le runner léger doit fournir TShark pour la PR comme pour la base.
+        run: |
+          set -o pipefail
+          if ! command -v tshark >/dev/null 2>&1; then
+            as_root=()
+            if [ "$(id -u)" -ne 0 ]; then as_root=(sudo); fi
+            echo "wireshark-common wireshark-common/install-setuid boolean false" \
+              | "${as_root[@]}" debconf-set-selections
+            "${as_root[@]}" apt-get update -qq
+            "${as_root[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq tshark
+          fi
+          tshark --version 2>&1 | sed -n 1p
+
       # test_catalogues_a_jour_avec_les_sources compare les catalogues
       # regeneres par le gettext installe : celui des runners maison
       # (0.19, Ubuntu 20.04) formate autrement que celui du projet. Ce test

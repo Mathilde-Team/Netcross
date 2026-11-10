@@ -7,6 +7,7 @@ tls, quic, redact).
 
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -71,6 +72,8 @@ def test_options_par_defaut_enregistrees():
         "known_hosts": None,
         "names_path": None,
         "rule_engine": False,
+        "confirm_active": False,
+        "active_dry_run": False,
         "expert_section": False,
         "media_quality": False,
         "tshark_stats": False,
@@ -108,11 +111,48 @@ def test_nat_window_invalide():
 
 
 @pytest.mark.parametrize("diag", ["tls", "quic"])
-def test_redact_incompatible_avec_tls_quic(diag):
+def test_redact_combine_avec_tls_quic(diag):
+    """Issue #1155 : redact + tls/quic autorisé -- les évènements TLS/QUIC
+    passent par la même table de pseudonymes que les paquets (aucune
+    adresse réelle dans le document)."""
     rep = _post({"label": "LAN", "redact": "true", diag: "true"})
-    assert rep.status_code == 400
-    assert "redact" in rep.json()["detail"]
-    assert store.list_ids() == []  # refusé avant toute analyse
+    assert rep.status_code == 201, rep.text
+    analysis_id = rep.json()["analysis_id"]
+    assert store.list_ids() == [analysis_id]
+    brut = client.get(f"/analyses/{analysis_id}").json()
+    assert "192.168.1.1" not in str(brut)
+    assert "192.168.1.2" not in str(brut)
+
+
+def test_redact_redige_evenements_tls():
+    """Issue #1155 : les évènements TLS relus par le pipeline indépendant
+    sont rédigés (adresses ET SNI) avec la table du run."""
+    from netcross_core.tls_diagnostics import TlsEvent
+
+    def _fake_parse(label, path):
+        return [
+            TlsEvent(
+                point=label,
+                ts=1000.0,
+                src="192.168.1.1",
+                sport=1234,
+                dst="93.184.216.34",
+                dport=443,
+                record_type="handshake",
+                handshake_type="client_hello",
+                sni="example.com",
+            )
+        ]
+
+    with patch("netcross_core.tls_diagnostics.parse_tls_capture", side_effect=_fake_parse):
+        rep = _post({"label": "LAN", "redact": "true", "tls": "true"})
+    assert rep.status_code == 201, rep.text
+    entry = store.get(rep.json()["analysis_id"])
+    joined = json.dumps(entry["tls_findings"], default=str)
+    # Adresses réelles et SNI réduit, pseudonymes présents.
+    assert "192.168.1.1" not in joined
+    assert "93.184.216.34" not in joined
+    assert "example.com" not in joined
 
 
 def test_redact_anonymise_et_saute_la_securite():
@@ -153,4 +193,4 @@ def test_options_sur_multi():
     assert rep.status_code == 201, rep.text
     opts = store.get(rep.json()["analysis_id"])["metadata"]["options"]
     assert opts["nat_tolerant"] and opts["redact"]
-    assert _post({"labels": "LAN,DC", "redact": "true", "tls": "true"}, route="/captures/multi").status_code == 400
+    assert _post({"labels": "LAN,DC", "redact": "true", "tls": "true"}, route="/captures/multi").status_code == 201

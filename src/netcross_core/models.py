@@ -539,6 +539,14 @@ class Report:
         default_factory=lambda: defaultdict(list)
     )
     clock_offset_estimate: dict[tuple[str, str], EstimationHorloge] = field(default_factory=dict)
+    # -- sondes (#1103) : pertes de capture DECLAREES par la sonde (ISB
+    # pcapng : ifdrop/osdrop) et etat d'horloge ANNONCE (chrony /
+    # timesyncd), par point. A distinguer des pertes RESEAUX estimees :
+    # une sonde qui admet avoir perdu n'a pas vu ce trafic, aucun constat
+    # ne peut le pretendre. Dictionnaire vide = pas de metadonnees de
+    # sonde (cas historique : fichiers pcap classiques sans ISB). --
+    pertes_sondes: dict[str, dict] = field(default_factory=dict)
+    horloges_sondes: dict[str, dict] = field(default_factory=dict)
     # -- VLAN 802.1Q --
     vlan_seen: dict[str, set[int]] = field(default_factory=lambda: defaultdict(set))
     vlan_change: dict[tuple[str, str], int] = field(default_factory=lambda: defaultdict(int))
@@ -556,6 +564,8 @@ class Report:
     # Flux RTP apparies entre points malgre NAT/SBC (#1121), voir
     # netcross_core.rtp_match.match_rtp_streams.
     rtp_matches: list[dict] = field(default_factory=list)
+    # #1123 : transport RTP/SRTP par segment, avec incertitude d'horloge.
+    rtp_segments: list[dict] = field(default_factory=list)
     # -- VoIP orientee appel (Job 24 / §6.12) --
     voip_calls: list[dict] = field(default_factory=list)
     voip_quality_distribution: dict[str, int] = field(default_factory=lambda: defaultdict(int))
@@ -763,6 +773,9 @@ class Report:
     # #1135 : événements et échelles refusées par point ; analyse automatique,
     # médiane des tranches non vides et seuil relatif si vitesse inconnue.
     microbursts: dict[str, dict] = field(default_factory=dict)
+    # #1137 : associations temporelles épisode/segment aval, preuves bornées.
+    # Une absence de paquet n'est pas une preuve de congestion physique.
+    microburst_correlations: list[dict] = field(default_factory=list)
     # -- Couverture du dechiffrement TLS/QUIC (issue #1043) -- dechiffrement
     # est rempli par analyse() (netcross_core.dechiffrement.compter_sessions) :
     # point -> {"tls"/"quic": {"sessions", "dechiffrees"}}. points_keylog est
@@ -773,6 +786,11 @@ class Report:
     # -- Integrite/qualite de capture (Job 43/issue #163) -- voir
     # netcross_core.forensic.validate_checksums().
     checksum_errors: list[ChecksumError] = field(default_factory=list)
+    # Issue #1068 : uniquement renseigné après activation/simulation explicite.
+    active_confirmation: dict | None = None
+    # Clés réellement en perte au point aval, collectées par le détecteur ;
+    # pas de rattachement heuristique à tous les flux d'un segment.
+    active_flow_evidence: dict[tuple[str, str], list[tuple]] = field(default_factory=lambda: defaultdict(list))
 
 
 @dataclass(slots=True)

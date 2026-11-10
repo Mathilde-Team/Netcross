@@ -74,6 +74,14 @@ fin de la capture, pour la latence par segment comme pour le délai RTP.
 
 ## Lire l'incertitude dans le rapport
 
+Après correction d'horloge, la latence par segment est un temps de
+transit positif : un paquet retour traverse les points dans l'ordre
+inverse, mais son délai ne doit pas annuler celui d'un paquet aller dans
+la moyenne. La même convention s'applique au délai RTP corrigé.
+Sans estimation ni décalage imposé, les deltas signés restent disponibles
+pour diagnostiquer les horloges ; l'incertitude et le caractère mesurable
+du segment restent contrôlés séparément.
+
 Chaque rapport (texte, PDF, JSON, HTML) affiche par paire de points :
 décalage, dérive, intervalles de confiance à 95 %, nombre d'échantillons
 et méthode. La méthode indique les sources collectées avant le filtre ;
@@ -141,6 +149,28 @@ défaut), répérable pour plusieurs paires. Le rapport indique que la
 valeur est imposée (dérive nulle).
 
 ## Les limites
+
+Avant le choix des délais minimaux, l'estimateur écarte les résidus
+extrêmes d'une tendance préliminaire robuste. Celle-ci utilise les
+médianes d'au plus 64 groupes d'effectifs voisins parmi la moitié
+des échanges les plus rapides, puis une médiane répétée des pentes
+(Siegel). Le bruit est estimé sur cette population rapide, pour ne
+pas le confondre avec les files d'attente ; 10 % d'aberrants bruts
+en constituent au plus 20 %, plutôt qu'une majorité de minima isolés.
+Le rejet porte sur tous les échantillons, à trois écarts MAD avec
+un plancher de 1 ms. Le choix final au délai minimal et la
+régression de décalage/dérive restent appliqués aux observations
+conservées. La méthode publiée mentionne ce rejet MAD.
+
+Cette étape évite que quelques observations aberrantes au RTT très bas
+deviennent majoritaires après le choix des minima. Les régressions
+couvrent exactement 10 % d'aberrants positifs ou négatifs, groupés,
+aléatoires ou placés sur les minima, ainsi que vingt jeux avec bruit
+et files asymétriques, perturbés de 2, 5, 20 ou 500 ms dans les deux
+sens. Il ne s'agit pas d'une garantie sur toute
+contamination arbitraire ni d'une authentification des captures.
+Avec moins de seize observations, cette étape préalable n'est pas
+appliquée ; la régression robuste existante reste utilisée.
 
 - **Chemin asymétrique.** La formule suppose des délais aller et retour
   égaux ; une file d'attente permanente dans un seul sens biaise

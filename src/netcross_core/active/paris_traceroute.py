@@ -148,6 +148,14 @@ def _lire_sortie(text: str, flux: FiveTuple, parameters: Parametres) -> dict:
     return trace
 
 
+def commande(flux: FiveTuple, parametres: Parametres | None = None) -> list[str]:
+    """Prépare la commande validée, sans recherche de binaire ni émission."""
+    logger.debug("commande: entrée")
+    resultat = _commande(_normaliser_flux(flux), parametres or Parametres(), "scamper")
+    logger.debug("commande: retour")
+    return resultat
+
+
 def mesurer(flux: FiveTuple, parametres: Parametres | None = None, *, binaire: str = "scamper") -> ResultatParis:
     """Exécute une seule mesure explicitement autorisée par l'appelant.
 

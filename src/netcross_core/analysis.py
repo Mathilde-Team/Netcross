@@ -21,6 +21,7 @@ from netcross_core.application import (
     build_http_transactions,
     classify_transaction,
 )
+from netcross_core.causality import MicroburstCorrelator
 from netcross_core.clock_samples import collect_udp_samples
 from netcross_core.clock_sync import (
     EchantillonHorloge,
@@ -87,6 +88,8 @@ def analyse(
     duplicate_counts=None,
     clock_offsets=None,
     link_speeds=None,
+    collect_active_evidence=False,
+    microburst_window_ms=None,
 ):
     # Job 41/issue #161 : exclude_duplicates (defaut False -> comportement
     # historique inchange) retire de `flows` ET de `all_packets` les paquets
@@ -215,10 +218,13 @@ def analyse(
             clock_offsets,
         )
 
+    microburst_correlator = MicroburstCorrelator(r, flows, bool(points_order), microburst_window_ms)
     for key, per_point in flows.items():
         present_points = [p for p in points if p in per_point]
         is_tcp = key[0] == "TCP"
         conversation_seen = conversation_points.get(_conversation_key(key))
+        if microburst_correlator.bounds:
+            microburst_correlator.add_retransmissions(per_point)
 
         for p in present_points:
             r.seen_count[p] += 1
@@ -270,10 +276,16 @@ def analyse(
                     if prev_point not in per_point:
                         continue
                     r.loss_count[p] += 1
+                    if collect_active_evidence:
+                        r.active_flow_evidence[("loss_per_segment", p)].append(key)
                     nearest_j = max(j for j in range(idx) if points[j] in per_point)
                     a_point = points[nearest_j]
                     ts_a = min(pkt.ts for pkt in per_point[a_point])
                     r.loss_event_buckets[(a_point, p)].append(int(ts_a // bucket_seconds))
+                    if microburst_correlator.bounds:
+                        microburst_correlator.add_loss(
+                            a_point, p, min(per_point[a_point], key=lambda packet: packet.ts)
+                        )
 
         for a, b in pairs:
             if a in per_point and b in per_point:
@@ -285,7 +297,11 @@ def analyse(
                 # t0 PLUS derive x duree ecoulee -- pas une constante.
                 estimation = r.clock_offset_estimate.get((a, b))
                 if estimation is not None:
-                    lat_ms -= estimation.decalage_a(pkt_a.ts)
+                    # La paire de points reste ordonnée a -> b, même pour
+                    # un paquet retour b -> a. Après correction d'horloge,
+                    # son temps de transit est positif dans les deux sens.
+                    # Sans estimation, conserver le delta signé pour l'audit.
+                    lat_ms = abs(lat_ms - estimation.decalage_a(pkt_a.ts))
                 r.latency[(a, b)].append(lat_ms)
                 r.latency_by_bucket[(a, b)][int(pkt_a.ts // bucket_seconds)].append(lat_ms)
 
@@ -407,6 +423,8 @@ def analyse(
                 if per_point_encap.get(a) != per_point_encap.get(b):
                     r.encap_frag_correlated[(a, b)] += 1
 
+    with _phase("microburst_causality"):
+        r.microburst_correlations = microburst_correlator.results()
     with _phase("pmtud"):
         _analyse_pmtud(r, flows, pairs)
     # idle_timeout_seconds=None (defaut) -> _IDLE_TIMEOUT_SECONDS via le
@@ -460,6 +478,12 @@ def analyse(
         from netcross_core.rtp_match import match_rtp_streams
 
         r.rtp_matches = match_rtp_streams(all_packets, points if points_order else None)
+    with _phase("rtp_segments"):
+        from netcross_core.rtp_segments import analyse_rtp_segments
+
+        r.rtp_segments = analyse_rtp_segments(
+            all_packets, r.rtp_matches, r.clock_offset_estimate, ordered=points_order, clock_rate=rtp_clock_rate
+        )
     with _phase("response_time"):
         _analyse_response_time(r, flows, all_packets, points, points_order)
     with _phase("dhcp"):
@@ -1688,7 +1712,9 @@ def _analyse_rtp(r: Report, all_packets, points, points_order, clock_rate):
                 if offset_info is not None:
                     # #996 : correction au temps du premier paquet du flux,
                     # pas une constante -- la derive est integree.
-                    delay_ms -= offset_info.decalage_a(t_a)
+                    # Le flux RTP peut parcourir les points dans le sens
+                    # retour : ne pas produire de délai physique négatif.
+                    delay_ms = abs(delay_ms - offset_info.decalage_a(t_a))
 
         r_factor = mos = None
         ref_point = points[-1] if points_order and points[-1] in loss_pct else None
@@ -2159,22 +2185,18 @@ _TOPOLOGY_MIN_JACCARD = 0.05
 _TOPOLOGY_MIN_MAJORITY = 0.7
 
 
-def _infer_topology(flows, points):
-    """
-    Deduit l'ordre/la topologie des points de capture sans --order, a partir
-    de deux signaux par paire de points :
-      - le delta de TTL sur les flux vus aux deux points (qui indique le
-        sens de propagation, comme le module de sauts de routeur) ;
-      - le recouvrement de flux (Jaccard) entre les deux points, qui permet
-        de distinguer une vraie relation amont/aval d'un simple manque de
-        preuve, et de detecter les chemins paralleles (deux points en aval
-        du meme point mais qui ne se recoupent pas entre eux).
+def _stats_topologie(flows):
+    """Agregats de topologie par paire de points : flux vus a chaque point
+    (total_flows_at) et, pour chaque paire, votes de TTL entre premiers
+    paquets des flux vus aux deux points (pair_stats).
 
-    Retourne (edges, ambiguous, isolated, branch_points, merge_points).
-    `edges` est deja reduit transitivement : un arc X->Z n'est garde que
-    s'il n'est pas deja explique par un chemin indirect X->...->Z via
-    d'autres arcs deduits (pour n'afficher que les sauts "directs").
+    Seule la passe d'agregation du detecteur -- le min de ts par (flux,
+    point) suffit, le TTL compare est celui du premier paquet. Partagee
+    entre le mode batch (``_infer_topology``) et la seconde passe ciblée
+    en flux (#1025, ``netcross_core.seconde_passe``) : memes agregats,
+    meme deduction, memes resultats.
     """
+    logger.debug("_stats_topologie: entrée ({} flux)", len(flows))
     total_flows_at = defaultdict(int)
     pair_stats = {}
     for per_point in flows.values():
@@ -2203,7 +2225,22 @@ def _infer_topology(flows, points):
                     stats["y_gt_x"] += 1
                 else:
                     stats["eq"] += 1
+    logger.debug("_stats_topologie: retour ({} point(s), {} paire(s))", len(total_flows_at), len(pair_stats))
+    return total_flows_at, pair_stats
 
+
+def _deduire_topologie(total_flows_at, pair_stats, points):
+    """Deduit la topologie des agregats de ``_stats_topologie`` : arcs
+    amont/aval votes par le delta de TTL, reduits transitivement, plus les
+    paires ambiguës (TTL indisponible, identique ou contradictoire) et,
+    en sortie, les points isoles, points de branchement et points de fusion.
+
+    Retourne (edges, ambiguous, isolated, branch_points, merge_points).
+    `edges` est deja reduit transitivement : un arc X->Z n'est garde que
+    s'il n'est pas deja explique par un chemin indirect X->...->Z via
+    d'autres arcs deduits (pour n'afficher que les sauts "directs").
+    """
+    logger.debug("_deduire_topologie: entrée")
     candidate_edges = []
     ambiguous = []
     for (x, y), stats in pair_stats.items():
@@ -2302,6 +2339,29 @@ def _infer_topology(flows, points):
         len(merge_points),
     )
     return direct_edges, ambiguous, isolated, branch_points, merge_points
+
+
+def _infer_topology(flows, points):
+    """
+    Deduit l'ordre/la topologie des points de capture sans --order, a partir
+    de deux signaux par paire de points :
+      - le delta de TTL sur les flux vus aux deux points (qui indique le
+        sens de propagation, comme le module de sauts de routeur) ;
+      - le recouvrement de flux (Jaccard) entre les deux points, qui permet
+        de distinguer une vraie relation amont/aval d'un simple manque de
+        preuve, et de detecter les chemins paralleles (deux points en aval
+        du meme point mais qui ne se recoupent pas entre eux).
+
+    Retourne (edges, ambiguous, isolated, branch_points, merge_points).
+    `edges` est deja reduit transitivement : un arc X->Z n'est garde que
+    s'il n'est pas deja explique par un chemin indirect X->...->Z via
+    d'autres arcs deduits (pour n'afficher que les sauts "directs").
+    """
+    logger.debug("_infer_topology: entrée ({} point(s))", len(points))
+    total_flows_at, pair_stats = _stats_topologie(flows)
+    resultat = _deduire_topologie(total_flows_at, pair_stats, points)
+    logger.debug("_infer_topology: retour")
+    return resultat
 
 
 def _check_order_consistency(points_order, topo_edges):

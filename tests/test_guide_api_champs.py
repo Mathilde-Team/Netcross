@@ -6,7 +6,9 @@ Le guide reporté depuis la chaîne orpheline décrivait un champ
 ``rotation=true`` que ``dev`` n'a jamais eu : ce test l'aurait refusé.
 """
 
+import os
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -50,3 +52,34 @@ def test_le_guide_cite_des_champs():
 def test_chaque_champ_du_guide_existe_dans_l_api():
     inconnus = sorted(_champs_du_guide() - _champs_de_l_api())
     assert not inconnus, f"champs du guide absents de POST /captures et /captures/multi : {inconnus}"
+
+
+def test_le_jeton_du_guide_reste_disponible_pour_curl():
+    """Rejouer le démarrage documenté sans installation, serveur ni vrai jeton."""
+    texte = GUIDE.read_text(encoding="utf-8")
+    commandes = texte.split("```bash\n", 1)[1].split("```", 1)[0]
+    doublures = """
+set -eu
+pip() { :; }
+openssl() { printf '%s' jeton-factice-du-guide; }
+uvicorn() {
+    sh -c 'test "$NETCROSS_API_TOKEN" = jeton-factice-du-guide'
+}
+"""
+    verification = """
+if [ -n "${serveur_pid:-}" ]; then
+    wait "$serveur_pid"
+fi
+sh -c 'test "$NETCROSS_API_TOKEN" = jeton-factice-du-guide'
+"""
+    resultat = subprocess.run(
+        ["sh", "-c", doublures + commandes + verification],
+        env={"PATH": os.defpath},
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert resultat.returncode == 0, (
+        "Le jeton doit être exporté pour le serveur et les appels curl suivants : " + resultat.stderr
+    )

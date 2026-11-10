@@ -9,6 +9,7 @@ import csv
 import statistics
 from collections import Counter, defaultdict
 
+from netcross_core.causality import format_microburst_correlation
 from netcross_core.dechiffrement import lignes as lignes_dechiffrement
 from netcross_core.forensic import annotations_by_tag
 from netcross_core.logging_config import get_logger, summarize
@@ -267,11 +268,46 @@ def print_report(r: Report):
             tick = f", horodatage au {resolution:g} s" if resolution else ""
             print(f"  {point_label} : {vitesse}{tick}")
 
+    if r.pertes_sondes or r.horloges_sondes:
+        # Issue #1103 : métadonnées de sonde -- pertes DÉCLARÉES par la
+        # sonde (ISB pcapng) et horloge ANNONCÉE, à distinguer des pertes
+        # réseau estimées. Section absente sans --sonde-meta (sortie
+        # historique inchangée).
+        print("\n-- Sondes (pertes déclarées, horloge annoncée) --")
+        for point in r.points:
+            pertes = r.pertes_sondes.get(point)
+            if pertes:
+                recus = pertes.get("packets_received") or 0
+                perdus = pertes.get("packets_dropped")
+                if perdus is not None and recus + perdus > 0:
+                    taux = 100.0 * perdus / (recus + perdus)
+                    print(
+                        f"  {point} : {taux:.1f} % de pertes de capture "
+                        f"({perdus} perdu(s) sur {recus + perdus} annoncés, "
+                        f"ifdrop {pertes.get('ifdrop')} / osdrop {pertes.get('osdrop')})"
+                    )
+                else:
+                    print(f"  {point} : aucune perte de capture déclarée")
+            horloge = r.horloges_sondes.get(point)
+            if horloge:
+                annonce = f"décalage annoncé {horloge.get('offset_ms')} ms"
+                if horloge.get("dispersion_ms") is not None:
+                    annonce += f", dispersion {horloge.get('dispersion_ms')} ms"
+                if horloge.get("reference"):
+                    annonce += f", référence {horloge.get('reference')}"
+                synchronise = "synchronisée" if horloge.get("synchronized") else "NON synchronisée"
+                print(f"  {point} : horloge {horloge.get('source')} ({synchronise}, {annonce})")
+
     bursts = [event for record in r.microbursts.values() for event in record["events"]]
     if bursts:
         print("\n-- Microrafales (indices à confirmer, fenêtres de détection) --")
         for event in bursts:
             print(f"  {format_microburst(event)}")
+
+    if r.microburst_correlations:
+        print("\n-- Microrafales et impacts aval (association temporelle) --")
+        for correlation in r.microburst_correlations:
+            print(f"  {format_microburst_correlation(correlation)}")
 
     couverture = lignes_dechiffrement(r)
     if couverture:

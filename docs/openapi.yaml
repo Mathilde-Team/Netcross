@@ -2908,6 +2908,44 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /metrics:
+    get:
+      tags:
+      - metrics
+      summary: Metrics
+      description: Dernier relevé direct ou analyse finale, sans lancer de capture.
+      operationId: metrics_metrics_get
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: format
+        in: query
+        required: false
+        schema:
+          enum:
+          - prometheus
+          - openmetrics
+          type: string
+          default: prometheus
+          title: Format
+      responses:
+        '200':
+          description: Dernier relevé publié, éventuellement vide
+          content:
+            text/plain:
+              schema:
+                type: string
+            application/openmetrics-text:
+              schema:
+                type: string
+        '401':
+          description: Clé API absente ou incorrecte
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /analyses/{analysis_id}/annotations:
     get:
       tags:
@@ -3596,8 +3634,8 @@ components:
           type: boolean
           title: Redact
           description: 'true : anonymise les adresses IP/MAC avant analyse (équivalent
-            de --redact) ; incompatible avec tls/quic, et le rapport de sécurité n''est
-            alors pas calculé'
+            de --redact) ; combinable avec tls/quic (issue #1155, même table de pseudonymes),
+            et le rapport de sécurité n''est alors pas calculé'
           default: false
         loss_threshold_pp:
           type: number
@@ -3894,8 +3932,8 @@ components:
           type: boolean
           title: Redact
           description: 'true : anonymise les adresses IP/MAC avant analyse (équivalent
-            de --redact) ; incompatible avec tls/quic, et le rapport de sécurité n''est
-            alors pas calculé'
+            de --redact) ; combinable avec tls/quic (issue #1155, même table de pseudonymes),
+            et le rapport de sécurité n''est alors pas calculé'
           default: false
         max_packets:
           anyOf:
@@ -4008,6 +4046,16 @@ components:
           title: Split Interfaces
           description: 'true : séparer les interfaces d''un pcapng multi-interfaces
             (équiv. --split-interfaces)'
+          default: false
+        confirm_active:
+          type: boolean
+          title: Confirm Active
+          description: Autorise explicitement les sondes actives (8 mesures maximum)
+          default: false
+        active_dry_run:
+          type: boolean
+          title: Active Dry Run
+          description: Simulation des commandes sans émission ; prioritaire sur confirm_active
           default: false
         rule_engine:
           type: boolean
@@ -4146,8 +4194,8 @@ components:
           type: boolean
           title: Redact
           description: 'true : anonymise les adresses IP/MAC avant analyse (équivalent
-            de --redact) ; incompatible avec tls/quic, et le rapport de sécurité n''est
-            alors pas calculé'
+            de --redact) ; combinable avec tls/quic (issue #1155, même table de pseudonymes),
+            et le rapport de sécurité n''est alors pas calculé'
           default: false
         max_packets:
           anyOf:
@@ -4250,6 +4298,16 @@ components:
           title: Split Interfaces
           description: 'true : séparer les interfaces d''un pcapng multi-interfaces
             (équiv. --split-interfaces)'
+          default: false
+        confirm_active:
+          type: boolean
+          title: Confirm Active
+          description: Autorise explicitement les sondes actives (8 mesures maximum)
+          default: false
+        active_dry_run:
+          type: boolean
+          title: Active Dry Run
+          description: Simulation des commandes sans émission ; prioritaire sur confirm_active
           default: false
         rule_engine:
           type: boolean

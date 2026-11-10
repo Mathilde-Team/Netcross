@@ -8,6 +8,124 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Distinction « le réseau a perdu » / « la sonde a perdu » (#1103,
+  sous-issue 4/6 du chantier sondes distribuées #1002) : la sonde
+  déclare ce qu'elle a perdu (somme des ISB pcapng du tampon : `ifdrop` +
+  `osdrop`) et son horloge (chrony `tracking` puis systemd-timesyncd :
+  source, synchronisée, décalage, dispersion ; `unknown` si aucun des
+  deux ne répond, jamais inventée) — clés `capture_loss` et `clock` du
+  JSON `netcross_probe fenetre`. L'analyseur les consomme via
+  `--sonde-meta POINT=JSON` (répétable, refus d'un point inconnu ou
+  d'un JSON illisible) : rapport texte « Sondes (pertes déclarées,
+  horloge annoncée) », section Markdown, clés `sondes` du JSON et
+  `annonce` accolée à chaque estimation de décalage d'horloge. Les
+  pertes de capture déclarées restent distinctes des pertes réseau
+  estimées ; la section est absente sans `--sonde-meta` (sortie
+  historique inchangée). Implémentation `netcross_probe.etat`,
+  `FenetreResultat.pertes/horloge`, tests `test_probe_etat.py`.
+- Réécriture pcapng anonymisée `--redact-pcap DOSSIER` (#1157, sous-issue 4/5 du
+  chantier anonymisation #1007, dépend de #1153) : avec `--redact`, l'analyseur
+  écrit en plus un pcapng anonymisé par point de capture (un fichier par
+  label, fusion des plusieurs fichiers d'un même point). Les trames sont
+  relues via libpcap (ctypes, aucune dépendance ajoutée) et réécrites avec la
+  table du run — mêmes pseudonymes que les constats (un même hôte garde le
+  même pseudonyme sur chaque pcap produit) — adresses MAC/IPv4/IPv6 et ARP
+  traduites, sommes de contrôle IPv4/TCP/UDP/ICMP recalculées (RFC 1071, aucun
+  « bad checksum » ajouté), fragments IPv4 et charges utiles applicatives
+  zéroées par défaut (`--redact-pcap-keep-payload` pour les conserver, longueurs
+  conservées dans tous les cas). Les horodatages sont conservés à la µs, ou
+  décalés uniformément via `--redact-pcap-decalage SECONDES`. L'analyse du pcap
+  anonymisé (tshark) donne les mêmes constats réseau que l'original —
+  protocoles, ports, longueurs, séquences — pseudonymes mis à part. Écrit avant
+  la table `--redact-map` pour que la correspondance couvre aussi les adresses
+  découvertes dans les trames brutes. Implémentation `netcross_core.redact_pcap`,
+  tests `test_redact_pcap.py`.
+- Encart « Anonymisation » du rapport (#1159, sous-issue 5/5 du chantier
+  anonymisation #1007) : le rapport certifie ce qui a été masqué. Un encart en
+  tête du Markdown, en page de garde du PDF, clé `redaction` du JSON (donc du
+  rapport HTML et de l'API) liste précisément le périmètre appliqué : portée
+  (`--redact-scope`), nombre d'adresses IP/MAC et de noms anonymisés, pcapng
+  anonymisés produits (`--redact-pcap`) et traitement de leurs charges
+  utiles, table `--redact-map` — et rappelle que les constats (protocoles,
+  ports, longueurs, horodatages) ne changent pas. Source unique
+  `netcross_report.redaction_note`, aucun recalcul dans les générateurs.
+  README (« Limites connues » remis à jour : combinable `--tls`/`--quic`/
+  `--client-group` depuis #1155) et features-backlog section 5.2 actualisés.
+  Tests `test_redaction_note.py`.
+- Tableau de bord Grafana d'exemple (#1118, sous-issue 5/5 de l'export observabilité #1003) :
+  `docs/grafana/netcross-segments.json` (score de santé, pertes et délais par segment via `$segment`,
+  triage, constats, paquets/flux perdus/retransmissions par point — variables `$run` et `$segment`)
+  et guide `docs/grafana-dashboard.md` : exposition (textfile node_exporter ou route `/metrics`),
+  import, lecture des panneaux et exemples d'alertes Prometheus (perte de segment, délai p95,
+  santé basse, flux perdus au point). Le test `test_grafana_dashboard.py` vérifie que le JSON
+  est valide et que chaque métrique référencée existe dans le catalogue figé.
+- Sonde `netcross-probe` (#1099, sous-issue 2/6 du chantier sondes distribuées #1002) :
+  agent léger de capture locale en tampon circulaire (tshark/dumpcap,
+  `ring_recorder_args`), qui extrait à la demande une fenêtre [t1, t2] filtrée BPF
+  et la livre en pcapng avec son SHA-256 et son intervalle réellement couvert
+  (contrat v1, `docs/probe-api-v1.yaml`). Le filtre BPF est appliqué par libpcap
+  elle-même en relecture (tshark interdit `-f` avec `-r`, dumpcap ne filtre pas un
+  tube) via `netcross_probe.bpf` (ctypes, aucune dépendance ajoutée) ; la fenêtre
+  est découpée par editcap, fusionnée par mergecap, convertie en pcapng. CLI
+  `python3 -m netcross_probe` (`capture`, `fenetre`). La sécurité mTLS (#1101),
+  les métadonnées pertes/horloge (#1103) et le collecteur (#1105) viendront se
+  brancher sur `AgentProbe`. Voir docs/probe-agent.md.
+- Image CI préconstruite effectivement utilisée (#968) : les cinq jobs en
+  conteneur chargent `ghcr.io/mathilde-team/netcross-ci:26.04` avec lecture
+  seule du registre ; les installations apt ne tournent que si un paquet
+  requis manque. Node.js est inclus et contrôlé dans l'image.
+- Orchestration automatique de la chaîne d'incident (#1001) : `netcross_core.incident_chain.ChaineIncidents`,
+  branchée sur `LiveDiffEngine(gel=chaine)` à la place du `GelManager` nu, enchaîne à chaque alarme le gel
+  rétroactif (#1087), l'attente effective de la fin de fenêtre (calculée depuis l'horodatage du dernier paquet vu,
+  en arrière-plan — le moteur live n'est jamais bloqué), l'archivage signé (#1090), l'analyse multi-points et la
+  notification (#1091) — sans rien relancer à la main. `chaine_incidents_depuis_reglages()` raccorde les réglages
+  partagés (gel_settings) au moteur live. Un gel sans fichier protégé est signalé sans archiver ; un échec à une
+  étape est journalisé sans interrompre le moteur ni les autres incidents. Voir docs/incidents-gel.md
+  (« L'orchestration automatique »).
+- Corrélation temporelle des microrafales et impacts aval (#1137) : pertes
+  localisées et copies TCP supplémentaires, fenêtre de 50 ms configurable
+  par `NETCROSS_MICROBURST_WINDOW_MS` pour CLI/API/GTK4 et par argument Python.
+  Encadrement par paquets communs, correction de dérive et incertitude des
+  retransmissions ; dix preuves au maximum par épisode et segment. Les constats
+  et le JSON distinguent association temporelle et congestion physique prouvée.
+- Qualité de transport RTP/SRTP par segment (#1123) : pertes supplémentaires
+  entre paquets communs, gigue RFC 3550, délai corrigé avec incertitude d'horloge
+  et note indicative de transport, avec constat localisé. Réutilise l'appariement
+  NAT/SBC ; les pertes déjà présentes et les bords de capture ne sont pas recomptés.
+  Sans ordre du chemin, aucun segment n'est inventé ; sans horloge exploitable,
+  aucun délai physique n'est affirmé. Le contenu SRTP et la qualité perçue ne
+  sont pas analysés. Voir docs/rtp-segments.md.
+- Route `/metrics` en direct (#1113) : authentification commune à l'API,
+  formats Prometheus/OpenMetrics, dernier relevé remplacé atomiquement et
+  compteurs directs sans métriques non mesurées. L'analyse finale d'une
+  capture directe expose le catalogue complet ; cardinalité bornée et
+  anonymisation des étiquettes avec `redact`.
+- Seconde passe ciblée en flux (#1025, sous-issue 6/6 du chantier pipeline en flux #995) :
+  la topologie est désormais déduite en mode `--streaming` comme en batch — un enregistrement
+  compact par (flux, point) (horodatage et TTL du premier paquet) est collecté au fil de l'eau
+  (ARP/STP exclus, doublons avec `--exclude-duplicates`, nat-tolerant identique à
+  `correlate`), puis la même déduction que le mode batch s'exécute à la fermeture : mêmes
+  seuils, mêmes arêtes/ambiguïtés/isolés/branchements/fusions. La mémoire est proportionnelle
+  au nombre de flux (pas de paquets) et déportée sur disque avec `--spill-seuil` (#1024),
+  sans changer les résultats. Exposé dans `streaming.seconde_passe` de `--json-report`.
+  Voir docs/seconde-passe.md. Restent hors de cette passe : `clock_sync`,
+  `detect_microbursts`, l'équivalence complète du rapport et le basculement du défaut
+  vers `--streaming` (décision humaine, voir l'issue).
+- Historique TCP privé sur disque (#1023, intégration du débordement #1024) :
+  `--spill-seuil N` configure un cache LRU facultatif de N résumés ; à zéro comme sans option,
+  l'historique exact reste sur disque au lieu de grandir sans limite en RAM.
+  Les échéances sont indépendantes par protocole, la file d'expiration et les traces récentes
+  sont bornées, et les constats NAT restent équivalents au batch à seuil TCP identique.
+  La base temporaire est supprimée en fin d'analyse. Le test RSS sur 10⁶ paquets à un point
+  conserve son plafond de 250 Mio ; les tests multi-points vérifient séparément l'historique
+  et les réouvertures après éviction. Voir docs/debordement-flux.md et docs/etat-flux.md.
+- État par flux avec expiration (#1023, chantier pipeline en flux #995) : `--flow-timeouts` (délais par
+  protocole à la Zeek, format `TCP=3600,UDP=60,ICMP=60,AUTRE=60`) configure la table d'état de flux de
+  `--streaming` — un flux inactif depuis son délai libère son état (mémoire bornée par les flux actifs),
+  la réouverture après expiration est comptée, et le détecteur de coupure NAT/pare-feu silencieuse y est
+  incrémental : mêmes constats que le détecteur batch, exposés dans `streaming.flow_state` de
+  `--json-report` (clés `records`, `expired`, `reopened`, `peak_active`, `nat_cutoffs`…) et les lignes
+  « État par flux » du rapport texte. Voir docs/etat-flux.md.
 - Campagne de performance multi-cœurs documentée (#1018, banc de performance #994) :
   `docs/performance.md` présente les mesures du pipeline complet (`tshark` inclus) sur les jeux
   synthétiques — tables jeux × degré de parallélisme (2 à 10 points, 10⁴ à 10⁶ paquets par point,
@@ -79,6 +197,18 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   sécurité) et à la demande. `ci.yml` basculera dessus dans une seconde PR, une fois l'image publiée.
 
 ### Modifié
+- Levée de l'exclusion `--redact` avec `--tls`/`--quic`/`--client-group`
+  (#1155, sous-issue 3/5 du chantier anonymisation #1007) : les évènements
+  TLS/QUIC des pipelines indépendants sont rédigés par
+  `redact_diagnostic_events()` (adresses src/dst et SNI via la table commune
+  aux paquets) et les adresses `--client-group` sont traduites avant usage par
+  `redact_client_group()` — un run combiné ne laisse filtrer aucune adresse
+  réelle. Branché sur les deux CLI (analyseur et diff), l'API
+  (`redact` + `tls`/`quic` autorisés ; route `client-diff` traduite par la
+  table du run, conservée en mémoire dans l'analyse) et la GUI (cases
+  combinables, seuls le rapport de sécurité et `--tls-keylog` restent
+  refusés avec l'anonymisation). Tests `test_redact_tls_quic.py` et
+  couverture CLI/API/GUI du run combiné.
 - Licence (#986) : passage de MIT à **GPL-3.0-or-later** — texte officiel
   GPLv3 dans `LICENSE`, déclaration `license = "GPL-3.0-or-later"` dans
   `pyproject.toml`, en-têtes `SPDX-License-Identifier` sur tous les

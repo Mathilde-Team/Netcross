@@ -14,9 +14,9 @@ ici fait donc échouer la CI.
 
 | Surface | Points d'entrée | Capacités |
 |---|---|---|
-| CLI | `cross_capture_analyzer_cli.py` (138 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
+| CLI | `cross_capture_analyzer_cli.py` (146 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 4 pages, 44 cases à cocher, 35 réglages numériques | Analyse interactive et exploration visuelle ; onglet « Incidents » : réglages du gel rétroactif et archives (issue #1095) |
-| API | 67 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) |
+| API | 68 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) |
 
 
 Légende : **oui** = disponible ; **non** = absent ; **auto** = toujours
@@ -47,17 +47,21 @@ actif, non réglable.
 | Topologie déduite automatiquement | oui (case « Deduire la topologie automatiquement ») | oui (sans `--order`) | oui (sans `points_order`) |
 | Tolérance NAT | oui (« Correlation tolérante au NAT ») | `--nat-tolerant`, `--nat-window-ms` (fenêtre : les trois surfaces, « Fenêtre NAT (ms) » dans la GUI) | `nat_tolerant`, `nat_window_ms` |
 | Corrélation en flux par fenêtre glissante | non | `--streaming`, `--streaming-window` (issue #1022) | non |
+| État par flux avec expiration par protocole (repli si fenêtre glissante absente) | non | `--flow-timeouts` (issue #1023) | non |
+| Débordement sur disque des structures de flux longues | non | `--spill-seuil` (issue #1024) | non |
 | Doublons inter-captures | oui (« Détecter... », « Exclure... », seuil) | `--detect-duplicates`, `--exclude-duplicates`, `--duplicate-threshold-ms` | `detect_duplicates`, `exclude_duplicates`, `duplicate_threshold_ms` (#330, #841) |
 | Lecture parallèle | oui (« Lecture parallele des captures », nombre « Lecteurs paralleles » en analyse simple, issue #672) | `--parallel`, `--parallel-workers` | `parallel_workers` (issue #672) |
 | Fenêtre temporelle du débit | oui | `--bucket-ms` | `bucket_ms` (#330, #841) |
 | Cadence RTP | oui | `--rtp-clock-rate` | `rtp_clock_rate` (#330, #841) |
 | Vitesse de lien (repli si `if_speed` absent) | non | `--link-speed` | non (#1132) |
 | Décalage d'horloge entre points (estimation TCP/DNS/RTP/RTCP bidirectionnel, correction automatique des délais) | non | `--clock-offset` (décalage manuel imposé, désactive l'estimation de la paire) | non |
+| Métadonnées de sonde : pertes de capture déclarées (ISB) et horloge annoncée, par point | non | `--sonde-meta POINT=JSON` (répétable, JSON `netcross_probe fenetre`) | non |
+| Confirmation active liée à une preuve paquet ou clé de flux en perte, jamais à une cible devinée | non | `--confirm-active`, `--active-dry-run` (simulation prioritaire, sans émission) | `confirm_active`, `active_dry_run` dans `POST /captures` et `POST /captures/multi` ; émission refusée par défaut, nécessite aussi `NETCROSS_API_ACTIVE=1` sur le serveur |
 | Seuil de coupure NAT/pare-feu silencieuse | oui (« Coupure silencieuse (s) », 0 = défaut 60 s) | `--idle-timeout-seconds` | `idle_timeout_seconds` (#330, #841) |
 | Limiter ou échantillonner les paquets | oui (« Paquets max. », « Echantillonnage 1/N » en analyse simple, troncature annoncée dans le rapport ; issue #672) | `--max-packets`, `--sample` | `max_packets`, `sample` (issue #672) |
 | Noms logiques des hôtes | oui (« Table des noms... », exports CSV détaillé et JSON) | `--names` | `names` (fichier joint, issue #672) |
 | Plages TEST-NET traitées comme externes | oui (case « Plages TEST-NET externes », avec « Rapport de securite » ; issue #672) | `--test-net-external` | `test_net_external` (issue #672) |
-| Anonymisation IP/MAC et noms (portée « tout » hors CLI) | oui (« Anonymiser les adresses IP/MAC », table : « Table d'anonymisation (--redact-map)... » des Résultats, issue #876) | `--redact`, `--redact-scope`, `--redact-map` | `redact` (sans sécurité, refusé avec `tls`/`quic`, comme la CLI) ; table : `GET /analyses/{analysis_id}/redact-map` (issue #876) |
+| Anonymisation IP/MAC et noms (portée « tout » hors CLI) | oui (« Anonymiser les adresses IP/MAC », table : « Table d'anonymisation (--redact-map)... » des Résultats, issue #876) | `--redact`, `--redact-scope`, `--redact-map`, `--redact-pcap` (pcapng anonymisé par point, #1157), `--redact-pcap-keep-payload`, `--redact-pcap-decalage` | `redact` (sans sécurité, combinable avec `tls`/`quic` depuis l'issue #1155) ; table : `GET /analyses/{analysis_id}/redact-map` (issue #876) |
 
 ## Diagnostics et triage
 
@@ -100,7 +104,7 @@ actif, non réglable.
 | Cartographie des communications (qui parle à qui, anomalies en rouge) | oui (vue « Cartographie » : filtres protocole, Top-N, « Anomalies seulement ») | `--comm-map FICHIER` (DOT Graphviz si `.dot`/`.gv`, JSON sinon), `--comm-map-protocol`, `--comm-map-top-n`, `--comm-map-anomalies-only` (issue #909) | `GET /analyses/{analysis_id}/comm-map` : `protocol`, `top_n`, `anomalies_only`, `format` (`json` ou `dot` ; issue #909) |
 | Export SIEM (CEF, LEEF, STIX) | oui (panneau « SIEM, ticket de support, historique » de la page Résultats, après un rapport de sécurité, même fichier ; issue #674) | `--siem-export`, `--siem-output` | `GET /analyses/{analysis_id}/siem` (issue #674), `format` |
 | Journaux de flux Zeek conn.log (TSV, JSON) | non | `--zeek-conn`, `--zeek-format` (issue #1115) | non |
-| Métriques Prometheus / OpenMetrics (fichier .prom) | non | `--prom-file`, `--openmetrics-file`, `--metrics-run` (issue #1112) | non |
+| Métriques Prometheus / OpenMetrics | non | `--prom-file`, `--openmetrics-file`, `--metrics-run` (issue #1112) | `GET /metrics` : dernier relevé direct ou analyse finale de capture directe simple ; même authentification, `format` prometheus ou openmetrics (issue #1113) |
 | Historique SQLite | oui (« Historique... » et « Etiquette » de la configuration, derniers runs dans le panneau « SIEM, ticket de support, historique » ; issue #674) | `--history-db`, `--history-label`, `--history-show` ; `netcross-history` | `history`, `history_label` de `POST /captures` et `POST /captures/multi` (base fixée par `NETCROSS_HISTORY_DB`, `history_id` ou `history_error` dans le résumé ; issue #890), consultation `GET /history` ; persistance propre des analyses (`NETCROSS_DB_PATH`), `GET /analyses` |
 | Ticket de support anonymisé | oui (case de consentement et « Ticket de support... » du panneau « SIEM, ticket de support, historique », ticket « diagnostic », toutes portées ; issue #674) | `--support-ticket`, `--support-consent`, `--support-scope`, `--support-map`, `--support-marker` | `POST /analyses/{analysis_id}/support-ticket` (issue #674), `consent`, `kind`, `scopes`, `marker`, `include_map` (issue #877) |
 

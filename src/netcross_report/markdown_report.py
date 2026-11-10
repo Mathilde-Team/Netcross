@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from netcross_core.i18n import _
 from netcross_core.logging_config import get_logger, summarize
 from netcross_report.synthesis import Finding, build_findings
 from netcross_report.triage import health_label, health_score, rank_segments
@@ -234,6 +235,7 @@ def build_markdown_report_document(
     security_report=None,
     rule_engine_findings=None,
     names=None,
+    redaction=None,
 ) -> str:
     """
     Construit le document Markdown complet (sans l'écrire).
@@ -247,10 +249,14 @@ def build_markdown_report_document(
     security_report : SecurityReport optionnel (issue #218).
     rule_engine_findings : dict optionnel {rule_id: [Finding, ...]}.
     names : dict optionnel {host: name} pour résolution de noms.
+    redaction : dict optionnel issu de redaction_note.build_redaction_info()
+    (issue #1159) ; fourni, un encart certifie le périmètre d'anonymisation
+    appliqué.
     """
     logger.debug(
         "build_markdown_report_document: r={} title={} meta={} findings={} tls_findings={} "
-        "quic_findings={} session_objects={} security_report={} rule_engine_findings={} names={}",
+        "quic_findings={} session_objects={} security_report={} rule_engine_findings={} names={} "
+        "redaction={}",
         summarize(r, "r"),
         summarize(title, "title"),
         summarize(meta, "meta"),
@@ -261,6 +267,7 @@ def build_markdown_report_document(
         summarize(security_report, "security_report"),
         summarize(rule_engine_findings, "rule_engine_findings"),
         summarize(names, "names"),
+        summarize(redaction, "redaction"),
     )
     if findings is None:
         findings = build_findings(r)
@@ -277,8 +284,22 @@ def build_markdown_report_document(
     if meta:
         lines.extend(f"**{k}** : {v}" for k, v in meta.items())
     lines.append("")
+    # -- Encart Anonymisation (issue #1159) --
+    if redaction:
+        from netcross_report.redaction_note import lignes_encart_markdown
+
+        lines.extend(lignes_encart_markdown(redaction))
+        lines.append("")
 
     # -- Score de santé --
+    if getattr(r, "active_confirmation", None):
+        from html import escape
+
+        from netcross_report.active_confirmation import lignes_confirmation
+
+        lines.append("## " + _("Confirmation active") + "\n")
+        lines.extend(f"- {_cell(escape(ligne))}" for ligne in lignes_confirmation(r.active_confirmation))
+        lines.append("")
     lines.append("## Score de santé\n")
     lines.append(f"- Score : **{score}/100**")
     lines.append(f"- État : **{health_label(score)}**")
@@ -315,6 +336,38 @@ def build_markdown_report_document(
             loss = r.loss_count.get(p, 0)
             if loss:
                 lines.append(f"- **{p}** : {loss} paquet(s) perdu(s)")
+        lines.append("")
+
+    # -- Sondes (issue #1103) : pertes DÉCLARÉES + horloge ANNONCÉE --
+    # À distinguer des pertes réseau estimées ci-dessus : section absente
+    # sans --sonde-meta (sortie historique inchangée).
+    pertes_sondes = getattr(r, "pertes_sondes", None) or {}
+    horloges_sondes = getattr(r, "horloges_sondes", None) or {}
+    if pertes_sondes or horloges_sondes:
+        lines.append("### Sondes — pertes de capture déclarées, horloge annoncée\n")
+        for p in r.points:
+            pertes = pertes_sondes.get(p)
+            if pertes:
+                recus = pertes.get("packets_received") or 0
+                perdus = pertes.get("packets_dropped")
+                if perdus is not None and recus + perdus > 0:
+                    taux = 100.0 * perdus / (recus + perdus)
+                    lines.append(
+                        f"- **{p}** : {taux:.1f} % de pertes de capture "
+                        f"({perdus} perdu(s) sur {recus + perdus} annoncés, "
+                        f"ifdrop {pertes.get('ifdrop')} / osdrop {pertes.get('osdrop')})"
+                    )
+                else:
+                    lines.append(f"- **{p}** : aucune perte de capture déclarée")
+            horloge = horloges_sondes.get(p)
+            if horloge:
+                annonce = f"décalage annoncé {horloge.get('offset_ms')} ms"
+                if horloge.get("dispersion_ms") is not None:
+                    annonce += f", dispersion {horloge.get('dispersion_ms')} ms"
+                if horloge.get("reference"):
+                    annonce += f", référence {horloge.get('reference')}"
+                synchronise = "synchronisée" if horloge.get("synchronized") else "NON synchronisée"
+                lines.append(f"- **{p}** : horloge {horloge.get('source')} ({synchronise}, {annonce})")
         lines.append("")
 
     # -- Topologie --

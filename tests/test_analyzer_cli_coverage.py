@@ -115,16 +115,21 @@ def test_redact_map_sans_redact_refuse(monkeypatch, capsys):
     assert "--redact-map necessite --redact" in capsys.readouterr().err
 
 
-def test_redact_avec_tls_refuse(monkeypatch, capsys):
+def test_redact_avec_tls_autorise(monkeypatch, capsys):
+    """Issue #1155 : --redact + --tls n'est plus refuse -- le run echoue
+    ici sur le fichier absent, pas sur la combinaison."""
     code = _run_main(monkeypatch, ["--capture", "A=x.pcap", "--redact", "--tls"])
-    assert code == 1
-    assert "--redact n'est pas disponible avec --tls/--quic" in capsys.readouterr().err
+    assert code != 0  # echec sur le fichier absent, pas sur la combinaison
+    assert "--redact n'est pas disponible avec" not in capsys.readouterr().err
 
 
-def test_redact_avec_client_group_refuse(monkeypatch, capsys):
+def test_redact_avec_client_group_autorise(monkeypatch, capsys):
+    """Issue #1155 : --redact + --client-group n'est plus refuse (les
+    adresses sont traduites par la table commune) -- le run echoue ici sur
+    le fichier absent, pas sur la combinaison."""
     code = _run_main(monkeypatch, ["--capture", "A=x.pcap", "--redact", "--client-group", "10.0.0.1"])
-    assert code == 1
-    assert "--redact n'est pas disponible avec" in capsys.readouterr().err
+    assert code != 0  # echec sur le fichier absent, pas sur la combinaison
+    assert "--redact n'est pas disponible avec" not in capsys.readouterr().err
 
 
 # -- --history-label / --history-show (lignes 1505-1507) ---------------------

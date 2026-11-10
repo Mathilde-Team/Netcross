@@ -1143,6 +1143,17 @@ def render_html_report(doc: dict) -> str:
     langue = (active_language() or "fr").replace("_", "-")
     titre = doc.get("title") or _("Rapport Netcross")
     genere = doc.get("generated_at") or ""
+    confirmation = ""
+    if doc.get("active_confirmation"):
+        from netcross_report.active_confirmation import lignes_confirmation
+
+        confirmation = (
+            '<section aria-labelledby="confirmation-active"><h2 id="confirmation-active">'
+            + _e(_("Confirmation active"))
+            + "</h2><ul>"
+            + "".join(f"<li>{_e(ligne)}</li>" for ligne in lignes_confirmation(doc["active_confirmation"]))
+            + "</ul></section>"
+        )
     page = (
         "<!DOCTYPE html>\n"
         f'<html lang="{_e(langue)}"><head><meta charset="utf-8">'
@@ -1152,6 +1163,7 @@ def render_html_report(doc: dict) -> str:
         "style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:\">"
         f"<title>{_e(titre)}</title><style>{_CSS}</style></head><body>"
         f'<header><h1>{_e(titre)}</h1><p class="sous-titre">{_e(_("Genere le"))} {_e(genere)}</p></header>'
+        f"{confirmation}"
         f'<main id="rapport"><noscript>{_static_body(doc, labels)}</noscript></main>'
         f'<script type="application/json" id="{DATA_ELEMENT_ID}">{_json_for_script(doc)}</script>'
         f'<script type="application/json" id="netcross-labels">{_json_for_script(labels)}</script>'

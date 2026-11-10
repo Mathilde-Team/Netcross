@@ -61,9 +61,11 @@ from netcross_api.models import (
 from netcross_api.store import COMPLETED, FAILED, PENDING, report_document, store
 from netcross_core import analyse, correlate, parse_capture
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
+from netcross_core.i18n import _
 from netcross_core.logging_config import get_logger, summarize
 from netcross_core.notify.request import NotifySettings, send_notifications
 from netcross_core.notify.request import validate_settings as validate_notify
+from netcross_core.redact import redact_client_group, redact_diagnostic_events
 from netcross_core.security.findings import apply_security_findings, scan_capture_exploits
 from netcross_core.tls_keylog import (
     TlsKeylogError,
@@ -97,7 +99,8 @@ _QUIC_FORM = Form(default=False, description="true : diagnostic QUIC/HTTP3 (équ
 _REDACT_FORM = Form(
     default=False,
     description="true : anonymise les adresses IP/MAC avant analyse (équivalent de --redact) ; "
-    "incompatible avec tls/quic, et le rapport de sécurité n'est alors pas calculé",
+    "combinable avec tls/quic (issue #1155, même table de pseudonymes), et le rapport de sécurité "
+    "n'est alors pas calculé",
 )
 # Issue #672 : options d'analyse avancées (équivalents CLI)
 _MAX_PACKETS_FORM = Form(
@@ -161,6 +164,11 @@ _EXTRA_FILES = File(
     description="Fichiers pcap/pcapng supplémentaires pour le même point (rotation) — équiv. --capture NOM=a,b",
 )
 # Issue #673 : sections d'expertise
+_CONFIRM_ACTIVE_FORM = Form(False, description=_("Autorise explicitement les sondes actives (8 mesures maximum)"))
+_ACTIVE_ALLOWED = os.environ.get("NETCROSS_API_ACTIVE", "0") == "1"
+_ACTIVE_DRY_RUN_FORM = Form(
+    False, description=_("Simulation des commandes sans émission ; prioritaire sur confirm_active")
+)
 _RULE_ENGINE_FORM = Form(
     default=False, description="true : évaluer le moteur de règles déclaratif (équiv. --rule-engine)"
 )
@@ -355,6 +363,8 @@ class ApiAnalysisOptions:
     # Issue #671 : split_interfaces (--split-interfaces)
     split_interfaces: bool = False
     # Issue #673 : sections d'expertise
+    confirm_active: bool = False
+    active_dry_run: bool = False
     rule_engine: bool = False
     expert_section: bool = False
     media_quality: bool = False
@@ -420,6 +430,8 @@ def _options(
     notify_email: str | None = None,
     notify_detail: str = "resume",
     split_interfaces: bool = False,
+    confirm_active: bool = False,
+    active_dry_run: bool = False,
     rule_engine: bool = False,
     expert_section: bool = False,
     media_quality: bool = False,
@@ -436,19 +448,23 @@ def _options(
     history_label: str | None = None,
     plugins: str | None = None,
 ) -> ApiAnalysisOptions:
-    """Valide les options comme la CLI : ``redact`` exclut ``tls``/``quic``,
-    qui relisent les fichiers d'origine (adresses réelles).
+    """Valide les options comme la CLI : ``redact`` se combine avec
+    ``tls``/``quic`` depuis l'issue #1155 (les évènements TLS/QUIC passent
+    par la même table de pseudonymes que les paquets).
 
     Issue #672 : validation de ``sample`` (format 1/N) comme la CLI
     (``_parse_sample_spec``).
     """
-    if redact and (tls or quic):
-        logger.debug("_options: si redact and (tls or quic) -> levée HTTPException")
+    if redact and (confirm_active or active_dry_run):
+        logger.debug("_options: confirmation active sur cibles anonymisées -> refus")
+        raise HTTPException(status_code=400, detail=_("confirm_active/active_dry_run incompatibles avec redact"))
+    if confirm_active and not active_dry_run and not _ACTIVE_ALLOWED:
+        logger.debug("_options: émission active non autorisée sur ce serveur -> refus")
         raise HTTPException(
-            status_code=400,
-            detail="redact n'est pas disponible avec tls/quic : ces diagnostics relisent les fichiers "
-            "d'origine, avec les adresses réelles (même règle que la CLI)",
+            status_code=403,
+            detail=_("Confirmation active désactivée sur le serveur (NETCROSS_API_ACTIVE=1 requis)."),
         )
+    # Issue #1155 : redact + tls/quic autorisé (même table de pseudonymes).
     sample_n: int | None = None
     if sample:
         import re
@@ -547,6 +563,8 @@ def _options(
         history=history,
         history_label=history_label,
         plugins=plugin_names,
+        confirm_active=confirm_active,
+        active_dry_run=active_dry_run,
     )
     logger.debug("_options: retour options={}", summarize(options, "options"))
     return options
@@ -567,17 +585,25 @@ def _collect_tshark_stats_api(captures: list[tuple[str, str]]) -> dict:
 
 
 def _tls_quic_findings(
-    captures: list[tuple[str, str]], points: list[str], options: ApiAnalysisOptions
+    captures: list[tuple[str, str]],
+    points: list[str],
+    options: ApiAnalysisOptions,
+    redactor: Any = None,
 ) -> tuple[list | None, list | None]:
     """Diagnostics TLS / QUIC demandés, relus sur les fichiers comme
-    ``--tls`` / ``--quic`` ; ``None`` pour un diagnostic non demandé."""
+    ``--tls`` / ``--quic`` ; ``None`` pour un diagnostic non demandé.
+    Issue #1155 : avec ``redact``, les évènements passent par la même
+    table de pseudonymes que les paquets (``redact_diagnostic_events``)."""
     tls_findings = quic_findings = None
     if options.tls:
         from netcross_core.tls_diagnostics import build_handshake_status, diagnose_tls, parse_tls_capture
 
         tls_events = []
         for label, path in captures:
-            tls_events.extend(parse_tls_capture(label, path))
+            events = parse_tls_capture(label, path)
+            if redactor is not None:
+                redact_diagnostic_events(events, redactor)
+            tls_events.extend(events)
         tls_findings = diagnose_tls(build_handshake_status(tls_events), points)
     if options.quic:
         try:
@@ -587,7 +613,10 @@ def _tls_quic_findings(
             raise AnalysisError("quic nécessite le paquet cryptography (pip install cryptography)") from exc
         quic_events = []
         for label, path in captures:
-            quic_events.extend(parse_quic_capture(label, path, **options_lecture(dict(options.tls_keylogs), label)))
+            quic_found = parse_quic_capture(label, path, **options_lecture(dict(options.tls_keylogs), label))
+            if redactor is not None:
+                redact_diagnostic_events(quic_found, redactor)
+            quic_events.extend(quic_found)
         quic_findings = diagnose_quic(quic_events, points)
     logger.debug(
         "_tls_quic_findings: retour tls={} quic={}",
@@ -749,6 +778,7 @@ def _analyse_captures(
             exclude_duplicates=options.exclude_duplicates,
             duplicate_counts=duplicate_counts,
             link_speeds=resolve_link_speeds(captures),
+            collect_active_evidence=options.confirm_active or options.active_dry_run,
         )
         if truncation_note:
             report.truncated = True
@@ -788,15 +818,31 @@ def _analyse_captures(
                 # Issue #875 : trace de chaque canal dans le rapport de
                 # sécurité (section « Notifications », clé `notifications`)
                 security_report.notifications = send_notifications(report, security_report, options.notify)
-        tls_findings, quic_findings = _tls_quic_findings(captures, list(report.points), options)
+        tls_findings, quic_findings = _tls_quic_findings(captures, list(report.points), options, redactor)
         # Issue #330 : même document que `netcross --json-report
         # --security-report` (constats, triage, score de santé).
         # Issue #670 : findings calculés une fois, partagés entre le JSON
         # structuré et les exports texte/PDF/CSV ultérieurs.
+        if options.confirm_active or options.active_dry_run:
+            from netcross_report.active_confirmation import confirmer_rapport
+
+            confirmer_rapport(
+                report,
+                flows,
+                enabled=options.confirm_active,
+                dry_run=options.active_dry_run,
+                redact=options.redact,
+            )
         findings = build_findings(report)
         meta = {"Source": "API REST"}
         if options.redact:
             meta["Anonymisation"] = "adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (redact)"
+        # Issue #1159 : encart « Anonymisation » -- même périmètre que la CLI.
+        redaction_info = None
+        if options.redact and redactor is not None:
+            from netcross_report.redaction_note import build_redaction_info
+
+            redaction_info = build_redaction_info(redactor, redactor.scope)
         # Issue #673 : sections d'expertise (équiv. --rule-engine,
         # --expert-section, --media-quality, --tshark-stats, --flow-timeline)
         rule_engine_findings = None
@@ -824,6 +870,7 @@ def _analyse_captures(
             quic_findings=quic_findings,
             rule_engine_findings=rule_engine_findings,
             meta=meta,
+            redaction=redaction_info,
         )
         if session_objects is not None:
             structured["session_objects"] = session_objects
@@ -959,6 +1006,7 @@ def _run_job(
             quic_findings=quic_findings,
             all_packets=all_packets,
             redaction_map=redactor.entries() if redactor is not None else None,
+            redactor=redactor if options and options.redact else None,
         )
     finally:
         for _label, path in captures:
@@ -1141,6 +1189,8 @@ async def upload_capture(
     tls_keylog: list[UploadFile] | None = _TLS_KEYLOG_FILES,
     tls_keylog_labels: str | None = _TLS_KEYLOG_LABELS_FORM,
     split_interfaces: bool = _SPLIT_INTERFACES_FORM,
+    confirm_active: bool = _CONFIRM_ACTIVE_FORM,
+    active_dry_run: bool = _ACTIVE_DRY_RUN_FORM,
     rule_engine: bool = _RULE_ENGINE_FORM,
     expert_section: bool = _EXPERT_SECTION_FORM,
     media_quality: bool = _MEDIA_QUALITY_FORM,
@@ -1190,6 +1240,8 @@ async def upload_capture(
         tls,
         quic,
         redact,
+        confirm_active=confirm_active,
+        active_dry_run=active_dry_run,
         max_packets=max_packets,
         sample=sample,
         test_net_external=test_net_external,
@@ -1380,6 +1432,8 @@ async def upload_multi_capture(
     tls_keylog: list[UploadFile] | None = _TLS_KEYLOG_FILES,
     tls_keylog_labels: str | None = _TLS_KEYLOG_LABELS_FORM,
     split_interfaces: bool = _SPLIT_INTERFACES_FORM,
+    confirm_active: bool = _CONFIRM_ACTIVE_FORM,
+    active_dry_run: bool = _ACTIVE_DRY_RUN_FORM,
     rule_engine: bool = _RULE_ENGINE_FORM,
     expert_section: bool = _EXPERT_SECTION_FORM,
     media_quality: bool = _MEDIA_QUALITY_FORM,
@@ -1427,6 +1481,8 @@ async def upload_multi_capture(
         tls,
         quic,
         redact,
+        confirm_active=confirm_active,
+        active_dry_run=active_dry_run,
         max_packets=max_packets,
         sample=sample,
         test_net_external=test_net_external,
@@ -2497,6 +2553,12 @@ async def client_comparison(
     client_groups: dict[str, set[str]] = {}
     for name, ips in groups.items():
         client_groups[name] = set(ips)
+    # Issue #1155 : si l'analyse est anonymisée, les groupes fournis en IP
+    # réelles sont traduits par la table du run (mêmes pseudonymes que les
+    # paquets) -- sinon la comparaison ne trouverait aucun paquet.
+    redactor = entry.get("redactor")
+    if redactor is not None:
+        client_groups = redact_client_group(client_groups, redactor)
     comparison = compare_clients(all_packets, client_groups, reference=reference)
     payload = {
         "analysis_id": analysis_id,
@@ -3309,6 +3371,10 @@ live_captures = _live_routes.register(
         "get_analysis": lambda analysis_id: store.get(analysis_id),
     },
 )
+
+from netcross_api import metrics_routes as _metrics_routes  # noqa: E402
+
+_metrics_routes.register(app, _verify_api_key, live_captures.metrics)
 
 # Issue #910 : annotations d'une analyse (rangées dans ses métadonnées, par point)
 from netcross_api import annotations_routes as _annotations_routes  # noqa: E402

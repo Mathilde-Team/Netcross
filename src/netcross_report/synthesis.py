@@ -164,6 +164,7 @@ oubli.
 
 from dataclasses import dataclass, field
 
+from netcross_core.causality import format_microburst_correlation
 from netcross_core.expert_model import EvidenceLink, ExpertEvent, PacketEvidence
 from netcross_core.logging_config import get_logger, summarize
 from netcross_core.microburst import format_microburst
@@ -268,6 +269,28 @@ def build_findings(r) -> list[Finding]:
                 rule_id="microburst",
             )
             for event in record["events"]
+        )
+
+    for correlation in r.microburst_correlations:
+        a, b = correlation["upstream"], correlation["downstream"]
+        findings.append(
+            Finding(
+                "a_surveiller",
+                "Microrafales",
+                f"{a} -> {b}",
+                format_microburst_correlation(correlation),
+                sample_size=correlation["losses"] + correlation["retransmissions"],
+                rule_id="microburst_downstream_impact",
+                evidence=[
+                    link
+                    for item in correlation["evidence"]
+                    for link in _evidence(
+                        item["point"],
+                        [f"{item['kind']} à {item['ts']:.6f} s"],
+                        [item["frame_number"]],
+                    )
+                ],
+            )
         )
 
     # -- pertes --
@@ -765,6 +788,23 @@ def build_findings(r) -> list[Finding]:
                 rule_id="rtp_quality_mos",
             )
         )
+
+    findings.extend(
+        Finding(
+            "a_surveiller",
+            "RTP/Voix",
+            segment["segment"],
+            f"Dégradation de transport RTP/SRTP ({segment['label']}) : "
+            f"{segment['loss_pct']:.2f} % de visibilité perdue, "
+            f"gigue ajoutée {segment['added_jitter_ms']:.2f} ms, "
+            f"note indicative {segment['transport_quality']:.1f}/100. "
+            "Pertes de capture à exclure ; contenu et qualité perçue non mesurés."
+            + (" Sens média non confirmé par les horloges." if not segment["direction_confirmed"] else ""),
+            sample_size=segment["sample_count"],
+        )
+        for segment in getattr(r, "rtp_segments", ())
+        if segment["degraded"]
+    )
 
     # -- decomposition reseau / serveur --
     if r.server_think_time:

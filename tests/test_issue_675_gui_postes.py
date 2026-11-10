@@ -36,12 +36,13 @@ def test_groupe_invalide(texte):
 
 def test_validations_de_la_cli():
     deux = {"A": {"1.1.1.1"}, "B": {"2.2.2.2"}}
-    assert validate_client_settings({}, None, False) == []
-    assert validate_client_settings(deux, "B", False) == []
-    assert "au moins deux groupes" in validate_client_settings({}, "A", False)[0]
-    assert "au moins 2 postes" in validate_client_settings({"A": {"1.1.1.1"}}, None, False)[0]
-    assert "absente des groupes" in validate_client_settings(deux, "Z", False)[0]
-    assert "anonymisation" in validate_client_settings(deux, None, True)[0]
+    assert validate_client_settings({}, None) == []
+    assert validate_client_settings(deux, "B") == []
+    assert "au moins deux groupes" in validate_client_settings({}, "A")[0]
+    assert "au moins 2 postes" in validate_client_settings({"A": {"1.1.1.1"}}, None)[0]
+    assert "absente des groupes" in validate_client_settings(deux, "Z")[0]
+    # Issue #1155 : redact + comparaison de postes autorise (adresses traduites)
+    assert validate_client_settings(deux, None) == []
 
 
 def test_synthese():
@@ -87,9 +88,15 @@ def test_pipeline_sans_groupes(_paquets):
     assert "COMPARAISON CLIENT VS CLIENT" not in result.text
 
 
-def test_pipeline_refuse_l_anonymisation(_paquets):
-    with pytest.raises(ValueError, match="anonymisation"):
-        run_analysis_pipeline(
-            [("A", "a.pcap")],
-            AnalysisOptions(parallel=False, redact=True, client_groups={"A": {"1.1.1.1"}, "B": {"2.2.2.2"}}),
-        )
+def test_pipeline_redige_les_groupes_anonymises(_paquets):
+    """Issue #1155 : redact + comparaison de postes autorisé -- les
+    adresses des groupes passent par la table commune, aucune adresse
+    réelle dans le rendu."""
+    result = run_analysis_pipeline(
+        [("A", "a.pcap")],
+        AnalysisOptions(parallel=False, redact=True, client_groups={"A": {"10.0.0.5"}, "B": {"10.0.0.12"}}),
+    )
+    assert result.client_comparison is not None
+    assert "COMPARAISON CLIENT VS CLIENT" in result.text
+    assert "10.0.0.5" not in result.text
+    assert "10.0.0.12" not in result.text
