@@ -338,6 +338,38 @@ def build_markdown_report_document(
                 lines.append(f"- **{p}** : {loss} paquet(s) perdu(s)")
         lines.append("")
 
+    # -- Sondes (issue #1103) : pertes DÉCLARÉES + horloge ANNONCÉE --
+    # À distinguer des pertes réseau estimées ci-dessus : section absente
+    # sans --sonde-meta (sortie historique inchangée).
+    pertes_sondes = getattr(r, "pertes_sondes", None) or {}
+    horloges_sondes = getattr(r, "horloges_sondes", None) or {}
+    if pertes_sondes or horloges_sondes:
+        lines.append("### Sondes — pertes de capture déclarées, horloge annoncée\n")
+        for p in r.points:
+            pertes = pertes_sondes.get(p)
+            if pertes:
+                recus = pertes.get("packets_received") or 0
+                perdus = pertes.get("packets_dropped")
+                if perdus is not None and recus + perdus > 0:
+                    taux = 100.0 * perdus / (recus + perdus)
+                    lines.append(
+                        f"- **{p}** : {taux:.1f} % de pertes de capture "
+                        f"({perdus} perdu(s) sur {recus + perdus} annoncés, "
+                        f"ifdrop {pertes.get('ifdrop')} / osdrop {pertes.get('osdrop')})"
+                    )
+                else:
+                    lines.append(f"- **{p}** : aucune perte de capture déclarée")
+            horloge = horloges_sondes.get(p)
+            if horloge:
+                annonce = f"décalage annoncé {horloge.get('offset_ms')} ms"
+                if horloge.get("dispersion_ms") is not None:
+                    annonce += f", dispersion {horloge.get('dispersion_ms')} ms"
+                if horloge.get("reference"):
+                    annonce += f", référence {horloge.get('reference')}"
+                synchronise = "synchronisée" if horloge.get("synchronized") else "NON synchronisée"
+                lines.append(f"- **{p}** : horloge {horloge.get('source')} ({synchronise}, {annonce})")
+        lines.append("")
+
     # -- Topologie --
     lines.append(_topology_section(r))
     lines.append("")
