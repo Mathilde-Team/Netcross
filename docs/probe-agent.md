@@ -54,7 +54,13 @@ PYTHONPATH=src python3 -m netcross_probe fenetre \
    aucune dépendance Python ajoutée) puis convertit le résultat en pcapng
    (editcap) ;
 4. calcul du SHA-256, de la taille et de l'intervalle réellement couvert
-   (premier/dernier paquet, via capinfos).
+   (premier/dernier paquet, via capinfos) ;
+5. lecture des pertes de capture **déclarées** (somme des ISB des fichiers
+   du tampon utilisés : `ifdrop` + `osdrop`, distinctes des pertes réseau
+   estimées par l'analyse) et de l'horloge **annoncée** (chrony
+   `tracking` puis systemd-timesyncd, source/décalage/dispersion ;
+   `unknown` si aucun des deux ne répond, jamais inventée) — clés
+   `capture_loss` et `clock` du JSON de sortie (#1103).
 
 La sortie standard décrit la fenêtre en JSON (miroir de l'objet `Window`
 du contrat v1) : `window_id`, `requested`, `covered` (plus court que la
@@ -64,6 +70,36 @@ demande si le tampon a déjà tourné -- ce n'est pas une absence de trafic),
 Codes de retour de `fenetre` : 0 nominal, 2 rien dans le tampon pour
 cette fenêtre, 3 fenêtre refusée (bornes inversées, BPF invalide), 4
 fenêtre au-delà de `--max-octets` (le pcapng est alors supprimé).
+
+## Sécurité : mTLS, enrôlement, révocation (#1101)
+
+Aucune écoute ni transfert sans authentification mutuelle. La sonde
+s'inscrit auprès du collecteur une seule fois, par jeton à usage unique
+remis par l'administrateur :
+
+```bash
+PYTHONPATH=src python3 -c "
+from netcross_api.probe_routes import registre_sondes
+print(registre_sondes.creer_jeton())"   # côté collecteur : imprime le jeton
+
+PYTHONPATH=src python3 -c "
+from netcross_probe.enrolement import demander_enrolement
+demander_enrolement('https://collecteur:8443/probe/v1/enrollments',
+                     JETON, 'ROUTEUR', '/var/lib/netcross-probe/identite')"
+```
+
+La clé privée est générée sur la sonde et ne la quitte jamais : seule la
+CSR PKCS#10 part sur le réseau. Le collecteur signe un certificat client
+dont le SAN URI vaut `urn:netcross:probe:<probe_id>` et répond la chaîne
+de son autorité (`netcross_probe.securite.AutoriteConfiance`).
+
+Ensuite, tout échange passe en TLS mutuel (TLS 1.3, certificat exigé
+pendant la poignée de main, épinglage sur l'autorité du collecteur) :
+`netcross_probe.securite.contexte_mtls_serveur` / `contexte_mtls_client`
+construisent les contextes, `verifier_certificat_sonde` refuse un
+certificat non signé, expiré ou révoqué. Une sonde est révoquée côté
+collecteur (`RegistreSondes.revoquer(probe_id)`) : son certificat est
+refusé partout, refus explicite jamais silencieux.
 
 ## Programmation
 

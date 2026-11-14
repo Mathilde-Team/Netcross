@@ -8,6 +8,38 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- mTLS, enrôlement et révocation des sondes (#1101, sous-issue 3/6 du
+  chantier sondes distribuées #1002, dépend de #1099) : aucune écoute ni
+  transfert sans authentification mutuelle. La sonde s'inscrit par jeton à
+  usage unique (256 bits d'entropie, stocké haché côté collecteur) en
+  présentant une CSR PKCS#10 — la clé privée ne quitte jamais la sonde —
+  et le collecteur signe un certificat client dont le SAN URI vaut
+  `urn:netcross:probe:<probe_id>` (contrat v1 :
+  `POST /probe/v1/enrollments`, seule route sans certificat client).
+  Les contextes TLS mutuels exigent le certificat client pendant la
+  poignée de main (TLS 1.3, épinglage sur l'autorité du collecteur) : un
+  client sans certificat est refusé par le transport, aucune route n'est
+  servie. Une sonde révoquée est refusée partout (401 `probe_revoked`,
+  vérification de certificat explicite). Implémentation
+  `netcross_probe.securite` (autorité, CSR, contextes mTLS, jetons),
+  `netcross_probe.enrolement` (client), `netcross_api.probe_routes`
+  (route du collecteur), tests `test_probe_securite.py` (vraie poignée
+  de main TLS incluse).
+- Distinction « le réseau a perdu » / « la sonde a perdu » (#1103,
+  sous-issue 4/6 du chantier sondes distribuées #1002) : la sonde
+  déclare ce qu'elle a perdu (somme des ISB pcapng du tampon : `ifdrop` +
+  `osdrop`) et son horloge (chrony `tracking` puis systemd-timesyncd :
+  source, synchronisée, décalage, dispersion ; `unknown` si aucun des
+  deux ne répond, jamais inventée) — clés `capture_loss` et `clock` du
+  JSON `netcross_probe fenetre`. L'analyseur les consomme via
+  `--sonde-meta POINT=JSON` (répétable, refus d'un point inconnu ou
+  d'un JSON illisible) : rapport texte « Sondes (pertes déclarées,
+  horloge annoncée) », section Markdown, clés `sondes` du JSON et
+  `annonce` accolée à chaque estimation de décalage d'horloge. Les
+  pertes de capture déclarées restent distinctes des pertes réseau
+  estimées ; la section est absente sans `--sonde-meta` (sortie
+  historique inchangée). Implémentation `netcross_probe.etat`,
+  `FenetreResultat.pertes/horloge`, tests `test_probe_etat.py`.
 - Réécriture pcapng anonymisée `--redact-pcap DOSSIER` (#1157, sous-issue 4/5 du
   chantier anonymisation #1007, dépend de #1153) : avec `--redact`, l'analyseur
   écrit en plus un pcapng anonymisé par point de capture (un fichier par
