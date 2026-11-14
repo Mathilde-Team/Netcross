@@ -3538,6 +3538,14 @@ from netcross_api import bpf_routes as _bpf_routes  # noqa: E402
 
 _bpf_routes.register(app, _verify_api_key)
 
+# Issue #1101 : enrôlement des sondes auprès du collecteur (contrat v1,
+# docs/probe-api-v1.yaml) -- seule route sans certificat client ni clé
+# API : la sonde ne possède encore ni l'un ni l'autre, elle s'authentifie
+# par le jeton d'enrôlement à usage unique.
+from netcross_api import probe_routes as _probe_routes  # noqa: E402
+
+_probe_routes.register(app)
+
 # Issue #1095 : gel rétroactif et incidents archivés (réglages partagés avec
 # la GUI, fichier fixé par NETCROSS_API_GEL_CONFIG)
 from netcross_api import incident_routes as _incident_routes  # noqa: E402

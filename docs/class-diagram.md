@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-254 modules · 363 classes · 888 fonctions publiques de module.
+257 modules · 368 classes · 901 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -44,6 +44,7 @@ flowchart TD
     netcross_api -->|"31 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
     netcross_api -->|"69 imports"| netcross_core
+    netcross_api -->|"1 import"| netcross_probe
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"61 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
@@ -546,8 +547,10 @@ classDiagram
 | `netcross_probe.agent` | L'agent ``netcross-probe`` : capture locale + extraction de fenêtres. |
 | `netcross_probe.bpf` | Filtrage BPF (syntaxe pcap-filter) en relecture d'un fichier de capture. |
 | `netcross_probe.capture` | Capture locale de la sonde ``netcross-probe`` en tampon circulaire. |
+| `netcross_probe.enrolement` | inscription d'une sonde auprès du collecteur (issue #1101 ; contrat v1 ``docs/probe-api-v1.yaml``). |
 | `netcross_probe.etat` | pertes de capture et état d'horloge de la sonde (issue #1103, sous-issue 4/6 du chantier #1002). |
 | `netcross_probe.fenetres` | Extraction d'une fenêtre [t1, t2] filtrée du tampon circulaire de la sonde. |
+| `netcross_probe.securite` | mTLS, enrôlement et révocation des sondes (issue #1101, sous-issue 3/6 du chantier #1002). |
 
 ### Diagramme
 
@@ -611,6 +614,24 @@ classDiagram
         +inventaire() list~RingFile~
     }
 
+    %% ===== netcross_probe.enrolement =====
+    class EnrolementError {
+        <<Exception>>
+    }
+    class Enrolement {
+        <<dataclass, frozen>>
+        +str probe_id
+        +str certificat_pem
+        +str cle_pem
+        +str ca_pem
+        +str api_version
+        +float certificate_expires_at
+    }
+    class mod_netcross_probe_enrolement["netcross_probe.enrolement"] {
+        <<module>>
+        +demander_enrolement(url_collecteur, jeton, nom_sonde, dossier, version_agent, versions_api) Enrolement
+    }
+
     %% ===== netcross_probe.etat =====
     class PertesCapture {
         <<dataclass, frozen>>
@@ -661,6 +682,30 @@ classDiagram
     class mod_netcross_probe_fenetres["netcross_probe.fenetres"] {
         <<module>>
         +extraire_fenetre(dossier_tampon, debut, fin, prefixe, filtre_bpf, inclure_inconnus, dossier_sortie, max_octets, lire_horloge) FenetreResultat
+    }
+
+    %% ===== netcross_probe.securite =====
+    class AutoriteConfiance {
+        <<dataclass, frozen>>
+        +str certificat_pem
+        +str cle_pem
+    }
+    class EnrolementRefuseError {
+        <<Exception>>
+    }
+    class mod_netcross_probe_securite["netcross_probe.securite"] {
+        <<module>>
+        +generer_cle_privee() str
+        +creer_autorite(nom, jours) AutoriteConfiance
+        +generer_csr_sonde(nom_sonde, cle_pem) str
+        +signer_csr_sonde(csr_pem, probe_id, autorite, jours) str
+        +expiration_certificat(certificat_pem) float
+        +identifiant_sonde(certificat_pem) str?
+        +verifier_certificat_sonde(certificat_pem, autorite, revoques) str
+        +contexte_mtls_serveur(certificat_pem, cle_pem, ca_pem) ssl.SSLContext
+        +contexte_mtls_client(certificat_pem, cle_pem, ca_pem) ssl.SSLContext
+        +generer_jeton_enrolement() str
+        +hacher_jeton(jeton) str
     }
 
     %% ===== relations =====
@@ -5059,6 +5104,7 @@ classDiagram
 | `netcross_api.lua_doc_routes` | documentation hors ligne de l'API Lua Wireshark (issue #873), équivalent de ``netcross-lua-doc --json``. |
 | `netcross_api.metrics_routes` | Dernier relevé publié, borné et exposé sous l'authentification de l'API. |
 | `netcross_api.models` | modèles Pydantic pour les requêtes/réponses API (issue #209). |
+| `netcross_api.probe_routes` | enrôlement des sondes auprès du collecteur (issue #1101, chantier #1002 ; contrat v1 ``docs/probe-api-v1.yaml``). |
 | `netcross_api.store` | analyses de l'API : statut, document JSON, persistance. |
 | `netcross_api.tools_routes` | manipulation de captures (issues #868, #869, #870, #886, #887), équivalents des modes utilitaires de la CLI : |
 
@@ -5379,6 +5425,17 @@ classDiagram
         +list~str~ points
         +str order_source
         +list~SegmentLoss~ segments
+    }
+
+    %% ===== netcross_api.probe_routes =====
+    class RegistreSondes {
+        +creer_jeton() str
+        +revoquer(probe_id) None
+        +inscrire(demande) tuple~int, dict~str, Any~ or JSONResponse~
+    }
+    class mod_netcross_api_probe_routes["netcross_api.probe_routes"] {
+        <<module>>
+        +register(app) None
     }
 
     %% ===== netcross_api.store =====
