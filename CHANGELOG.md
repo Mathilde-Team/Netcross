@@ -8,6 +8,21 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [Unreleased]
 
 ### Ajouté
+- Distinction « le réseau a perdu » / « la sonde a perdu » (#1103,
+  sous-issue 4/6 du chantier sondes distribuées #1002) : la sonde
+  déclare ce qu'elle a perdu (somme des ISB pcapng du tampon : `ifdrop` +
+  `osdrop`) et son horloge (chrony `tracking` puis systemd-timesyncd :
+  source, synchronisée, décalage, dispersion ; `unknown` si aucun des
+  deux ne répond, jamais inventée) — clés `capture_loss` et `clock` du
+  JSON `netcross_probe fenetre`. L'analyseur les consomme via
+  `--sonde-meta POINT=JSON` (répétable, refus d'un point inconnu ou
+  d'un JSON illisible) : rapport texte « Sondes (pertes déclarées,
+  horloge annoncée) », section Markdown, clés `sondes` du JSON et
+  `annonce` accolée à chaque estimation de décalage d'horloge. Les
+  pertes de capture déclarées restent distinctes des pertes réseau
+  estimées ; la section est absente sans `--sonde-meta` (sortie
+  historique inchangée). Implémentation `netcross_probe.etat`,
+  `FenetreResultat.pertes/horloge`, tests `test_probe_etat.py`.
 - Réécriture pcapng anonymisée `--redact-pcap DOSSIER` (#1157, sous-issue 4/5 du
   chantier anonymisation #1007, dépend de #1153) : avec `--redact`, l'analyseur
   écrit en plus un pcapng anonymisé par point de capture (un fichier par
