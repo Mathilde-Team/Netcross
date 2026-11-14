@@ -72,6 +72,49 @@ s'il compte au moins 10 paquets aux numéros de séquence majoritairement consé
 Autres codecs (Opus, G.722, G.729, VP8…) : note de dégradation seulement. Flux **SRTP**
 (SDP `RTP/SAVP`) : statistiques de transport, contenu chiffré non exporté.
 
+## Comparaison audio entre points
+
+Avec plusieurs captures et `--extract-kinds audio`, les jambes G.711 claires
+appariées par les en-têtes RTP produisent un WAV mono aligné par point et un WAV
+stéréo comparatif. L'ordre physique explicite est prioritaire ; sans cet ordre,
+l'extraction utilise l'ordre des captures :
+
+```bash
+netcross-analyze --capture A=amont.pcap --capture B=milieu.pcap --capture C=aval.pcap \
+  --order A,B,C --extract-contents ./comparaison --extract-kinds audio
+```
+
+Pour chaque groupe, `audio/aligne-NNNN-NN.wav` partage la même origine média,
+le même nombre d'échantillons et la même durée à 8000 Hz. Les échantillons absents
+au début, au milieu ou à la fin d'un point sont remplacés par du silence.
+`audio/comparaison-NNNN-stereo.wav` place le premier point à gauche et le dernier
+à droite : A/C dans cet exemple, A/B pour deux points. Les doublons et le
+désordre des paquets ne dupliquent pas le son.
+
+Cette origine repose sur l'horodatage RTP normalisé, y compris après un décalage
+constant de séquence/horodatage NAT/SBC reconnu par l'appariement existant. Ce
+n'est ni un décalage d'horloge de capture ni une mesure du délai physique du
+réseau : l'audio commun est superposé pour comparer les pertes de contenu.
+L'appariement reste une association d'en-têtes, pas une identification de voix
+ou une preuve qu'un transcodage arbitraire conserve le même contenu.
+
+La section `audio_comparisons` du manifeste décrit l'origine, les échantillons,
+la méthode d'appariement, chaque mono et la stéréo avec les points gauche/droite,
+tailles et SHA-256. Les entrées `media[].exported` pointent directement vers les
+mono alignés, sans écrire d'originaux redondants. Les flux isolés ou non appariés
+gardent l'export mono historique ; ils ne sont pas présentés comme alignés.
+Sans extraction explicite, aucun WAV comparatif n'est créé.
+
+La comparaison est limitée à G.711 µ-law/A-law clair à 8000 Hz, une heure par
+groupe au maximum. Une durée vide ou excessive, un changement de payload type,
+des échantillons chevauchants ou une erreur d'écriture empêchent la comparaison
+de ce groupe et sont signalés dans `errors`, sans produire de comparaison
+tronquée. Les autres exports restent disponibles. Un fichier préexistant,
+même créé concurremment, n'est ni écrasé ni supprimé ; en cas d'échec, seuls les
+nouveaux fichiers de cette comparaison sont nettoyés.
+
+## Manifeste et permissions
+
 Le répertoire est créé en `0700`, chaque fichier en `0600`. `manifest.json` décrit chaque
 flux (qualité, fichier produit) et chaque document (protocole, taille, **SHA-256**, type
 détecté par signature) ; les erreurs de `tshark` (protocole non pris en charge par la

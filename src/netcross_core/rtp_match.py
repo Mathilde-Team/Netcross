@@ -47,7 +47,7 @@ DEFAULT_WINDOW_SECONDS = 5.0
 
 
 @dataclass
-class _Leg:
+class RtpLeg:
     """Jambe RTP : paquets d'un point pour un 5-tuple et un SSRC."""
 
     point: str
@@ -94,7 +94,10 @@ class _Leg:
         }
 
 
-def _legs(all_packets) -> list[_Leg]:
+_Leg = RtpLeg
+
+
+def _legs(all_packets) -> list[RtpLeg]:
     """Jambes RTP, triees par premier paquet."""
     logger.debug("_legs: entrée")
     paquets: dict[tuple, list] = defaultdict(list)
@@ -195,7 +198,15 @@ def match_rtp_streams(all_packets, points=None, window_seconds: float = DEFAULT_
     vus a une jambe et absents de la suivante).
     """
     logger.debug("match_rtp_streams: entrée")
-    legs = _legs(all_packets)
+    result = match_rtp_legs(_legs(all_packets), points, window_seconds)
+    logger.debug("match_rtp_streams: sortie {} flux", len(result))
+    return result
+
+
+def match_rtp_legs(legs: list[RtpLeg], points=None, window_seconds: float = DEFAULT_WINDOW_SECONDS) -> list[dict]:
+    """Même appariement pour des séries RTP déjà collectées, sans recopier les paquets."""
+    logger.debug("match_rtp_legs: entrée jambes={}", len(legs))
+    legs = sorted(legs, key=lambda leg: (leg.first_ts, leg.point))
     candidats = []
     for i, a in enumerate(legs):
         for j in range(i + 1, len(legs)):

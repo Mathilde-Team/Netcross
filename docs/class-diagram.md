@@ -2413,7 +2413,7 @@ classDiagram
     }
 
     %% ===== netcross_core.rtp_match =====
-    class _Leg {
+    class RtpLeg {
         <<dataclass>>
         +str point
         +str src
@@ -2434,6 +2434,7 @@ classDiagram
     class mod_netcross_core_rtp_match["netcross_core.rtp_match"] {
         <<module>>
         +match_rtp_streams(all_packets, points, window_seconds) list~dict~
+        +match_rtp_legs(legs, points, window_seconds) list~dict~
     }
 
     %% ===== netcross_core.rtp_segments =====
@@ -3038,6 +3039,7 @@ classDiagram
         +list~StreamQuality~ media
         +list~ExtractedDocument~ documents
         +list~str~ errors
+        +list~dict~ audio_comparisons
         +to_dict() dict
     }
     class mod_netcross_core_extract_contents["netcross_core.extract.contents"] {
@@ -3048,7 +3050,7 @@ classDiagram
         +export_documents(captures, out_dir, protocols, tshark_bin, timeout) tuple~list~ExtractedDocument~, list~str~~
         +datagrams_from_raw(label, raw_packets) Iterable~tuple~
         +analyse_media(datagrams) tuple~list~RtpStream~, list~StreamQuality~~
-        +run_extraction(captures, out_dir, kinds, read_capture, tshark_bin) ContentExtraction
+        +run_extraction(captures, out_dir, kinds, read_capture, tshark_bin, points_order) ContentExtraction
         +write_manifest(result, out) None
         +format_extraction(result) list~str~
     }
@@ -3121,6 +3123,7 @@ classDiagram
         +write_wav(st, path) None
         +depacketize_h264(ordered) bytes
         +export_stream(st, out_dir) Path
+        +export_aligned_audio(streams, out_dir, points, max_duration_seconds) tuple~list~dict~, list~str~~
     }
 
     %% ===== relations =====

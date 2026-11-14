@@ -1411,7 +1411,7 @@ def _write_metrics_files(args, r, findings, redactor) -> None:
     logger.debug("_write_metrics_files: retour None")
 
 
-def _run_content_extraction(captures, out_dir, kinds) -> None:
+def _run_content_extraction(captures, out_dir, kinds, points_order=None) -> None:
     """Analyse qualitative / extraction des contenus (issue #278)."""
     logger.debug("_run_content_extraction: entrée")
     from netcross_core.extract.contents import USAGE_REMINDER, format_extraction, run_extraction
@@ -1422,7 +1422,7 @@ def _run_content_extraction(captures, out_dir, kinds) -> None:
     if out_dir:
         print(USAGE_REMINDER, file=sys.stderr)
         logger.warning("extraction de contenus vers {} (types : {})", out_dir, ", ".join(kinds))
-    result = run_extraction(captures, out_dir=out_dir, kinds=kinds if out_dir else ())
+    result = run_extraction(captures, out_dir=out_dir, kinds=kinds if out_dir else (), points_order=points_order)
     for line in format_extraction(result):
         print(line)
     logger.debug("_run_content_extraction: fin")
@@ -3808,7 +3808,7 @@ def main():
         print_quic_diagnostics(quic_findings)
 
     if args.media_quality or args.extract_contents:
-        _run_content_extraction(captures, args.extract_contents, extract_kinds)
+        _run_content_extraction(captures, args.extract_contents, extract_kinds, points_order)
 
     marquer(mesures, "rapport")
     if args.detail_csv:
