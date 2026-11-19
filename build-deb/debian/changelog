@@ -1,3 +1,12 @@
+netcross (1.2.0) unstable; urgency=medium
+
+  * mTLS, enrôlement par jeton à usage unique et révocation des sondes
+    (#1101), pertes de capture et état d'horloge déclarés par sonde
+    (#1103), réécriture pcapng anonymisée --redact-pcap (#1157) — voir
+    CHANGELOG.md pour la liste complète.
+
+ -- Mathilde Deuscher <149895843+MathildeDec@users.noreply.github.com>  Thu, 19 Nov 2026 13:30:00 +0000
+
 netcross (1.1.0) unstable; urgency=medium
 
   * Captures en direct par l'API (#902-#908), bibliothèque de filtres BPF
