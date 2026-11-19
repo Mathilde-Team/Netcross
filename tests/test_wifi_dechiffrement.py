@@ -213,6 +213,14 @@ def test_avec_cle_raisons_du_repli(faux_tshark, fichier_cles, journal, eapol, ra
     assert wpa2_reference.PHRASE not in " ".join(args) + journal.getvalue()
 
 
+def test_cles_derivees_retirees(faux_tshark):
+    cles = {f"wlan_wlan_analysis_{nom}": "00" * 16 for nom in ("pmk", "kck", "kek", "tk", "gtk")}
+    _FauxPopen.lignes = [_record(wlan={**PROTEGEE, **cles}, ip={}), _record(wlan=[{}, {**PROTEGEE, **cles}], ip={})]
+    records = list(iter_ek_records(path=str(faux_tshark)))
+    assert records[0].layers["wlan"] == PROTEGEE
+    assert records[1].layers["wlan"] == [{}, PROTEGEE]
+
+
 def test_aucun_avertissement_sans_trame_chiffree(faux_tshark, journal):
     _FauxPopen.lignes = [_record(wlan=PROTEGEE, ip={}), _record(eth={})]
     list(iter_ek_records(path=str(faux_tshark)))
@@ -240,6 +248,23 @@ def test_tag_encapsulation():
 # -- vrai tshark -----------------------------------------------------------
 
 
+def _cles_derivees() -> tuple[str, ...]:
+    """PMK et TK de la capture de reference, en hexadecimal (forme sous
+    laquelle tshark les expose)."""
+    return wpa2_reference.pmk().hex(), wpa2_reference.ptk()[32:48].hex()
+
+
+@avec_tshark
+def test_cles_derivees_absentes_des_enregistrements_reels(fichier_cles):
+    os.environ[ENV_WIFI_KEYS] = str(fichier_cles)
+    brut = "".join(
+        json.dumps(r.layers) for r in iter_ek_records(path=str(wpa2_reference.WPA2_PCAP), read_via_stdin=True)
+    )
+    assert '"ip"' in brut
+    for secret in _cles_derivees():
+        assert secret not in brut
+
+
 @avec_tshark
 def test_dechiffrement_reel(fichier_cles, journal, monkeypatch):
     capture = str(wpa2_reference.WPA2_PCAP)
@@ -264,6 +289,8 @@ def test_dechiffrement_reel(fichier_cles, journal, monkeypatch):
     assert paquets[0].radio is not None and paquets[0].radio.channel == 6
     assert vus and all(wpa2_reference.PHRASE not in " ".join(a) for a in vus)
     assert wpa2_reference.PHRASE not in journal.getvalue()
+    for secret in _cles_derivees():
+        assert secret not in journal.getvalue()
 
 
 def _lancer_cli(monkeypatch, *argv):
@@ -299,6 +326,8 @@ def test_cli_wifi_keys_sans_fuite(fichier_cles, journal, monkeypatch, tmp_path):
     assert "10.0.0.2" in contenu
     for texte in (contenu, sortie, erreurs, journal.getvalue()):
         assert wpa2_reference.PHRASE not in texte
+        for secret in _cles_derivees():
+            assert secret not in texte.lower()
 
 
 def test_cli_wifi_keys_invalide(fichier_cles, monkeypatch, tmp_path):

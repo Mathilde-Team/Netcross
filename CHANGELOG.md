@@ -7,6 +7,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Sécurité
+- Clés dérivées 802.11 (PMK, KCK, KEK, TK, GTK) exposées par tshark en
+  sortie EK retirées de chaque enregistrement dès la lecture (#1143).
+
 ## [1.2.0] — 2026-11-19
 
 ### Ajouté
