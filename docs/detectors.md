@@ -267,6 +267,31 @@ une duplication, un rejeu ou un incident indépendant peuvent expliquer ces
 observations. Vérifier les compteurs de files et la qualité de capture avant
 d'attribuer les pertes à la rafale ; aucun essai matériel n'est implicite.
 
+## Wi-Fi : métriques radio par client
+
+Le détecteur `wifi_clients` (`netcross_core.wifi`, issue #1146) lit les points
+de capture 802.11 en mode moniteur. Il produit une fiche par station cliente :
+RSSI médian, distribution MCS et débit PHY, taux de retransmission radio,
+itinérances et temps d'antenne approximatif. Il émet aussi quatre constats :
+« perte dans l'air », « perte après le point d'accès », « débit PHY bas » et
+« itinérance pendant le flux ». Les définitions et les seuils sont détaillés
+dans [Déchiffrement Wi-Fi](dechiffrement-wifi.md#metriques-radio-par-client).
+Les fiches apparaissent dans le rapport texte, le PDF et la clé JSON
+`wifi_clients`.
+
+Couverture et limites :
+
+| Sujet | Couverture |
+| --- | --- |
+| En-têtes radio | radiotap, PPI, AVS et Prism via la pseudo-couche `wlan_radio` de tshark ; sans en-tête radio (linktype 105), seul le bit *retry* est lu, et un avertissement l'annonce |
+| Canaux | un canal par interface de capture. Une station qui change de canal n'est suivie que si une autre interface écoute le nouveau canal, déclarée comme un autre point |
+| MCS | 802.11n et 802.11ac (premier utilisateur) ; 802.11ax lu, mais en MU-MIMO/OFDMA seul le MCS du premier utilisateur est retenu (couverture partielle) |
+| Chiffrement | WPA/WPA2-PSK avec 4-way handshake capturé (`--wifi-keys`) ; WPA3-SAE et 802.1X/EAP non déchiffrés : métriques radio seules |
+| Retransmissions | copies *retry* fusionnées si elles ont la même identité (TA, séquence, fragment) au même point dans un délai d'une seconde (#1145) |
+| Localisation d'une perte | classée d'après la transmission d'origine vue par la sonde : une trame montante jamais captée reste « indéterminée » |
+| Temps d'antenne | ordre de grandeur, sans préambule, intervalles entre trames ni acquittements |
+| Anonymisation | `--redact` pseudonymise la station, le BSSID et l'émetteur radio |
+
 ## Voir aussi
 
 - [README.md](https://github.com/MathildeDec/Netcross/blob/dev/README.md) — vue d'ensemble du projet
