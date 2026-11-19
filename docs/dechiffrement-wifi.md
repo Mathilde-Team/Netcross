@@ -56,6 +56,35 @@ Chaque paquet IP extrait d'une trame 802.11 déchiffrée porte le tag
 d'encapsulation `802.11(déchiffré)`. Les trames 802.11 transportées par
 CAPWAP gardent leur seul tag CAPWAP.
 
+## Appariement air ↔ filaire
+
+Issue #1145. Après décapsulation, un paquet IP vu dans l'air s'apparie
+avec sa copie filaire comme entre deux points filaires. La clé de flux est
+le 5-tuple, plus l'identifiant IP ou le numéro de séquence TCP. Le pont
+802.11 ↔ Ethernet du point d'accès ne modifie pas l'en-tête IP.
+
+Une trame non acquittée est réémise par la station avec le bit `retry`. La
+sonde en mode moniteur voit alors plusieurs fois le même paquet IP, alors
+que le réseau ne l'a transporté qu'une fois, car le point d'accès filtre ces
+doublons. Sans traitement, ces copies seraient comptées comme
+retransmissions TCP, ACK dupliqués ou doublons UDP.
+
+Netcross applique le critère du récepteur 802.11 (IEEE 802.11-2020,
+10.3.2.14). Une trame à bit `retry` est une retransmission radio si, au
+même point et en moins d'une seconde, une trame de même identité a déjà été
+vue. L'identité regroupe l'adresse de l'émetteur radio TA, le numéro de
+séquence et le numéro de fragment.
+
+Une retransmission radio est fusionnée dans le paquet d'origine :
+
+- elle est retirée du flux de paquets, en lot comme en live ;
+- le compteur `Pkt.radio_retries` du paquet d'origine est incrémenté, pour
+  les métriques radio ;
+- un message de niveau INFO donne le nombre de fusions par point.
+
+Une trame à bit `retry` dont l'original n'a pas été capté est conservée,
+car c'est la seule copie vue.
+
 ## Non-fuite de la phrase de passe
 
 La phrase de passe ne passe jamais sur la ligne de commande de tshark, qui
