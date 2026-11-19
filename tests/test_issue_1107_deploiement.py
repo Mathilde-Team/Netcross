@@ -131,7 +131,7 @@ def test_workflow_construit_et_controle_l_image():
     assert "deploy/**" in declencheurs["push"]["paths"]
     etapes = workflow["jobs"]["image"]["steps"]
     construction = next(e for e in etapes if e["name"] == "Construction")
-    assert "deploy/conteneur" in construction["run"]
+    assert "-f deploy/conteneur/Dockerfile" in construction["run"]
     assert "docker build" in construction["run"]
     controle = next(e for e in etapes if e["name"].startswith("Contrôle"))
     assert "tshark" in controle["run"]

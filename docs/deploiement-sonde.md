@@ -92,7 +92,7 @@ réduit à `netcross_probe` + `pcap_parser`. Publiée depuis dev vers
 `Image de sonde`, construite et contrôlée en CI).
 
 ```bash
-docker build -t netcross-probe deploy/conteneur
+docker build -t netcross-probe -f deploy/conteneur/Dockerfile .
 
 # les capacités réseau sont nécessaires à la capture ; --network host
 # pour joindre le collecteur et écouter sur l'interface de la sonde

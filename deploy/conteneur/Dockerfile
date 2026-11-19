@@ -7,8 +7,9 @@
 # (compilation des filtres BPF par ctypes) sont les seuls apports
 # système ; cryptography et loguru les seuls paquets Python.
 #
-# Construction :
-#   docker build -t netcross-probe:latest deploy/conteneur
+# Construction (contexte à la racine du dépôt, comme le Dockerfile
+# racine de l'image d'analyse) :
+#   docker build -f deploy/conteneur/Dockerfile -t netcross-probe:latest .
 #
 # Utilisation (les capacités réseau sont nécessaires à la capture) :
 #   docker run --rm --network host \

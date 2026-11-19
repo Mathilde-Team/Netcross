@@ -53,12 +53,15 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Construction
-        # --pull : repart toujours du dernier python:3.12-slim.
+        # --pull : repart toujours du dernier python:3.12-slim. Le contexte
+        # est la racine du dépôt (le Dockerfile COPY src/…) : seul
+        # deploy/conteneur/Dockerfile est passé par -f.
         run: |
           docker build --pull \
+            -f deploy/conteneur/Dockerfile \
             -t "$IMAGE:$TAG" \
             -t "$IMAGE:$TAG-${GITHUB_SHA::12}" \
-            deploy/conteneur
+            .
 
       - name: Contrôle de la sonde dans l'image
         run: |
