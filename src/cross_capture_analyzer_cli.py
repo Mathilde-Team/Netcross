@@ -158,6 +158,7 @@ from netcross_core.flow_timeline import build_flow_timelines
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates
 from netcross_core.i18n import _
 from netcross_core.logging_config import add_debug_argument, apply_debug_argument, get_logger, summarize
+from netcross_core.probe_capture import collecter_fenetre_sonde, est_source_sonde
 from netcross_core.profiling import creer_mesures, marquer
 from netcross_core.redact import SCOPE_ALL as REDACT_SCOPE_ALL
 from netcross_core.redact import SCOPES as REDACT_SCOPES
@@ -225,7 +226,7 @@ def _parse_live_spec(spec):
     if not label or not iface:
         print(
             f"Format invalide pour --live: {spec} (attendu LABEL:INTERFACE[:FILTRE_BPF], INTERFACE pouvant "
-            "etre une source distante rpcap://, sshdump:// ou pipe://)",
+            "etre une source distante rpcap://, sshdump://, probe:// ou pipe://)",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -898,6 +899,10 @@ def _run_live_captures(live_specs, duration, reporter=None, ring_buffer=None):
     points = [_parse_live_spec(s) for s in live_specs]
     _check_single_stdin(points)
     stop_event = threading.Event()
+    # Issue #1105 : les points probe:// se servent a la fin de session (la
+    # sonde tient son tampon) -- l'horodatage Unix de debut de session borne
+    # la fenetre demandee a chaque sonde.
+    debut_session = time.time()
     # Issue #676 : ring buffer de capture. Un tshark d'enregistrement par
     # point ecrit les trames brutes en rotation native (-b files/duration) ;
     # l'analyse, elle, continue sur le flux de dissection habituel.
@@ -906,6 +911,10 @@ def _run_live_captures(live_specs, duration, reporter=None, ring_buffer=None):
     lock = threading.Lock()
 
     def _worker(label, iface, bpf):
+        if est_source_sonde(iface):
+            _worker_sonde(label, iface, bpf)
+            logger.debug("_run_live_captures._worker: fin (point sonde {})", label)
+            return
         count = 0
         last_log = time.monotonic()
         try:
@@ -930,6 +939,39 @@ def _run_live_captures(live_specs, duration, reporter=None, ring_buffer=None):
                 reporter.aggregator.set_status(label, "arrete")
         print(f"[{label}] capture arretee -- {count} paquet(s) au total.")
         logger.debug("_run_live_captures._worker: fin")
+
+    def _worker_sonde(label, iface, bpf):
+        """Point probe:// (issue #1105) : la sonde tient son tampon
+        circulaire en local, rien ne circule pendant la session -- la
+        fenetre [debut de session, arret] est tiree une fois la session
+        terminee (duree atteinte ou Ctrl+C), puis lue par le meme
+        pipeline qu'un fichier de capture."""
+        logger.debug("_run_live_captures._worker_sonde: entrée ({})", label)
+        print(
+            f"[{label}] sonde {iface} : tampon local, fenêtre tirée à l'arrêt"
+            + (f" (filtre BPF : {bpf})" if bpf else "")
+            + "..."
+        )
+        if reporter is not None:
+            reporter.aggregator.set_status(label, "attente")
+        stop_event.wait()
+        try:
+            pkts = collecter_fenetre_sonde(label, iface, debut=debut_session, fin=time.time(), bpf=bpf)
+        except Exception as e:  # noqa: BLE001 -- thread de fond : une erreur sur
+            # ce point doit etre rapportee sans arreter les autres points.
+            logger.exception(f"échec dans _worker_sonde: {e}")
+            print(f"[{label}] ERREUR : sonde injoignable ou refus -- {e}", file=sys.stderr)
+            if reporter is not None:
+                reporter.aggregator.set_status(label, "erreur", str(e))
+        else:
+            with lock:
+                packets_by_point[label].extend(pkts)
+            if reporter is not None:
+                for pkt in pkts:
+                    reporter.add(pkt)
+                reporter.aggregator.set_status(label, "arrete")
+            print(f"[{label}] fenêtre de sonde lue -- {len(pkts)} paquet(s) au total.")
+        logger.debug("_run_live_captures._worker_sonde: fin")
 
     def _on_sigint(_signum, _frame):
         print(

@@ -6,13 +6,17 @@ pyproject.toml) : les surfaces historiques se lancent par leur module.
 La sonde suit le même modèle -- ``PYTHONPATH=src python3 -m netcross_probe``
 -- plutôt qu'un point d'entrée console-script qui exigerait un build.
 
-Deux sous-commandes :
+Trois sous-commandes :
 
 - ``capture`` : démarre la capture locale en tampon circulaire (Ctrl-C
   pour arrêter proprement) ;
 - ``fenetre`` : extrait une fenêtre [t1, t2] du tampon existant, avec
   filtre BPF optionnel, et imprime la description JSON de la fenêtre
-  (miroir de ``Window`` du contrat v1, sans la couche réseau #1105).
+  (miroir de ``Window`` du contrat v1) ;
+- ``servir`` (issue #1105) : sert les routes du contrat v1 sur TLS
+  mutuel (santé, métadonnées, fenêtres) -- c'est la sonde complète, que
+  le collecteur inventorie et interroge (``GET /probes`` côté API), et
+  que ``--live probe://`` utilise comme point de capture.
 """
 
 from __future__ import annotations
@@ -23,12 +27,14 @@ import signal
 import sys
 import time
 from collections.abc import Sequence
+from pathlib import Path
 
 from loguru import logger
 
 from netcross_probe.agent import AgentProbe
 from netcross_probe.bpf import FiltreBpfInvalideError
 from netcross_probe.capture import ReglagesCapture
+from netcross_probe.enrolement import FICHIER_CA, FICHIER_CERTIFICAT, FICHIER_CLE, FICHIER_PROBE_ID
 from netcross_probe.fenetres import FenetreInvalideError, FenetreTropGrandeError, FenetreVideError
 
 __all__ = ["construire_parseur", "main"]
@@ -66,6 +72,29 @@ def construire_parseur() -> argparse.ArgumentParser:
         "--max-octets", type=int, default=None, help="taille maximale du pcapng produit (refus au-delà)"
     )
     fenetre.add_argument("--sortie", required=True, help="répertoire où écrire le pcapng de la fenêtre")
+    servir = sous_commandes.add_parser(
+        "servir", help="servir les routes mTLS du contrat v1 : santé, métadonnées, fenêtres (#1105)"
+    )
+    servir.add_argument("--interface", required=True, help="interface à capturer (ex. eth0)")
+    servir.add_argument("--dossier", required=True, help="répertoire du tampon circulaire")
+    servir.add_argument("--nb-fichiers", type=int, default=5, help="profondeur du tampon (nombre de fichiers)")
+    servir.add_argument("--duree-par-fichier", type=float, default=60.0, help="durée (s) par fichier du tampon")
+    servir.add_argument("--prefixe", default="probe", help="préfixe des fichiers du tampon")
+    servir.add_argument("--filtre-bpf", default=None, help="filtre de capture pcap-filter (optionnel)")
+    servir.add_argument("--identite", required=True, help="dossier de l'identité (certificat, clé, autorité)")
+    servir.add_argument("--nom", required=True, help="nom de la sonde (celui de l'inscription)")
+    servir.add_argument("--ecoute", default="0.0.0.0:9443", help="hôte:port d'écoute mTLS (port 9443 du contrat)")
+    servir.add_argument(
+        "--enrolement",
+        default=None,
+        help="URL d'inscription (…/probe/v1/enrollments) si l'identité n'existe pas encore",
+    )
+    servir.add_argument("--jeton", default=None, help="jeton d'enrôlement à usage unique (avec --enrolement)")
+    servir.add_argument(
+        "--listen-url",
+        default=None,
+        help="URL https:// annoncée au collecteur (défaut : dérivée de --ecoute si l'hôte n'est pas 0.0.0.0)",
+    )
     logger.debug("construire_parseur: retour parseur")
     return parseur
 
@@ -199,12 +228,94 @@ def extraire_fenetre_depuis_args(args: argparse.Namespace):
     return resultat
 
 
+def _commande_servir(args: argparse.Namespace, patienter=None) -> int:
+    """Sous-commande servir : la sonde complète (issue #1105).
+
+    Inscrit la sonde si l'identité n'existe pas encore (avec
+    ``--enrolement`` et son jeton à usage unique), lit l'identité, démarre
+    la capture en tampon circulaire puis le service mTLS du contrat v1,
+    et sert jusqu'à SIGINT/SIGTERM (``patienter`` : injecté pour les
+    tests, comme pour ``capture``).
+    """
+    logger.debug("_commande_servir: entrée")
+    from netcross_probe.enrolement import EnrolementError, demander_enrolement
+    from netcross_probe.serveur import ServeurSonde
+
+    dossier = Path(args.identite)
+    certificat_chemin = dossier / FICHIER_CERTIFICAT
+    if args.enrolement and not certificat_chemin.is_file():
+        if not args.jeton:
+            print("--enrolement exige --jeton (jeton à usage unique du collecteur)", file=sys.stderr, flush=True)
+            logger.debug("_commande_servir: retour 5 (jeton manquant)")
+            return 5
+        hote_ecoute = args.ecoute.rpartition(":")[0]
+        listen_url = args.listen_url or (f"https://{hote_ecoute}" if hote_ecoute and hote_ecoute != "0.0.0.0" else None)
+        try:
+            enrolement = demander_enrolement(args.enrolement, args.jeton, args.nom, dossier, listen_base_url=listen_url)
+        except EnrolementError as erreur:
+            print(f"enrôlement refusé : {erreur}", file=sys.stderr, flush=True)
+            logger.debug("_commande_servir: retour 5 (enrôlement refusé)")
+            return 5
+        print(f"sonde inscrite : {enrolement.probe_id}", flush=True)
+    try:
+        certificat = certificat_chemin.read_text(encoding="utf-8")
+        cle = (dossier / FICHIER_CLE).read_text(encoding="utf-8")
+        ca = (dossier / FICHIER_CA).read_text(encoding="utf-8")
+        probe_id = (dossier / FICHIER_PROBE_ID).read_text(encoding="utf-8").strip()
+    except OSError as erreur:
+        print(
+            f"identité illisible dans {dossier} : {erreur} (l'enrôlement --enrolement/--jeton l'écrit)",
+            file=sys.stderr,
+            flush=True,
+        )
+        logger.debug("_commande_servir: retour 5 (identité illisible)")
+        return 5
+    hote, _, port = args.ecoute.rpartition(":")
+    try:
+        numero_port = int(port)
+    except ValueError:
+        print(f"port d'écoute illisible : {port!r}", file=sys.stderr, flush=True)
+        logger.debug("_commande_servir: retour 5 (port illisible)")
+        return 5
+    agent = AgentProbe(
+        ReglagesCapture(
+            interface=args.interface,
+            dossier=args.dossier,
+            nb_fichiers=args.nb_fichiers,
+            duree_par_fichier=args.duree_par_fichier,
+            prefixe=args.prefixe,
+            filtre_bpf=args.filtre_bpf,
+        ),
+        dossier_fenetres=str(dossier),
+    )
+    serveur = ServeurSonde(agent, (certificat, cle, ca), probe_id, args.nom, demarrer_capture=True)
+    try:
+        url = serveur.demarrer(hote or "0.0.0.0", numero_port)
+    except OSError as erreur:
+        print(f"écoute impossible sur {args.ecoute} : {erreur}", file=sys.stderr, flush=True)
+        logger.debug("_commande_servir: retour 6 (écoute impossible)")
+        return 6
+    print(
+        f"sonde {args.nom} en service sur {url} "
+        f"(capture : {args.interface}, tampon : {args.dossier}, Ctrl-C pour arrêter)",
+        flush=True,
+    )
+    ok = _boucle_attente(agent, patienter)
+    serveur.arreter()
+    agent.capture.arreter()
+    print("sonde arrêtée, tampon conservé", flush=True)
+    logger.debug("_commande_servir: retour {}", 0 if ok else 1)
+    return 0 if ok else 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entrée de la sonde ; renvoie un code de sortie (0 nominal)."""
     logger.debug("main: entrée")
     args = construire_parseur().parse_args(argv)
-    if args.commande == "capture":  # noqa: SIM108 -- deux sous-commandes distinctes, pas une alternative
+    if args.commande == "capture":  # noqa: SIM108 -- sous-commandes distinctes, pas une alternative
         code = _commande_capture(args)
+    elif args.commande == "servir":
+        code = _commande_servir(args)
     else:
         code = _commande_fenetre(args)
     logger.debug("main: retour {}", code)

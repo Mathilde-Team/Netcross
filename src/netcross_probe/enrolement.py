@@ -29,6 +29,7 @@ VERSIONS_API = ["1.0"]
 FICHIER_CERTIFICAT = "sonde-certificat.pem"
 FICHIER_CLE = "sonde-cle-privee.pem"
 FICHIER_CA = "collecteur-ca.pem"
+FICHIER_PROBE_ID = "sonde-identifiant"  # issue #1105 : le service (servir) relit l'identité
 
 
 class EnrolementError(Exception):
@@ -63,26 +64,32 @@ def demander_enrolement(
     dossier: str | Path,
     version_agent: str = VERSION_AGENT,
     versions_api: list[str] | None = None,
+    listen_base_url: str | None = None,
 ) -> Enrolement:
     """Inscrit la sonde auprès du collecteur et stocke ses secrets.
 
     La clé privée est générée ici, sur la sonde ; seule la CSR part sur le
     réseau. Le jeton n'apparaît jamais dans les messages d'erreur. En cas
     de refus, :class:`EnrolementError` porte le code stable du contrat.
+
+    ``listen_base_url`` (issue #1105, contrat 1.1) : l'URL (``https://``)
+    où cette sonde sert ses routes mTLS -- le collecteur s'en sert pour
+    l'inventaire et le suivi de santé (``GET /probes/{id}/health``).
     """
     logger.debug("demander_enrolement: entrée (collecteur {})", url_collecteur)
     dossier = Path(dossier)
     cle_pem = generer_cle_privee()
     csr_pem = generer_csr_sonde(nom_sonde, cle_pem)
-    demande = json.dumps(
-        {
-            "probe_name": nom_sonde,
-            "csr_pem": csr_pem,
-            "agent_version": version_agent,
-            "api_versions": versions_api or VERSIONS_API,
-            "capabilities": ["bpf", "pcapng_isb", "clock_status"],
-        }
-    ).encode()
+    demande_json: dict[str, object] = {
+        "probe_name": nom_sonde,
+        "csr_pem": csr_pem,
+        "agent_version": version_agent,
+        "api_versions": versions_api or VERSIONS_API,
+        "capabilities": ["bpf", "pcapng_isb", "clock_status"],
+    }
+    if listen_base_url is not None:
+        demande_json["listen_base_url"] = listen_base_url
+    demande = json.dumps(demande_json).encode()
     requete = urllib.request.Request(
         url_collecteur,
         data=demande,
@@ -112,6 +119,7 @@ def demander_enrolement(
     (dossier / FICHIER_CERTIFICAT).write_text(corps["client_certificate_pem"], encoding="utf-8")
     (dossier / FICHIER_CLE).write_text(cle_pem, encoding="utf-8")
     (dossier / FICHIER_CA).write_text(corps["ca_chain_pem"], encoding="utf-8")
+    (dossier / FICHIER_PROBE_ID).write_text(corps["probe_id"], encoding="utf-8")
     enrolement = Enrolement(
         probe_id=corps["probe_id"],
         certificat_pem=corps["client_certificate_pem"],

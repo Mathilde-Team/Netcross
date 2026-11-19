@@ -357,3 +357,64 @@ def test_gui_invalid_sources():
     errors = invalid_sources([("A", "-", None), ("B", "pipe://-", "tcp")])
     assert errors == ["une seule source peut lire l'entree standard (pipe://-) : A, B"]
     assert invalid_sources([("A", "eth0", None)]) == []
+
+
+# ---------------------------------------------------------------------------
+# probe:// (issue #1105)
+# ---------------------------------------------------------------------------
+
+
+def test_probe_url_port_par_defaut_et_nom_de_sonde():
+    src = parse_source("probe://sonde.lan", env={})
+    assert (src.kind, src.interface, src.extra_args, src.is_remote) == (
+        "probe",
+        "probe://sonde.lan:9443",
+        (),
+        True,
+    )
+    assert parse_source("probe://sonde.lan:8443/ROUTEUR", env={}).interface == "probe://sonde.lan:8443/ROUTEUR"
+    assert source_display("probe://sonde.lan:8443/ROUTEUR") == "probe://sonde.lan:8443/ROUTEUR"
+
+
+def test_probe_url_utilisateur_refuse():
+    """Aucun secret dans l'URL : l'authentification est le TLS mutuel."""
+    with pytest.raises(CaptureSourceError, match="utilisateur"):
+        parse_source("probe://root@sonde.lan", env={})
+    with pytest.raises(CaptureSourceError, match="mot de passe"):
+        parse_source("probe://root:pw@sonde.lan", env={})
+
+
+def test_probe_url_nom_de_sonde_invalide():
+    with pytest.raises(CaptureSourceError, match="nom de sonde"):
+        parse_source("probe://sonde.lan/nom;invalide", env={})
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("probe://sonde.lan", ("probe://sonde.lan", None)),
+        ("probe://sonde.lan:8443/ROUTEUR", ("probe://sonde.lan:8443/ROUTEUR", None)),
+        ("probe://sonde.lan/ROUTEUR:tcp port 443", ("probe://sonde.lan/ROUTEUR", "tcp port 443")),
+        ("probe://sonde.lan:8443/ROUTEUR:host 10.0.0.1", ("probe://sonde.lan:8443/ROUTEUR", "host 10.0.0.1")),
+    ],
+)
+def test_split_live_target_probe(text, expected):
+    """Le filtre BPF d'un point probe:// exige le nom de sonde dans le
+    chemin (même règle que rpcap:// : premier ':' après le chemin)."""
+    assert split_live_target(text) == expected
+
+
+def test_probe_sans_nom_de_sonde_naccepte_pas_de_filtre():
+    """Sans nom de sonde, un filtre accolé reste dans l'URL (aucun
+    chemin ne délimite le filtre) : la source est ensuite refusée par
+    l'analyse du port -- même comportement que rpcap://."""
+    assert split_live_target("probe://sonde.lan:tcp port 443") == ("probe://sonde.lan:tcp port 443", None)
+    with pytest.raises(CaptureSourceError):
+        parse_source(split_live_target("probe://sonde.lan:tcp port 443")[0], env={})
+
+
+def test_ring_recorder_args_refuse_probe(tmp_path):
+    """Une source probe:// n'a pas d'arguments tshark : la sonde tamponne
+    déjà, l'enregistreur local n'a rien à faire (refus explicite)."""
+    with pytest.raises(CaptureSourceError, match="probe"):
+        capture_mod.ring_recorder_args("probe://sonde.lan/ROUTEUR", str(tmp_path), max_files=2, max_duration_per_file=5)

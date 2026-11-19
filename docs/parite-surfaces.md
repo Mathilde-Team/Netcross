@@ -16,7 +16,7 @@ ici fait donc échouer la CI.
 |---|---|---|
 | CLI | `cross_capture_analyzer_cli.py` (147 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 4 pages, 44 cases à cocher, 35 réglages numériques | Analyse interactive et exploration visuelle ; onglet « Incidents » : réglages du gel rétroactif et archives (issue #1095) |
-| API | 71 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) ; enrôlement des sondes `POST /probe/v1/enrollments` (mTLS, #1101) |
+| API | 73 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) ; enrôlement des sondes `POST /probe/v1/enrollments` (mTLS, #1101) ; inventaire `GET /probes` et santé `GET /probes/{probe_id}/health` des sondes (#1105) |
 
 
 Légende : **oui** = disponible ; **non** = absent ; **auto** = toujours
@@ -321,6 +321,9 @@ l'option CLI de même nom) : `nat_tolerant`, `nat_window_ms`, `tls`,
 | `GET /comparisons/{comparison_id}/redact-map` | Table d'anonymisation commune baseline/courant (issue #876) |
 | `POST /tools/replay` | Rejeu sur une interface autorisée (issue #871) |
 | `GET /analyses/{analysis_id}/dashboard` | Agrégats croisés du dashboard, filtres `segment`, `host`, `protocol` (issue #911) |
+| `POST /probe/v1/enrollments` | Inscription d'une sonde : jeton à usage unique + CSR, certificat signé (issue #1101) |
+| `GET /probes` | Inventaire des sondes inscrites : adresse annoncée, révocation, expiration, dernière santé (issue #1105) |
+| `GET /probes/{probe_id}/health` | Santé actuelle d'une sonde, lue en direct en mTLS par le collecteur ; refus explicites 404/401/409/502 (issue #1105) |
 | `GET /analyses/{analysis_id}/stats` | Exploration statistique, JSON ou CSV (issue #912) |
 | `GET /analyses/{analysis_id}/comm-map` | Cartographie des communications, JSON ou DOT (issue #909) |
 | `POST /live-captures` | Capture en direct sur des interfaces autorisées puis analyse (issue #902) |

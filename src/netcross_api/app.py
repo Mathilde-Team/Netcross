@@ -3544,7 +3544,9 @@ _bpf_routes.register(app, _verify_api_key)
 # par le jeton d'enrôlement à usage unique.
 from netcross_api import probe_routes as _probe_routes  # noqa: E402
 
-_probe_routes.register(app)
+# Issue #1105 : l'inventaire et la santé des sondes sont réservés à la clé
+# API ; l'enrôlement reste au jeton à usage unique (contrat v1).
+_probe_routes.register(app, _verify_api_key)
 
 # Issue #1095 : gel rétroactif et incidents archivés (réglages partagés avec
 # la GUI, fichier fixé par NETCROSS_API_GEL_CONFIG)
