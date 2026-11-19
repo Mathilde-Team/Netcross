@@ -45,7 +45,7 @@ from pcap_parser.protocols import (
     extract_tls_certificate,
     extract_tls_handshake,
 )
-from pcap_parser.radio import RadioInfo, extract_mpdu_id, extract_radio
+from pcap_parser.radio import RadioInfo, extract_mpdu_id, extract_radio, extract_station
 from pcap_parser.tunnels import detect_encapsulation, select_innermost_layers
 
 # pcap_parser reste independant de netcross_core (contrat import-linter) :
@@ -320,6 +320,9 @@ class RawPacket:
     # Identite 802.11 de la trame (emetteur TA, sequence, fragment -- issue
     # #1145) : detection des retransmissions radio. None hors 802.11.
     wlan_mpdu: tuple[str, int, int] | None = None
+    # Station cliente 802.11 (MAC, BSSID, emise par la station -- issue
+    # #1146) : metriques radio par client. None hors 802.11 ou en WDS.
+    wlan_station: tuple[str, str, bool] | None = None
     # RTCP disséqué par tshark : empreinte de la charge utile, jamais le contenu.
     rtcp_hash: str | None = None
     # Commentaire de paquet pcapng (Enhanced Packet Block, option
@@ -912,6 +915,7 @@ def build_packet(ts_seconds: float, layers: dict) -> RawPacket | None:
         sip_contact=sip_contact,
         radio=extract_radio(layers),
         wlan_mpdu=extract_mpdu_id(layers),
+        wlan_station=extract_station(layers),
         ip_checksum=ip_checksum,
         ip_checksum_bad=ip_checksum_bad,
         tcp_checksum=tcp_checksum,

@@ -40,6 +40,7 @@ from netcross_core.models import Pkt, Report
 from netcross_core.parsing import compute_mos
 from netcross_core.security.exfiltration import detect_exfiltration
 from netcross_core.security.expert_correlation import apply_expert_correlation
+from netcross_core.wifi import metriques_clients
 
 logger = get_logger(__name__)
 
@@ -158,6 +159,8 @@ def analyse(
         r.throughput = compute_throughput(all_packets, bucket_seconds)
     with _phase("detect_microbursts"):
         r.microbursts = detect_microbursts(all_packets, r.link_speeds)
+    with _phase("wifi_clients"):
+        r.wifi_clients = metriques_clients(all_packets)
     r.topn_timeseries = {dim: compute_topn_series(all_packets, bucket_seconds, dim, topn) for dim in TOPN_DIMENSIONS}
     r.topology_edges = topo_edges
     r.topology_ambiguous = topo_ambiguous

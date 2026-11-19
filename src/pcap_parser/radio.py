@@ -109,6 +109,36 @@ def extract_mpdu_id(layers: dict) -> tuple[str, int, int] | None:
     return mpdu
 
 
+def extract_station(layers: dict) -> tuple[str, str, bool] | None:
+    """Station cliente d'une trame 802.11 : (adresse MAC de la station,
+    BSSID, True si la trame est emise par la station), lue dans les bits
+    ToDS/FromDS (issue #1146). ToDS seul : station -> point d'acces
+    (station = TA/SA) ; FromDS seul : point d'acces -> station (station =
+    RA/DA). None hors 802.11, en WDS (ToDS et FromDS, pas de station) ou
+    sans BSSID."""
+    logger.debug("extract_station: debut")
+    wlan = layers.get("wlan")
+    if isinstance(wlan, list):
+        wlan = wlan[-1]
+    if wlan is None:
+        logger.debug("extract_station: pas de couche wlan -> retour None")
+        return None
+    ds = hex_or_dec_to_int(g(wlan, "wlan_wlan_fc_ds"))
+    bssid = g(wlan, "wlan_wlan_bssid")
+    if ds == 1:
+        station, emise = g(wlan, "wlan_wlan_ta") or g(wlan, "wlan_wlan_sa"), True
+    elif ds == 2:
+        station, emise = g(wlan, "wlan_wlan_ra") or g(wlan, "wlan_wlan_da"), False
+    else:
+        logger.debug("extract_station: ds={} sans station -> retour None", ds)
+        return None
+    if not isinstance(station, str) or not isinstance(bssid, str):
+        logger.debug("extract_station: station ou BSSID absent -> retour None")
+        return None
+    logger.debug("extract_station: retour (emise={})", emise)
+    return (station, bssid, emise)
+
+
 def missing_radiotap_note(path: str) -> str | None:
     """Message explicite si `path` est une capture 802.11 sans en-tete
     radio (linktype 105 sur toutes ses interfaces 802.11), None sinon (ou
