@@ -7,6 +7,8 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-11-19
+
 ### Ajouté
 - mTLS, enrôlement et révocation des sondes (#1101, sous-issue 3/6 du
   chantier sondes distribuées #1002, dépend de #1099) : aucune écoute ni

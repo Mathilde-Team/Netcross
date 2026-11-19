@@ -1,5 +1,7 @@
 Name:           netcross
-Version:        1.1.0
+# Valeur de repli uniquement : build-rpm/build.sh remplace ce champ par la
+# version lue dans pyproject.toml (source unique, issues #939/#986).
+Version:        1.2.0
 Release:        1%{?dist}
 Summary:        Analyse croisee de captures Wireshark multi-points
 License:        GPL-3.0-or-later
@@ -96,6 +98,10 @@ install -m 755 netcross-lua-doc-wrapper %{buildroot}%{_bindir}/netcross-lua-doc
 %{_datadir}/locale/*/LC_MESSAGES/netcross.mo
 
 %changelog
+* Thu Nov 19 2026 Mathilde Deuscher <149895843+MathildeDec@users.noreply.github.com> - 1.2.0-1
+- mTLS, enrôlement par jeton à usage unique et révocation des sondes ;
+  pertes de capture et état d'horloge déclarés par sonde ; réécriture
+  pcapng anonymisée (--redact-pcap).
 * Sun Oct 18 2026 Mathilde Deuscher <149895843+MathildeDec@users.noreply.github.com> - 1.1.0-1
 - Captures en direct par l'API, bibliothèque de filtres BPF, catalogue
   des dissecteurs Lua, parité GUI/CLI/API complète, exploration et
