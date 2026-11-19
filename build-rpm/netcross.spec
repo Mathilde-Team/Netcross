@@ -60,6 +60,7 @@ cp -r netcross_report %{buildroot}%{_datadir}/netcross/
 cp -r netcross_gtk4 %{buildroot}%{_datadir}/netcross/
 cp -r netcross_api %{buildroot}%{_datadir}/netcross/
 cp -r netcross_ai %{buildroot}%{_datadir}/netcross/
+cp -r netcross_probe %{buildroot}%{_datadir}/netcross/
 cp cross_capture_analyzer_cli.py %{buildroot}%{_datadir}/netcross/
 cp cross_capture_diff_cli.py %{buildroot}%{_datadir}/netcross/
 cp cross_history_cli.py %{buildroot}%{_datadir}/netcross/
@@ -82,6 +83,7 @@ install -m 755 netcross-history-wrapper %{buildroot}%{_bindir}/netcross-history
 install -m 755 netcross-batch-wrapper %{buildroot}%{_bindir}/netcross-batch
 install -m 755 netcross-ai-models-wrapper %{buildroot}%{_bindir}/netcross-ai-models
 install -m 755 netcross-lua-doc-wrapper %{buildroot}%{_bindir}/netcross-lua-doc
+install -m 755 netcross-probe-wrapper %{buildroot}%{_bindir}/netcross-probe
 
 %files
 %license %{_licensedir}/%{name}/LICENSE
@@ -93,6 +95,7 @@ install -m 755 netcross-lua-doc-wrapper %{buildroot}%{_bindir}/netcross-lua-doc
 %{_bindir}/netcross-batch
 %{_bindir}/netcross-ai-models
 %{_bindir}/netcross-lua-doc
+%{_bindir}/netcross-probe
 %{_datadir}/locale/*/LC_MESSAGES/netcross.mo
 
 %changelog
