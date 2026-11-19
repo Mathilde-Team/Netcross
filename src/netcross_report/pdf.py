@@ -794,6 +794,30 @@ def expert_section_story(session_objects, styles, top_n=EXPERT_TABLE_TOP_N):
     return story
 
 
+def _wifi_table(wifi_clients, styles):
+    """Fiches radio par station 802.11 (issue #1146) : une ligne par
+    (point, station), constats en derniere colonne."""
+    logger.debug("_wifi_table: {} point(s)", len(wifi_clients))
+    data: list[list] = [["Point", "Station", "RSSI", "Débit PHY", "Retrans. radio", "Itinér.", "Antenne", "Constats"]]
+    data.extend(
+        [
+            Paragraph(_xml_escape(point), styles["Cell"]),
+            Paragraph(_xml_escape(fiche["station"]), styles["Cell"]),
+            Paragraph(_fmt_num(fiche["rssi_median_dbm"], " dBm", 0), styles["Cell"]),
+            Paragraph(_fmt_num(fiche["debit_phy_median_mbps"], " Mbit/s"), styles["Cell"]),
+            Paragraph(f"{fiche['taux_retransmission_radio']:.1%}", styles["Cell"]),
+            Paragraph(str(len(fiche["itinerances"])), styles["Cell"]),
+            Paragraph(f"{fiche['temps_antenne_s'] * 1000:.2f} ms", styles["Cell"]),
+            Paragraph(_xml_escape(", ".join(fiche["constats"])) or "\u2014", styles["Cell"]),
+        ]
+        for point, fiches in wifi_clients.items()
+        for fiche in fiches
+    )
+    table = _grid_table(data, [1.4 * cm, 2.8 * cm, 1.5 * cm, 1.9 * cm, 2.3 * cm, 1.3 * cm, 1.6 * cm, 4.2 * cm])
+    logger.debug("_wifi_table: retour {} ligne(s)", len(data) - 1)
+    return table
+
+
 def _kv_table(rows, styles, col_widths=None):
     data = [[Paragraph(str(a), styles["Normal"]), Paragraph(str(b), styles["Normal"])] for a, b in rows]
     t = Table(data, colWidths=col_widths or [5 * cm, 10 * cm])
@@ -1397,6 +1421,19 @@ def generate_pdf(
             story.append(Spacer(1, 0.3 * cm))
             story.append(Paragraph("Déchiffrement TLS / QUIC", styles["H2b"]))
             story.extend(Paragraph(ligne, styles["Normal"]) for ligne in couverture)
+
+        if r.wifi_clients:
+            # Issue #1146/#1148 : metriques radio par station 802.11.
+            story.append(Spacer(1, 0.3 * cm))
+            story.append(Paragraph("Wi-Fi : métriques radio par client", styles["H2b"]))
+            story.append(
+                Paragraph(
+                    "RSSI et débit PHY médians (RSSI des seules trames émises par la station) ; "
+                    "temps d'antenne approximatif (sans préambule, intervalles entre trames ni acquittements).",
+                    styles["Small"],
+                )
+            )
+            story.append(_wifi_table(r.wifi_clients, styles))
 
         if tls_findings or quic_findings:
             story.append(Spacer(1, 0.3 * cm))
