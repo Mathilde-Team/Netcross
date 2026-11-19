@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-257 modules · 368 classes · 901 fonctions publiques de module.
+258 modules · 370 classes · 905 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -36,7 +36,7 @@ flowchart TD
     CLI -->|"29 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
     CLI -->|"65 imports"| netcross_core
-    CLI -->|"8 imports"| pcap_parser
+    CLI -->|"9 imports"| pcap_parser
     netcross_gtk4 -->|"36 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
     netcross_gtk4 -->|"122 imports"| netcross_core
@@ -168,6 +168,7 @@ flowchart LR
 | `pcap_parser.radio` | metadonnees radio 802.11 par paquet (issue #1142). |
 | `pcap_parser.remote` | sources de capture distantes (issue #166). |
 | `pcap_parser.tunnels` | couche 3 : detection de la pile d'encapsulation (VLAN/MPLS/GRE/VXLAN/GTP-U/ERSPAN/CAPWAP) et selection de la couche IP/TCP/UDP/ICMP la plus interne a utiliser pour l'analyse. |
+| `pcap_parser.wifi_keys` | dechiffrement WPA/WPA2-PSK par tshark (issue #1143). |
 
 ### Diagramme
 
@@ -529,6 +530,25 @@ classDiagram
         +is_tunnel(layers) bool
         +detect_encapsulation(layers) tuple~str, ...~
         +select_innermost_layers(layers) dict
+    }
+
+    %% ===== pcap_parser.wifi_keys =====
+    class WifiKeysError {
+        <<ValueError>>
+    }
+    class WifiKey {
+        <<dataclass, frozen>>
+        +str kind
+        +str secret
+        +str? ssid
+        +uat_line() str
+    }
+    class mod_pcap_parser_wifi_keys["pcap_parser.wifi_keys"] {
+        <<module>>
+        +parse_wifi_keys(texte) tuple~WifiKey, ...~
+        +load_wifi_keys(chemin) tuple~WifiKey, ...~
+        +wifi_keys_from_env(environ) tuple~WifiKey, ...~
+        +wlan_decryption(cles) Iterator~tuple~dict~str, str~, tuple~str, ...~~~
     }
 
     %% ===== relations =====
