@@ -428,7 +428,8 @@ def _run_ek(
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,  # bufsize=1 : line-buffered, necessaire pour le live
-            **({"env": {**os.environ, **env_wifi}} if env_wifi else {}),
+            # env=None (defaut de Popen) sans cle Wi-Fi : environnement herite, inchange
+            env={**os.environ, **env_wifi} if env_wifi else None,
         )
     finally:
         # le processus fils a herite du descripteur : le parent peut fermer le sien

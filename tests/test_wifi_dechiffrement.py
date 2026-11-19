@@ -193,7 +193,7 @@ def test_sans_cle_appel_inchange_et_avertissement(faux_tshark, journal):
     ]
     assert len(list(iter_ek_records(path=str(faux_tshark)))) == 5
     args, kwargs = _FauxPopen.appels[0]
-    assert "env" not in kwargs
+    assert kwargs.get("env") is None
     assert not any("wlan.enable_decryption" in a for a in args)
     assert "2 trame(s) de données 802.11 chiffrée(s) non déchiffrée(s) : aucune clé Wi-Fi fournie" in journal.getvalue()
 
