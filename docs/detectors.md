@@ -85,6 +85,7 @@ celui que produit `tableau_markdown()`.
 | `infer_topology` | phase | seconde_passe | écarts de TTL et ensembles de flux vus par paire de points | capture entière | `topology_edges` | recouvrement de Jaccard entre ensembles complets ; sans objet avec --order |
 | `compute_throughput` | phase | incremental | octets par (point, tranche) | aucune | `throughput` |  |
 | `detect_microbursts` | phase | seconde_passe | médianes des tranches non vides et fenêtres glissantes par point | 100 µs, 1 ms, 10 ms ; référence sur la capture entière | `microbursts` | tri et référence globale actuellement nécessaires ; ne prétend pas être un détecteur en flux |
+| `wifi_clients` | phase | seconde_passe | trames 802.11 par point et par station, premières transmissions des segments TCP | capture entière | `wifi_clients` | médianes et itinérances calculées sur toutes les trames de la station |
 | `detect_extracted_files` | phase | fenetre_bornee | charges utiles en cours de réassemblage par flux | durée du transfert de l'objet | `extracted_files` |  |
 | `application_transactions` | phase | fenetre_bornee | requêtes HTTP/DNS en attente de réponse | seuil de réponse du protocole ; « réponse manquante » décidée à l'expiration | `application_transactions` |  |
 | `clock_sync` | phase | seconde_passe | échanges SYN / SYN-ACK et copies d'un même paquet entre paires de points | capture entière | `clock_offset_estimate`, `clock_offset_samples` | estimateur robuste (Theil-Sen, #996) calculé avant la boucle des flux : la latence par segment est corrigée au temps de chaque paquet |
@@ -146,7 +147,7 @@ celui que produit `tableau_markdown()`.
 | `quic_diagnostics` | diagnostic | seconde_passe | paquets QUIC Initial de chaque point | capture entière |  | --quic : relit les fichiers avec tshark |
 | `greffons` | greffon | seconde_passe | DetectorContext : tous les paquets et le rapport, en lecture seule | capture entière |  | contrat de netcross_core.plugins.api ; un mode en flux devra proposer un contrat incrémental |
 
-Total : 63 détecteurs -- incremental : 28, fenetre_bornee : 27, seconde_passe : 8.
+Total : 64 détecteurs -- incremental : 28, fenetre_bornee : 27, seconde_passe : 9.
 
 <!-- inventaire-detecteurs:fin -->
 

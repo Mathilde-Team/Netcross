@@ -144,6 +144,7 @@ def _to_pkt(label: str, raw: RawPacket) -> Pkt:
         sip_contact=raw.sip_contact,
         radio=raw.radio,
         wlan_mpdu=raw.wlan_mpdu,
+        wlan_station=raw.wlan_station,
         comment=raw.comment,
         ip_checksum=raw.ip_checksum,
         ip_checksum_bad=raw.ip_checksum_bad,

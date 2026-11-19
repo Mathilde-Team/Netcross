@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-259 modules · 371 classes · 907 fonctions publiques de module.
+260 modules · 371 classes · 910 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -452,6 +452,7 @@ classDiagram
         +str? sip_contact
         +RadioInfo? radio
         +tuple~str, int, int~? wlan_mpdu
+        +tuple~str, str, bool~? wlan_station
         +str? rtcp_hash
         +str? comment
         +str? ip_checksum
@@ -502,6 +503,7 @@ classDiagram
         <<module>>
         +extract_radio(layers) RadioInfo?
         +extract_mpdu_id(layers) tuple~str, int, int~?
+        +extract_station(layers) tuple~str, str, bool~?
         +missing_radiotap_note(path) str?
     }
 
@@ -804,6 +806,7 @@ classDiagram
 | `netcross_core.tls_diagnostics` | extrait l'etat des handshakes TLS (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de capture et localise le segment ou un handshake qui reussissait en amont se met a echouer. |
 | `netcross_core.tls_keylog` | Fichiers de clés TLS (SSLKEYLOGFILE) par point de capture (issue #1040, chantier #997). |
 | `netcross_core.voip` | Analyse VoIP orientee appel, association SIP/RTP par SDP. |
+| `netcross_core.wifi` | Métriques et constats radio par client 802.11 (issue #1146). |
 | `netcross_core.wireshark_expert` | Session 1 de FEATURES.md section 13.3 ("exploitation de l'expertise Wireshark/TShark") : convertit les signaux d'expertise BRUTS deja produits par le moteur de dissection de tshark (champs… |
 
 ### Diagramme (1/2)
@@ -1993,6 +1996,7 @@ classDiagram
         +RadioInfo? radio
         +tuple~str, int, int~? wlan_mpdu
         +int radio_retries
+        +tuple~str, str, bool~? wlan_station
         +str? rtcp_hash
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -2190,6 +2194,7 @@ classDiagram
         +dict~str, dict~ link_speeds
         +dict~str, dict~ microbursts
         +list~dict~ microburst_correlations
+        +dict~str, list~dict~~ wifi_clients
         +dict~str, dict~str, dict~str, int~~~ dechiffrement
         +list~str~ points_keylog
         +list~ChecksumError~ checksum_errors
@@ -2679,6 +2684,13 @@ classDiagram
     class mod_netcross_core_voip["netcross_core.voip"] {
         <<module>>
         +build_calls(all_packets, rtp_streams) tuple~list~Call~, dict~str, int~~
+    }
+
+    %% ===== netcross_core.wifi =====
+    class mod_netcross_core_wifi["netcross_core.wifi"] {
+        <<module>>
+        +metriques_clients(all_packets) dict~str, list~dict~~
+        +format_fiche(point, fiche) str
     }
 
     %% ===== netcross_core.wireshark_expert =====
