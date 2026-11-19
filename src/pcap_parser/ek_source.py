@@ -356,6 +356,21 @@ def iter_ek_records(
     logger.debug("iter_ek_records: fin")
 
 
+# Cles derivees que tshark ajoute a chaque trame dechiffree (wlan.analysis.*) :
+# equivalentes a la phrase de passe pour qui les lit, jamais conservees.
+CLES_DERIVEES_80211: tuple[str, ...] = tuple(f"wlan_wlan_analysis_{nom}" for nom in ("pmk", "kck", "kek", "tk", "gtk"))
+
+
+def _retirer_cles_derivees(wlan: dict | list) -> None:
+    """Retire en place les cles derivees de la (des) couche(s) wlan d'un
+    enregistrement EK, avant toute autre lecture (issue #1143)."""
+    logger.debug("_retirer_cles_derivees: entrée")
+    for couche in wlan if isinstance(wlan, list) else (wlan,):
+        for champ in CLES_DERIVEES_80211:
+            couche.pop(champ, None)
+    logger.debug("_retirer_cles_derivees: fin")
+
+
 def _trame_80211_chiffree(layers: dict) -> bool:
     """Trame de donnees 802.11 protegee dont tshark n'a extrait aucune
     couche IP (pas de cle, handshake absent ou cle fausse). Chemin chaud :
@@ -458,6 +473,7 @@ def _run_ek(
                     ts = 0.0
             layers = obj["layers"]
             if "wlan" in layers:
+                _retirer_cles_derivees(layers["wlan"])
                 chiffrees_80211 += _trame_80211_chiffree(layers)
                 eapol_80211 += "eapol" in layers
             yield EkRecord(ts=ts, layers=layers)
