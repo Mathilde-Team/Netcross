@@ -407,7 +407,10 @@ def ring_recorder_args(
     imprimee, le processus ne fait qu'enregistrer.
 
     Leve ``CaptureSourceError`` pour une source ``pipe://`` : un second
-    lecteur prendrait les octets du flux au processus d'analyse.
+    lecteur prendrait les octets du flux au processus d'analyse. Idem
+    pour ``probe://`` (issue #1105) : la sonde tient elle-meme son tampon
+    circulaire, les trames brutes arrivent par la fenetre tiree a la fin
+    de session -- un enregistreur local n'aurait rien a ecrire.
     """
     if max_files < 1:
         logger.debug("ring_recorder_args: refus")
@@ -421,6 +424,13 @@ def ring_recorder_args(
         raise CaptureSourceError(
             "rotation de capture impossible sur une source pipe:// : "
             "un second lecteur prendrait les octets du flux a l'analyse"
+        )
+    if source.kind == "probe":
+        logger.debug("ring_recorder_args: source sonde {} -> refus", source.display or interface)
+        raise CaptureSourceError(
+            "rotation de capture impossible sur une source probe:// : "
+            "la sonde tient deja son propre tampon circulaire, les trames "
+            "brutes arrivent par la fenetre tiree a la fin de la session"
         )
     # tshark attend un nombre entier de secondes pour -b duration.
     duration = max(1, math.ceil(max_duration_per_file))

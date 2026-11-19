@@ -1,12 +1,24 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""netcross_api.probe_routes -- enrôlement des sondes auprès du collecteur
-(issue #1101, chantier #1002 ; contrat v1 ``docs/probe-api-v1.yaml``).
+"""netcross_api.probe_routes -- collecteur : enrôlement, inventaire et
+santé des sondes (issues #1101 et #1105, chantier #1002 ; contrat v1
+``docs/probe-api-v1.yaml``).
 
-Le collecteur (cette API) expose l'unique route sans certificat client :
-``POST /probe/v1/enrollments``. Tout le reste du contrat (santé,
-métadonnées, fenêtres) est servi par les sondes en TLS mutuel -- voir
-``netcross_probe.securite`` pour les contextes mTLS et la vérification
-des certificats.
+Le collecteur (cette API) expose l'unique route du contrat sans
+certificat client : ``POST /probe/v1/enrollments``. Tout le reste du
+contrat (santé, métadonnées, fenêtres) est servi par les sondes en TLS
+mutuel -- voir ``netcross_probe.securite`` pour les contextes mTLS et la
+vérification des certificats, ``netcross_probe.client`` pour l'appel.
+
+Issue #1105, l'inventaire et la santé côté collecteur :
+
+- ``GET /probes`` : chaque sonde inscrite -- identité, adresse annoncée
+  à l'inscription (``listen_base_url``, contrat 1.1), révocation,
+  expiration du certificat, dernière santé connue ;
+- ``GET /probes/{probe_id}/health`` : la santé **actuelle**, lue en
+  direct auprès de la sonde en mTLS avec le certificat client du
+  collecteur (SAN ``urn:netcross:collector:<id>``, forgé par l'autorité
+  du collecteur) ; une sonde muette est une erreur explicite (502),
+  jamais une santé inventée.
 
 Invariants de sécurité (critères d'acceptation de #1101) :
 
@@ -21,14 +33,18 @@ Invariants de sécurité (critères d'acceptation de #1101) :
 from __future__ import annotations
 
 import secrets
+import time
+from collections.abc import Callable
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+from netcross_probe.client import ClientSonde, SondeInjoignableError, SondeRefusError
 from netcross_probe.securite import (
     creer_autorite,
+    creer_certificat_collecteur,
     expiration_certificat,
     generer_jeton_enrolement,
     hacher_jeton,
@@ -36,7 +52,7 @@ from netcross_probe.securite import (
 )
 
 API_VERSION = "1.0"
-VERSIONS_SUPPORTÉES = frozenset({"1.0"})
+VERSIONS_SUPPORTÉES = frozenset({"1.0", "1.1"})
 _EN_TETE_CONTRAT = {"Netcross-Probe-Api": API_VERSION}
 
 
@@ -61,8 +77,9 @@ class RegistreSondes:
         self.autorite = creer_autorite()
         self.jetons: dict[str, dict[str, Any]] = {}  # hachage -> {consommé}
         self.inscrites: dict[str, str] = {}  # nom -> probe_id
-        self.par_identifiant: dict[str, str] = {}  # probe_id -> nom
+        self.par_identifiant: dict[str, dict[str, Any]] = {}  # probe_id -> fiche
         self.revoquees: set[str] = set()
+        self.sante_derniere: dict[str, dict[str, Any]] = {}  # probe_id -> santé + relevé
         logger.debug("RegistreSondes.__init__: retour registre")
 
     def creer_jeton(self) -> str:
@@ -97,38 +114,73 @@ class RegistreSondes:
         self.revoquees.add(probe_id)
         logger.debug("RegistreSondes.revoquer: retour")
 
+    def _version_negociee(self, versions: list[str]) -> str:
+        """Plus haute version commune entre la sonde et le collecteur."""
+        logger.debug("RegistreSondes._version_negociee: entrée")
+        communes = sorted(set(versions) & VERSIONS_SUPPORTÉES)
+        if not communes:
+            logger.debug("RegistreSondes._version_negociee: aucune commune -> levée ValueError")
+            raise ValueError("aucune version de contrat commune")
+        version = communes[-1]
+        logger.debug("RegistreSondes._version_negociee: retour {}", version)
+        return version
+
     def inscrire(self, demande: dict[str, Any]) -> tuple[int, dict[str, Any] | JSONResponse]:
         """Traite une demande d'inscription (contrat v1) : (statut,
-        corps). 201 et le certificat signé, ou un refus explicite."""
+        corps). 201 et le certificat signé, ou un refus explicite.
+
+        Issue #1105 (contrat 1.1) : ``listen_base_url`` (facultatif)
+        annonce l'URL où la sonde sert ses routes mTLS -- c'est elle que
+        ``GET /probes/{id}/health`` appelle. Absente : la sonde est
+        inscrite, simplement sans suivi de santé possible (erreur
+        explicite le cas échéant, jamais une santé inventée).
+        """
         logger.debug("RegistreSondes.inscrire: entrée")
         for champ in ("probe_name", "csr_pem", "agent_version", "api_versions"):
             if not demande.get(champ):
                 logger.debug("RegistreSondes.inscrire: champ {} manquant -> 400", champ)
                 return 400, {"error": "invalid_request", "message": f"champ {champ} manquant ou vide"}
         versions = demande["api_versions"]
-        if not isinstance(versions, list) or not set(versions) & VERSIONS_SUPPORTÉES:
+        if not isinstance(versions, list):
+            logger.debug("RegistreSondes.inscrire: versions non liste -> 426")
+            return 426, {"error": "incompatible_version", "message": "aucune version de contrat commune"}
+        try:
+            version = self._version_negociee(versions)
+        except ValueError:
             logger.debug("RegistreSondes.inscrire: aucune version commune -> 426")
             return 426, {"error": "incompatible_version", "message": "aucune version de contrat commune"}
         nom = demande["probe_name"]
-        probe_id = self.inscrites.get(nom)
-        if probe_id is not None and probe_id in self.revoquees:
+        ancien = self.inscrites.get(nom)
+        if ancien is not None and ancien in self.revoquees:
             logger.debug("RegistreSondes.inscrire: sonde révoquée -> 401")
             return 401, {"error": "probe_revoked", "message": f"sonde {nom} révoquée"}
         if nom in self.inscrites:
             logger.debug("RegistreSondes.inscrire: nom déjà inscrit -> 409")
             return 409, {"error": "probe_name_taken", "message": f"sonde {nom} déjà inscrite"}
-        if probe_id is None:
-            probe_id = f"prb_{secrets.token_hex(12)}"
+        probe_id = ancien or f"prb_{secrets.token_hex(12)}"
         try:
             certificat_pem = signer_csr_sonde(demande["csr_pem"], probe_id, self.autorite)
         except Exception:  # noqa: BLE001 -- toute CSR illisible est un refus
             logger.debug("RegistreSondes.inscrire: CSR illisible -> 400")
             return 400, {"error": "invalid_csr", "message": "demande de signature illisible"}
+        adresse = demande.get("listen_base_url") or None
+        if adresse is not None and (not isinstance(adresse, str) or not adresse.startswith("https://")):
+            logger.debug("RegistreSondes.inscrire: listen_base_url invalide -> 400")
+            return 400, {
+                "error": "invalid_request",
+                "message": "listen_base_url doit être une URL https://",
+            }
         self.inscrites[nom] = probe_id
-        self.par_identifiant[probe_id] = nom
+        self.par_identifiant[probe_id] = {
+            "probe_name": nom,
+            "listen_base_url": adresse,
+            "revoked": False,
+            "enrolled_at": time.time(),
+            "certificate_expires_at": expiration_certificat(certificat_pem),
+        }
         reponse = {
             "probe_id": probe_id,
-            "api_version": API_VERSION,
+            "api_version": version,
             "client_certificate_pem": certificat_pem,
             "ca_chain_pem": self.autorite.certificat_pem,
             "certificate_expires_at": expiration_certificat(certificat_pem),
@@ -136,14 +188,99 @@ class RegistreSondes:
         logger.debug("RegistreSondes.inscrire: retour 201 sonde {}", probe_id)
         return 201, reponse
 
+    def fiche(self, probe_id: str) -> dict[str, Any] | None:
+        """Fiche d'une sonde inscrite (ou None)."""
+        logger.debug("RegistreSondes.fiche: entrée ({})", probe_id)
+        fiche = self.par_identifiant.get(probe_id)
+        logger.debug("RegistreSondes.fiche: retour {}", "fiche" if fiche else "None")
+        return fiche
+
+    def inventaire(self) -> list[dict[str, Any]]:
+        """Inventaire des sondes (issue #1105) : identité, adresse,
+        révocation, expiration, dernière santé connue."""
+        logger.debug("RegistreSondes.inventaire: entrée")
+        sondes = []
+        for probe_id, fiche in self.par_identifiant.items():
+            sante = self.sante_derniere.get(probe_id)
+            sondes.append(
+                {
+                    "probe_id": probe_id,
+                    "probe_name": fiche["probe_name"],
+                    "listen_base_url": fiche["listen_base_url"],
+                    "revoked": probe_id in self.revoquees,
+                    "enrolled_at": fiche["enrolled_at"],
+                    "certificate_expires_at": fiche["certificate_expires_at"],
+                    "health": sante,
+                }
+            )
+        logger.debug("RegistreSondes.inventaire: retour {} sonde(s)", len(sondes))
+        return sondes
+
+    def maj_sante(self, probe_id: str, document: dict[str, Any]) -> None:
+        """Mémorise la dernière santé lue (avec l'heure du relevé)."""
+        logger.debug("RegistreSondes.maj_sante: entrée ({})", probe_id)
+        self.sante_derniere[probe_id] = {
+            "status": document.get("status"),
+            "checked_at": time.time(),
+            "health": document,
+        }
+        logger.debug("RegistreSondes.maj_sante: retour")
+
+    def identite_collecteur(self) -> tuple[str, str, str]:
+        """Identité mTLS du collecteur (certificat client, clé, autorité),
+        forgée une fois par processus à partir de sa propre autorité."""
+        logger.debug("RegistreSondes.identite_collecteur: entrée")
+        if not hasattr(self, "_identite_collecteur"):
+            certificat, cle = creer_certificat_collecteur(self.autorite)
+            self._identite_collecteur = (certificat, cle, self.autorite.certificat_pem)
+        logger.debug("RegistreSondes.identite_collecteur: retour identité")
+        return self._identite_collecteur
+
 
 registre_sondes = RegistreSondes()
 
 
-def register(app: FastAPI) -> None:
-    """Ajoute la route d'enrôlement au collecteur (seule route du contrat
-    sans certificat client : la sonde n'en possède pas encore)."""
+def _lire_sante(probe_id: str) -> tuple[int, dict[str, Any]]:
+    """Santé actuelle d'une sonde, lue en mTLS par le collecteur : (statut,
+    corps). Refus explicites : 404 sonde inconnue, 409 sonde sans adresse
+    annoncée, 502 sonde muette ou refusante."""
+    logger.debug("_lire_sante: entrée ({})", probe_id)
+    fiche = registre_sondes.fiche(probe_id)
+    if fiche is None:
+        logger.debug("_lire_sante: sonde inconnue -> 404")
+        return 404, {"error": "probe_unknown", "message": f"sonde {probe_id} inconnue"}
+    if probe_id in registre_sondes.revoquees:
+        logger.debug("_lire_sante: sonde révoquée -> 401")
+        return 401, {"error": "probe_revoked", "message": f"sonde {probe_id} révoquée"}
+    adresse = fiche.get("listen_base_url")
+    if not adresse:
+        logger.debug("_lire_sante: pas d'adresse annoncée -> 409")
+        return 409, {
+            "error": "probe_address_unknown",
+            "message": "la sonde n'a pas annoncé d'adresse à l'inscription (listen_base_url)",
+        }
+    certificat, cle, ca = registre_sondes.identite_collecteur()
+    client = ClientSonde(adresse, certificat, cle, ca)
+    try:
+        document = client.sante()
+    except SondeInjoignableError as exc:
+        logger.debug("_lire_sante: sonde injoignable -> 502")
+        return 502, {"error": "sonde_injoignable", "message": str(exc)}
+    except SondeRefusError as exc:
+        logger.debug("_lire_sante: sonde refusante -> 502")
+        return 502, {"error": "sonde_refus", "message": str(exc)}
+    registre_sondes.maj_sante(probe_id, document)
+    logger.debug("_lire_sante: retour 200")
+    return 200, document
+
+
+def register(app: FastAPI, verify: Callable[..., Any]) -> None:
+    """Déclare les routes du collecteur. ``verify`` : dépendance
+    d'authentification de l'API (clé) appliquée aux routes d'inventaire
+    -- l'enrôlement reste authentifié par le jeton à usage unique (la
+    sonde n'a pas encore de certificat, ni de clé API)."""
     logger.debug("probe_routes.register: entrée")
+    auth = [Depends(verify)]
 
     @app.post(
         "/probe/v1/enrollments",
@@ -178,5 +315,22 @@ def register(app: FastAPI) -> None:
         statut, corps = registre_sondes.inscrire(demande)
         logger.debug("enroller_sonde: retour {}", statut)
         return JSONResponse(status_code=statut, content=corps, headers=_EN_TETE_CONTRAT)
+
+    @app.get("/probes", tags=["probe"], dependencies=auth)
+    def inventaire_sondes() -> dict[str, Any]:
+        """Inventaire des sondes inscrites (issue #1105) : identité, adresse
+        annoncée, révocation, expiration du certificat, dernière santé."""
+        logger.debug("inventaire_sondes: entrée")
+        return {"probes": registre_sondes.inventaire()}
+
+    @app.get("/probes/{probe_id}/health", tags=["probe"], dependencies=auth)
+    def sante_sonde(probe_id: str) -> JSONResponse:
+        """Santé actuelle d'une sonde, lue en direct en mTLS par le
+        collecteur (issue #1105). Une sonde muette est un refus explicite,
+        jamais une santé inventée."""
+        logger.debug("sante_sonde: entrée ({})", probe_id)
+        statut, corps = _lire_sante(probe_id)
+        logger.debug("sante_sonde: retour {} ({})", statut, probe_id)
+        return JSONResponse(status_code=statut, content=corps)
 
     logger.debug("probe_routes.register: retour")

@@ -28,8 +28,8 @@ PKG="${2:?usage: $0 deb|rpm <paquet>}"
 # Extras optionnels : declares en Suggests, absents d'une installation
 # minimale. Leur import est donc exclu de l'etape 3.
 OPTIONAL_RE='^(netcross_api|netcross_ai|netcross_gtk4)(\.|$)'
-PACKAGES=(pcap_parser netcross_core netcross_report netcross_gtk4 netcross_api netcross_ai)
-CLIS=(netcross netcross-diff netcross-history netcross-batch netcross-ai-models netcross-lua-doc)
+PACKAGES=(pcap_parser netcross_core netcross_report netcross_gtk4 netcross_api netcross_ai netcross_probe)
+CLIS=(netcross netcross-diff netcross-history netcross-batch netcross-ai-models netcross-lua-doc netcross-probe)
 LAUNCHERS=("${CLIS[@]}" netcross-gui)
 
 fail() { echo "ECHEC : $*" >&2; exit 1; }

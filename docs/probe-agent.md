@@ -4,7 +4,9 @@ Issue #1099 (sous-issue 2/6 du chantier [sondes distribuées #1002](https://gith
 L'agent léger qui capture en local dans un tampon circulaire et extrait à
 la demande une fenêtre [t1, t2] filtrée BPF, livrée en pcapng. Le contrat
 avec le collecteur est figé dans [l'API des sondes distribuées](probe-api.md)
-(v1) ; cette page décrit l'agent livré ici, sans la couche réseau.
+(v1). Depuis #1105, la sous-commande `servir` sert aussi les routes du
+contrat en mTLS : la sonde complète, inventoriée par le collecteur et
+utilisable comme point de capture `probe://`.
 
 ## Principe
 
@@ -100,6 +102,44 @@ construisent les contextes, `verifier_certificat_sonde` refuse un
 certificat non signé, expiré ou révoqué. Une sonde est révoquée côté
 collecteur (`RegistreSondes.revoquer(probe_id)`) : son certificat est
 refusé partout, refus explicite jamais silencieux.
+
+## Servir : la sonde complète (#1105)
+
+`servir` lance la capture en tampon circulaire **et** le service mTLS du
+contrat v1 (santé, métadonnées, fenêtres) — c'est cette sonde-là que le
+collecteur inventorie (`GET /probes`) et que `--live probe://` utilise
+comme point de capture :
+
+```bash
+# première fois : l'identité n'existe pas, l'enrôlement la crée
+PYTHONPATH=src python3 -m netcross_probe servir \
+    --interface eth0 \
+    --dossier /var/lib/netcross-probe/tampon \
+    --identite /var/lib/netcross-probe/identite \
+    --nom ROUTEUR \
+    --ecoute 0.0.0.0:9443 \
+    --enrolement https://collecteur.lan:8443/probe/v1/enrollments \
+    --jeton <jeton-à-usage-unique> \
+    --listen-url https://sonde.lan:9443
+
+# fois suivantes : l'identité est relue, l'enrôlement est sauté
+PYTHONPATH=src python3 -m netcross_probe servir --interface eth0 \
+    --dossier /var/lib/netcross-probe/tampon \
+    --identite /var/lib/netcross-probe/identite --nom ROUTEUR
+```
+
+- `--ecoute` : `hote:port` d'écoute mTLS (port 9443, celui du contrat).
+- `--enrolement`/`--jeton` : l'inscription auprès du collecteur ; la clé
+  privée reste sur la sonde (seule la CSR part). `--listen-url` est
+  l'adresse `https://` annoncée au collecteur (déduite de `--ecoute`
+  si l'hôte n'est pas `0.0.0.0`) : sans elle, la sonde est inscrite
+  mais non interrogeable en direct (`409 probe_address_unknown`).
+- `--identite` : le dossier où l'enrôlement écrit certificat, clé,
+  autorité et `probe_id` — relu tel quel aux lancements suivants.
+
+Aucun flux ne circule pendant la session : le collecteur tire la fenêtre
+[début de session, arrêt] à la fin (`probe://` côté capture). Ctrl-C
+arrête service et capture ; le tampon est conservé.
 
 ## Programmation
 

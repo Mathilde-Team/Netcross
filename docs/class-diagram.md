@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-260 modules · 371 classes · 910 fonctions publiques de module.
+263 modules · 375 classes · 919 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -35,21 +35,22 @@ flowchart TD
     pcap_parser["pcap_parser"]
     CLI -->|"29 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
-    CLI -->|"65 imports"| netcross_core
+    CLI -->|"66 imports"| netcross_core
     CLI -->|"9 imports"| pcap_parser
     netcross_gtk4 -->|"36 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
-    netcross_gtk4 -->|"122 imports"| netcross_core
+    netcross_gtk4 -->|"123 imports"| netcross_core
     netcross_gtk4 -->|"6 imports"| pcap_parser
     netcross_api -->|"31 imports"| netcross_report
     netcross_api -->|"5 imports"| netcross_ai
-    netcross_api -->|"69 imports"| netcross_core
-    netcross_api -->|"1 import"| netcross_probe
+    netcross_api -->|"70 imports"| netcross_core
+    netcross_api -->|"2 imports"| netcross_probe
     netcross_api -->|"4 imports"| pcap_parser
     netcross_report -->|"61 imports"| netcross_core
     netcross_ai -->|"10 imports"| netcross_core
-    netcross_core -->|"27 imports"| pcap_parser
-    netcross_probe -->|"4 imports"| pcap_parser
+    netcross_core -->|"1 import"| netcross_probe
+    netcross_core -->|"28 imports"| pcap_parser
+    netcross_probe -->|"5 imports"| pcap_parser
 ```
 
 ## Relations inter-modules
@@ -571,10 +572,12 @@ classDiagram
 | `netcross_probe.agent` | L'agent ``netcross-probe`` : capture locale + extraction de fenêtres. |
 | `netcross_probe.bpf` | Filtrage BPF (syntaxe pcap-filter) en relecture d'un fichier de capture. |
 | `netcross_probe.capture` | Capture locale de la sonde ``netcross-probe`` en tampon circulaire. |
+| `netcross_probe.client` | client mTLS d'une sonde (issue #1105). |
 | `netcross_probe.enrolement` | inscription d'une sonde auprès du collecteur (issue #1101 ; contrat v1 ``docs/probe-api-v1.yaml``). |
 | `netcross_probe.etat` | pertes de capture et état d'horloge de la sonde (issue #1103, sous-issue 4/6 du chantier #1002). |
 | `netcross_probe.fenetres` | Extraction d'une fenêtre [t1, t2] filtrée du tampon circulaire de la sonde. |
 | `netcross_probe.securite` | mTLS, enrôlement et révocation des sondes (issue #1101, sous-issue 3/6 du chantier #1002). |
+| `netcross_probe.serveur` | service HTTP mTLS de la sonde (issue #1105). |
 
 ### Diagramme
 
@@ -600,6 +603,7 @@ classDiagram
         +extraire(debut, fin, filtre_bpf, inclure_inconnus, max_octets) FenetreResultat
         +fenetre(identifiant) FenetreResultat?
         +liberer(identifiant) bool
+        +expiration_fenetre(identifiant) float?
     }
 
     %% ===== netcross_probe.bpf =====
@@ -638,6 +642,26 @@ classDiagram
         +inventaire() list~RingFile~
     }
 
+    %% ===== netcross_probe.client =====
+    class SondeInjoignableError {
+        <<RuntimeError>>
+    }
+    class SondeRefusError {
+        <<RuntimeError>>
+    }
+    class ClientSonde {
+        +sante() dict~str, Any~
+        +metadonnees() dict~str, Any~
+        +demander_fenetre(debut, fin, bpf, max_octets, inclure_inconnus) dict~str, Any~
+        +telecharger_fenetre(identifiant) bytes
+        +liberer_fenetre(identifiant) None
+        +extraire_pcapng(debut, fin, bpf, max_octets, inclure_inconnus) bytes
+    }
+    class mod_netcross_probe_client["netcross_probe.client"] {
+        <<module>>
+        +client_depuis_env(url_base, env) ClientSonde
+    }
+
     %% ===== netcross_probe.enrolement =====
     class EnrolementError {
         <<Exception>>
@@ -653,7 +677,7 @@ classDiagram
     }
     class mod_netcross_probe_enrolement["netcross_probe.enrolement"] {
         <<module>>
-        +demander_enrolement(url_collecteur, jeton, nom_sonde, dossier, version_agent, versions_api) Enrolement
+        +demander_enrolement(url_collecteur, jeton, nom_sonde, dossier, version_agent, versions_api, listen_base_url) Enrolement
     }
 
     %% ===== netcross_probe.etat =====
@@ -723,6 +747,7 @@ classDiagram
         +creer_autorite(nom, jours) AutoriteConfiance
         +generer_csr_sonde(nom_sonde, cle_pem) str
         +signer_csr_sonde(csr_pem, probe_id, autorite, jours) str
+        +creer_certificat_collecteur(autorite, identifiant, jours) tuple~str, str~
         +expiration_certificat(certificat_pem) float
         +identifiant_sonde(certificat_pem) str?
         +verifier_certificat_sonde(certificat_pem, autorite, revoques) str
@@ -730,6 +755,18 @@ classDiagram
         +contexte_mtls_client(certificat_pem, cle_pem, ca_pem) ssl.SSLContext
         +generer_jeton_enrolement() str
         +hacher_jeton(jeton) str
+    }
+
+    %% ===== netcross_probe.serveur =====
+    class ServeurSonde {
+        +demarrer(hote, port) str
+        +arreter() None
+    }
+    class mod_netcross_probe_serveur["netcross_probe.serveur"] {
+        <<module>>
+        +construire_sante(agent, api_version, demarrage) dict~str, Any~
+        +construire_metadonnees(agent, probe_id, probe_name, agent_version, api_versions, api_version) dict~str, Any~
+        +fenetre_vers_dict(resultat, probe_id, expires_at, bpf) dict~str, Any~
     }
 
     %% ===== relations =====
@@ -788,6 +825,7 @@ classDiagram
 | `netcross_core.naming` | table locale de correspondance adresse/MAC -> nom logique, type, contexte (Job 18 / issue #16-bis, section 6.15 de FEATURES.md). |
 | `netcross_core.packet_limits` | ``--max-packets`` et ``--sample`` (issue #283), partages par la CLI et la GUI (issue #672). |
 | `netcross_core.parsing` | adaptateur entre pcap_parser (decodage via tshark -T ek) et le modele Pkt de netcross_core. |
+| `netcross_core.probe_capture` | point de capture servi par une sonde (issue #1105, sous-issue 5/6 du chantier #1002). |
 | `netcross_core.profiling` | Mesure par étape du pipeline d'analyse (issue #1016, banc #994). |
 | `netcross_core.pseudonyms` | Module commun de pseudonymisation : adresses et noms (issue #1151). |
 | `netcross_core.quic_diagnostics` | extraction du SNI des paquets QUIC Initial v1 et v2 (RFC 9000/9001/9369), pour voir le trafic HTTP/3 moderne (Chrome, Teams, Meet, WhatsApp...) que le reste de l'outil ne voit aujourd'hui qu'en UDP… |
@@ -2276,6 +2314,15 @@ classDiagram
         +parse_rtp(payload)
         +parse_sip(payload)
         +detect_encapsulation(layers)
+    }
+
+    %% ===== netcross_core.probe_capture =====
+    class mod_netcross_core_probe_capture["netcross_core.probe_capture"] {
+        <<module>>
+        +est_source_sonde(interface) bool
+        +url_sonde(interface) str
+        +telecharger_fenetre_sonde(interface, debut, fin, bpf, env, client) bytes
+        +collecter_fenetre_sonde(label, interface, debut, fin, bpf, env, client) list~Pkt~
     }
 
     %% ===== netcross_core.profiling =====
@@ -5151,7 +5198,7 @@ classDiagram
 | `netcross_api.lua_doc_routes` | documentation hors ligne de l'API Lua Wireshark (issue #873), équivalent de ``netcross-lua-doc --json``. |
 | `netcross_api.metrics_routes` | Dernier relevé publié, borné et exposé sous l'authentification de l'API. |
 | `netcross_api.models` | modèles Pydantic pour les requêtes/réponses API (issue #209). |
-| `netcross_api.probe_routes` | enrôlement des sondes auprès du collecteur (issue #1101, chantier #1002 ; contrat v1 ``docs/probe-api-v1.yaml``). |
+| `netcross_api.probe_routes` | collecteur : enrôlement, inventaire et santé des sondes (issues #1101 et #1105, chantier #1002 ; contrat v1 ``docs/probe-api-v1.yaml``). |
 | `netcross_api.store` | analyses de l'API : statut, document JSON, persistance. |
 | `netcross_api.tools_routes` | manipulation de captures (issues #868, #869, #870, #886, #887), équivalents des modes utilitaires de la CLI : |
 
@@ -5479,10 +5526,14 @@ classDiagram
         +creer_jeton() str
         +revoquer(probe_id) None
         +inscrire(demande) tuple~int, dict~str, Any~ or JSONResponse~
+        +fiche(probe_id) dict~str, Any~?
+        +inventaire() list~dict~str, Any~~
+        +maj_sante(probe_id, document) None
+        +identite_collecteur() tuple~str, str, str~
     }
     class mod_netcross_api_probe_routes["netcross_api.probe_routes"] {
         <<module>>
-        +register(app) None
+        +register(app, verify) None
     }
 
     %% ===== netcross_api.store =====

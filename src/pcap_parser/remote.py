@@ -22,6 +22,16 @@ d'interface locale (``eth0``), une URL de source :
 ``pipe:///chemin/fifo``
     Tube nomme (``mkfifo``) alimente par un autre processus.
 
+``probe://hote[:port][/nom-de-sonde]`` (issue #1105)
+    Sonde distribuee ``netcross-probe`` (port 9443 par defaut). La sonde
+    tamponne elle-meme en local (tampon circulaire) : la fenetre utile est
+    tiree a la fin de la session de capture, jamais en flux continu. Le
+    chemin, optionnel, est le nom de la sonde (informatif) -- il est requis
+    pour accoler un filtre BPF au ``--live`` (meme regle que l'interface de
+    ``rpcap://``, le separateur etant le premier ``:`` apres le chemin).
+    Authentification : TLS mutuel, identites lues par
+    ``netcross_probe.client.client_depuis_env`` -- aucune dans l'URL.
+
 Les secrets ne sont jamais acceptes dans l'URL (historique du shell, liste
 des processus, journaux) et n'apparaissent pas dans ``CaptureSource.display``.
 Chaque valeur est validee (hote, port, interface, utilisateur) : aucune ne
@@ -29,7 +39,9 @@ peut commencer par ``-`` ni contenir d'espace, donc aucune ne peut etre
 interpretee comme une option de tshark.
 
 Module sans E/S hormis la lecture de l'environnement et un ``stat`` pour
-``pipe://`` : testable sans tshark.
+``pipe://`` : testable sans tshark. Une source ``probe://`` n'est jamais
+donnee a tshark : le champ ``interface`` porte l'URL normalisee, c'est la
+couche sonde (``netcross_probe``) qui s'en sert.
 """
 
 from __future__ import annotations
@@ -50,9 +62,15 @@ logger = _loguru_logger.bind(name=__name__)
 
 ENV_RPCAP_PASSWORD = "NETCROSS_RPCAP_PASSWORD"
 ENV_SSH_PASSWORD = "NETCROSS_SSH_PASSWORD"
+# Identités mTLS d'une source probe:// (issue #1105) : noms des variables
+# d'environnement seulement -- la lecture, elle, vit dans netcross_probe.client.
+ENV_PROBE_CERT = "NETCROSS_PROBE_CERT_PEM"
+ENV_PROBE_KEY = "NETCROSS_PROBE_KEY_PEM"
+ENV_PROBE_CA = "NETCROSS_PROBE_CA_PEM"
 RPCAP_DEFAULT_PORT = 2002
 SSH_DEFAULT_PORT = 22
-REMOTE_SCHEMES = ("rpcap", "sshdump", "ssh", "pipe")
+PROBE_DEFAULT_PORT = 9443
+REMOTE_SCHEMES = ("rpcap", "sshdump", "ssh", "pipe", "probe")
 
 _HOSTNAME_RE = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,62})(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}))*$")
 _USER_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,63}$")
@@ -86,8 +104,8 @@ class CaptureSource:
 
     @property
     def is_remote(self) -> bool:
-        logger.debug("CaptureSource.is_remote: retour self.kind in ('rpcap', 'sshdump')")
-        return self.kind in ("rpcap", "sshdump")
+        logger.debug("CaptureSource.is_remote: retour self.kind in ('rpcap', 'sshdump', 'probe')")
+        return self.kind in ("rpcap", "sshdump", "probe")
 
 
 def is_source_url(text: str) -> bool:
@@ -280,6 +298,34 @@ def _parse_sshdump(body: str, env: Mapping[str, str]) -> CaptureSource:
     return CaptureSource("sshdump", "sshdump", tuple(extra), display)
 
 
+def _parse_probe(body: str, env: Mapping[str, str]) -> CaptureSource:
+    """``probe://hote[:port][/nom-de-sonde]`` (issue #1105).
+
+    La sonde garde son propre tampon circulaire : aucune lecture de flux
+    ici, la fenêtre est tirée à la fin de la session par la couche sonde.
+    Le chemin est le nom de la sonde (informatif, nécessaire pour accoler
+    un filtre BPF dans un ``--live`` : même séparateur que ``rpcap://``).
+    Aucun secret dans l'URL : l'authentification est mutuelle, identités
+    lues hors URL par la couche sonde (``netcross_probe.client``).
+    """
+    netloc, _, path = body.partition("/")
+    user, host, port = _split_netloc(netloc, "probe", PROBE_DEFAULT_PORT)
+    if user is not None:
+        logger.debug("_parse_probe: utilisateur refuse dans l'URL probe://")
+        raise CaptureSourceError(
+            "probe:// n'accepte pas d'utilisateur (authentification par TLS mutuel, "
+            f"identités dans {ENV_PROBE_CERT} / {ENV_PROBE_KEY} / {ENV_PROBE_CA})"
+        )
+    nom_sonde = unquote(path) if path else None
+    if nom_sonde is not None and not _IFACE_RE.match(nom_sonde):
+        logger.debug("_parse_probe: nom de sonde invalide {!r}", nom_sonde)
+        raise CaptureSourceError(f"nom de sonde invalide : {nom_sonde!r}")
+    target = f"probe://{_host_for_url(host)}:{port}" + (f"/{nom_sonde}" if nom_sonde else "")
+    display = target if nom_sonde is not None else f"probe://{_host_for_url(host)}:{port} (sonde)"
+    logger.debug("_parse_probe: {} (nom de sonde={})", display, nom_sonde)
+    return CaptureSource("probe", target, (), display)
+
+
 def _parse_pipe(body: str) -> CaptureSource:
     if body == "-":
         logger.debug("_parse_pipe: entrée standard")
@@ -329,11 +375,14 @@ def parse_source(text: str, env: Mapping[str, str] | None = None) -> CaptureSour
     if scheme in ("sshdump", "ssh"):
         logger.debug("parse_source: si scheme in ('sshdump', 'ssh') -> retour _parse_sshdump(…)")
         return _parse_sshdump(body, env)
+    if scheme == "probe":
+        logger.debug("parse_source: si scheme == 'probe' -> retour _parse_probe(…)")
+        return _parse_probe(body, env)
     if scheme == "pipe":
         logger.debug("parse_source: si scheme == 'pipe' -> retour _parse_pipe(…)")
         return _parse_pipe(body)
     logger.debug("parse_source: levée CaptureSourceError")
-    raise CaptureSourceError(f"schema de source inconnu : {scheme}:// (attendus : rpcap, sshdump, ssh, pipe)")
+    raise CaptureSourceError(f"schema de source inconnu : {scheme}:// (attendus : rpcap, sshdump, ssh, pipe, probe)")
 
 
 def source_display(text: str) -> str:

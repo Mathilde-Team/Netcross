@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: API agent netcross-probe <-> collecteur Netcross
-  version: 1.0.0
+  version: 1.1.0
   summary: Contrat v1 entre une sonde de capture distribuée et le collecteur central (issue #1098, chantier #1002).
   description: |
     Contrat FIGÉ avant l'écriture de l'agent (#1099) et du collecteur (#1105).
@@ -18,6 +18,12 @@ info:
 
     Versionnement : semver dans `info.version` ; le majeur figure dans le
     chemin (`/probe/v1`) et chaque réponse porte l'en-tête `Netcross-Probe-Api`.
+
+    1.1.0 (issue #1105) : ajout purement additif -- la sonde peut annoncer
+    `listen_base_url` à l'enrôlement ; le collecteur s'en sert pour
+    l'inventaire et `GET /probes/{id}/health` (routes collecteur, clé API).
+    Une 1.0 parle à une 1.1 sans changement : le champ est optionnel,
+    valeur absente = comportement 1.0.
   license:
     name: MIT
     identifier: MIT
@@ -355,6 +361,14 @@ components:
           items:
             $ref: '#/components/schemas/Capability'
           default: []
+        listen_base_url:
+          type: string
+          description: |
+            (1.1, issue #1105) URL `https://` où cette sonde sert ses routes
+            mTLS -- le collecteur s'en sert pour l'inventaire et le suivi de
+            santé (`GET /probes/{id}/health`). Optionnel : absente, la sonde
+            n'est pas interrogeable en direct.
+          pattern: '^https://.+'
       additionalProperties: true
     EnrollmentResponse:
       type: object
@@ -570,7 +584,8 @@ components:
         probe_name: ROUTEUR
         csr_pem: "-----BEGIN CERTIFICATE REQUEST-----\nMIIB...\n-----END CERTIFICATE REQUEST-----\n"
         agent_version: 0.1.0
-        api_versions: ['1.0']
+        api_versions: ['1.0', '1.1']
+        listen_base_url: https://sonde-routeur.example.net:9443
         capabilities: [bpf, pcapng_isb, clock_status]
     EnrollmentResponse:
       value:
