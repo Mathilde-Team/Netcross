@@ -210,6 +210,7 @@ from netcross_report.zeek_export import ZEEK_FORMATS, build_conn_records, write_
 from pcap_parser.capture import split_by_interface
 from pcap_parser.ek_source import TsharkError, TsharkNotFoundError
 from pcap_parser.remote import CaptureSourceError, parse_source, split_live_target
+from pcap_parser.wifi_keys import ENV_WIFI_KEYS, WifiKeysError, load_wifi_keys
 
 logger = get_logger(__name__)
 
@@ -2568,6 +2569,16 @@ def main():
         "comportement inchange (issue #1040).",
     )
     ap.add_argument(
+        "--wifi-keys",
+        metavar="FICHIER",
+        default=None,
+        help="Fichier de cles Wi-Fi pour dechiffrer les captures 802.11 en mode "
+        "moniteur (WPA/WPA2-PSK) : une cle par ligne, « wpa-pwd:PHRASE:SSID » ou "
+        "« wpa-psk:HEX64 ». Le 4-way handshake EAPOL doit figurer dans la capture. "
+        "Les secrets ne passent jamais en ligne de commande de tshark. Equivaut a "
+        "la variable NETCROSS_WIFI_KEYS (issue #1143).",
+    )
+    ap.add_argument(
         "--redact-scope",
         choices=REDACT_SCOPES,
         default=None,
@@ -3352,6 +3363,17 @@ def main():
         logger.debug("main: --tls-keylog refusé ({})", exc)
         print(exc, file=sys.stderr)
         sys.exit(1)
+    if args.wifi_keys:
+        try:
+            cles_wifi = load_wifi_keys(args.wifi_keys)
+        except WifiKeysError as exc:
+            logger.debug("main: --wifi-keys refusé ({})", exc)
+            print(f"--wifi-keys : {exc}", file=sys.stderr)
+            sys.exit(1)
+        # Lu par pcap_parser.ek_source a chaque lancement de tshark (y compris
+        # dans les processus de lecture parallele, qui heritent de l'environnement).
+        os.environ[ENV_WIFI_KEYS] = os.path.abspath(args.wifi_keys)
+        print(f"{len(cles_wifi)} cle(s) Wi-Fi transmise(s) a tshark (dechiffrement 802.11)", file=sys.stderr)
     if args.split_interfaces and captures:
         captures = _expand_split_interfaces(captures)
     if tls_keylogs:

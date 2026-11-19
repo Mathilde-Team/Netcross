@@ -14,7 +14,7 @@ ici fait donc échouer la CI.
 
 | Surface | Points d'entrée | Capacités |
 |---|---|---|
-| CLI | `cross_capture_analyzer_cli.py` (147 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
+| CLI | `cross_capture_analyzer_cli.py` (148 options), `cross_capture_diff_cli.py` (28), `cross_capture_batch_cli.py` (11), `cross_history_cli.py`, `netcross_lua_doc_cli.py`, `netcross_ai_models_cli.py` | Surface de référence : tout y est |
 | GUI | `netcross_gtk4` : 4 pages, 44 cases à cocher, 35 réglages numériques | Analyse interactive et exploration visuelle ; onglet « Incidents » : réglages du gel rétroactif et archives (issue #1095) |
 | API | 73 routes FastAPI | Analyse avec sécurité ; options NAT, TLS, QUIC, anonymisation ; exports texte, PDF, CSV (issue #670) ; options avancées (#672) ; comparaison baseline/courant (#669) ; recherche forensic, extraction, comparaison de postes, NetFlow (#675) ; réglages du gel rétroactif et incidents archivés, analyse d'une fenêtre gelée (issues #1091, #1095) ; enrôlement des sondes `POST /probe/v1/enrollments` (mTLS, #1101) ; inventaire `GET /probes` et santé `GET /probes/{probe_id}/health` des sondes (#1105) |
 
@@ -73,6 +73,7 @@ actif, non réglable.
 | Rapport de sécurité (détecteurs, signatures d'exploit, CVE) | oui (« Rapport de securite ») | `--security-report` | auto (toujours exécuté, sauf avec `redact`), `GET /analyses/{analysis_id}/security` |
 | Base CVE complète (NVD) | oui (« Base CVE... », avec « Rapport de securite » ; issue #672) | `--cve-db` | variable de serveur `NETCROSS_CVE_DB`, sinon base embarquée (issue #672) |
 | Déchiffrement TLS par fichier de clés (SSLKEYLOGFILE) | oui (« Cles TLS... » de la configuration : un fichier pour tous les points ; refusé avec l'anonymisation ; issue #1040) | `--tls-keylog FICHIER` (tous les points) ou `NOM=FICHIER` (un point), répétable, refusé avec `--redact` | `tls_keylog` (fichier(s) joint(s), copie temporaire 0600 supprimée en fin d'analyse) et `tls_keylog_labels` (un point par fichier, `*` = tous) ; refusé avec `redact` (issue #1040) |
+| Déchiffrement Wi-Fi WPA/WPA2-PSK (capture en mode moniteur) | via `NETCROSS_WIFI_KEYS` positionnée avant le lancement (issue #1143) | `--wifi-keys FICHIER` (ou `NETCROSS_WIFI_KEYS`) | variable de serveur `NETCROSS_WIFI_KEYS` (issue #1143, docs/dechiffrement-wifi.md) |
 | Couverture du déchiffrement TLS/QUIC par point (« k/n sessions TLS déchiffrées au point X ») | oui (rapport texte et PDF de l'analyse ; issue #1043) | rapport texte, `--pdf-report`, `--json-report` (clé `decryption`) | rapport, PDF et JSON (clé `decryption`) |
 | Destinations et hôtes connus (sécurité) | oui (« Destinations connues... », « Hotes connus... », avec « Rapport de securite » ; issue #672) | `--known-destinations`, `--known-hosts` | `known_destinations`, `known_hosts` (fichiers joints, issue #672) |
 | Moteur de règles | oui (case « Moteur de regles », section du rapport ; issue #673) | `--rule-engine` | `rule_engine` (clé `rule_engine` de `/report`, issue #673) |

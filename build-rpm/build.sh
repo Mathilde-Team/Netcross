@@ -64,7 +64,11 @@ cp "$SCRIPT_DIR/wrappers/netcross-probe-wrapper" "$STAGE_DIR/"
 find "$STAGE_DIR" -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 tar czf "$TOPDIR/SOURCES/netcross-${VERSION}.tar.gz" -C "$SCRIPT_DIR/_build" "netcross-${VERSION}"
-cp "$SCRIPT_DIR/netcross.spec" "$TOPDIR/SPECS/"
+# Issue #939/#986 : la version du spec vient de pyproject.toml (source
+# unique) ; le champ Version: de netcross.spec n'est qu'une valeur de
+# repli, remplacee ici a chaque construction.
+sed "s/^Version:.*/Version:        ${VERSION}/" \
+    "$SCRIPT_DIR/netcross.spec" > "$TOPDIR/SPECS/netcross.spec"
 
 rpmbuild --define "_topdir $TOPDIR" -bb "$TOPDIR/SPECS/netcross.spec"
 

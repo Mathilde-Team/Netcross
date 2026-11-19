@@ -41,6 +41,8 @@ from typing import IO
 
 from loguru import logger
 
+from pcap_parser.wifi_keys import WifiKeysError, wifi_keys_from_env, wlan_decryption
+
 # frame_frame_time_epoch : "2026-08-20T20:19:51.632525000Z" (nanosecondes).
 # Nettement plus precis que le "timestamp" racine du bulk EK (millisecondes
 # seulement) -- important pour des mesures de latence inter-points fines.
@@ -330,6 +332,81 @@ def iter_ek_records(
     """
     if path is not None:
         check_capture_readable(path)
+    # Dechiffrement 802.11 (issue #1143) : cles lues dans le fichier designe
+    # par NETCROSS_WIFI_KEYS. Sans cle, appel de tshark strictement inchange.
+    try:
+        cles_wifi = wifi_keys_from_env()
+    except WifiKeysError as exc:
+        logger.error("iter_ek_records: clés Wi-Fi refusées : {}", exc)
+        raise TsharkError(str(exc)) from exc
+    with wlan_decryption(cles_wifi) as (env_wifi, prefs_wifi):
+        yield from _run_ek(
+            path=path,
+            interface=interface,
+            bpf_filter=bpf_filter,
+            display_filter=display_filter,
+            extra_prefs=(*extra_prefs, *prefs_wifi),
+            extra_args=extra_args,
+            lua_scripts=lua_scripts,
+            stop_event=stop_event,
+            read_via_stdin=read_via_stdin,
+            env_wifi=env_wifi,
+            avec_cles_wifi=bool(cles_wifi),
+        )
+    logger.debug("iter_ek_records: fin")
+
+
+def _trame_80211_chiffree(layers: dict) -> bool:
+    """Trame de donnees 802.11 protegee dont tshark n'a extrait aucune
+    couche IP (pas de cle, handshake absent ou cle fausse). Chemin chaud :
+    l'appelant ne l'appelle que si la couche wlan est presente."""
+    if "ip" in layers or "ipv6" in layers:
+        logger.debug("_trame_80211_chiffree: couche IP présente -> retour False")
+        return False
+    wlan = layers["wlan"]
+    if isinstance(wlan, list):
+        wlan = wlan[-1]
+    chiffree = str(wlan.get("wlan_wlan_fc_type")) == "2" and wlan.get("wlan_wlan_fc_protected") in (True, "1", "true")
+    logger.debug("_trame_80211_chiffree: retour {}", chiffree)
+    return chiffree
+
+
+def _signaler_80211_chiffrees(chiffrees: int, eapol: int, avec_cles: bool) -> None:
+    """Repli explicite (issue #1143) : des trames chiffrees restent
+    illisibles, l'utilisateur doit savoir pourquoi."""
+    logger.debug("_signaler_80211_chiffrees: entrée ({} chiffrée(s), {} EAPOL)", chiffrees, eapol)
+    if not chiffrees:
+        logger.debug("_signaler_80211_chiffrees: rien à signaler")
+        return
+    if not avec_cles:
+        raison = "aucune clé Wi-Fi fournie (--wifi-keys ou NETCROSS_WIFI_KEYS)"
+    elif not eapol:
+        raison = "4-way handshake EAPOL absent de la capture"
+    else:
+        raison = "clé ne correspondant pas au réseau ou handshake incomplet"
+    logger.warning(
+        "{} trame(s) de données 802.11 chiffrée(s) non déchiffrée(s) : {} ; métriques radio seules, aucun paquet IP",
+        chiffrees,
+        raison,
+    )
+    logger.debug("_signaler_80211_chiffrees: retour")
+
+
+def _run_ek(
+    *,
+    path: str | None,
+    interface: str | None,
+    bpf_filter: str | None,
+    display_filter: str | None,
+    extra_prefs: Sequence[str],
+    extra_args: Sequence[str],
+    lua_scripts: Sequence[str],
+    stop_event: threading.Event | None,
+    read_via_stdin: bool,
+    env_wifi: dict[str, str],
+    avec_cles_wifi: bool,
+) -> Iterator[EkRecord]:
+    """Corps d'iter_ek_records : lance tshark et lit son flux EK."""
     args = _build_args(
         path=path,
         interface=interface,
@@ -351,6 +428,8 @@ def iter_ek_records(
             stderr=subprocess.PIPE,
             text=True,
             bufsize=1,  # bufsize=1 : line-buffered, necessaire pour le live
+            # env=None (defaut de Popen) sans cle Wi-Fi : environnement herite, inchange
+            env={**os.environ, **env_wifi} if env_wifi else None,
         )
     finally:
         # le processus fils a herite du descripteur : le parent peut fermer le sien
@@ -361,6 +440,7 @@ def iter_ek_records(
     logger.debug("iter_ek_records: tshark lancé (pid {}, source={})", getattr(proc, "pid", None), path or interface)
     records_count = 0
     produced_any = False
+    chiffrees_80211 = eapol_80211 = 0
     try:
         assert proc.stdout is not None
         for obj in _iter_ndjson_records(proc.stdout):
@@ -376,7 +456,11 @@ def iter_ek_records(
                 except (TypeError, ValueError):
                     logger.debug("iter_ek_records: horodatage illisible, 0.0 utilisé")
                     ts = 0.0
-            yield EkRecord(ts=ts, layers=obj["layers"])
+            layers = obj["layers"]
+            if "wlan" in layers:
+                chiffrees_80211 += _trame_80211_chiffree(layers)
+                eapol_80211 += "eapol" in layers
+            yield EkRecord(ts=ts, layers=layers)
     finally:
         if proc.poll() is None:
             proc.terminate()
@@ -398,6 +482,7 @@ def iter_ek_records(
                 # d'erreur eventuel plus bas -- son absence ne fait perdre
                 # aucune fonctionnalite, juste un message legerement moins detaille.
                 stderr_text = proc.stderr.read() or ""
+        _signaler_80211_chiffrees(chiffrees_80211, eapol_80211, avec_cles_wifi)
         if proc.returncode not in (0, None, -15) and not produced_any:
             # -15 = SIGTERM, normal quand on arrete nous-memes un live
             # capture. Un code d'echec alors qu'aucun paquet n'est sorti
@@ -409,4 +494,4 @@ def iter_ek_records(
                 returncode=proc.returncode,
                 stderr=stderr_text,
             )
-    logger.debug("iter_ek_records: fin")
+    logger.debug("_run_ek: fin")
