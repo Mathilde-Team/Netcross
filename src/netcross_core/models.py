@@ -207,6 +207,12 @@ class Pkt:
     # Metadonnees radio 802.11 par trame (issue #1142), reportees depuis
     # RawPacket.radio ; None hors capture 802.11.
     radio: RadioInfo | None = None
+    # Identite 802.11 (TA, sequence, fragment) reportee depuis RawPacket
+    # (issue #1145) et nombre de retransmissions radio (bit retry, meme
+    # identite) fusionnees dans ce paquet : un paquet vu N+1 fois dans
+    # l'air reste UN paquet reseau. Voir netcross_core.retransmissions_radio.
+    wlan_mpdu: tuple[str, int, int] | None = None
+    radio_retries: int = 0
     # Empreinte SHA-256 d'un datagramme identifié RTCP par tshark (#1029).
     rtcp_hash: str | None = None
     # -- Checksums IP/TCP/UDP (Job 43/issue #163) : valeurs brutes (chaine
