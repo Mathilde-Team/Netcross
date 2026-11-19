@@ -15,6 +15,13 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   retransmissions TCP ou doublons réseau, en lot comme en live. Nouvelle
   identité 802.11 `RawPacket.wlan_mpdu` / `Pkt.wlan_mpdu`, module
   `netcross_core.retransmissions_radio`.
+- Métriques et constats radio par client 802.11 (#1146, sous-issue 4/5 du
+  chantier #1006) : RSSI médian, distribution MCS et débit PHY, taux de
+  retransmission radio, itinérance et temps d'antenne approximatif par
+  station (MAC anonymisable par `--redact`) ; constats « perte dans l'air »,
+  « perte après le point d'accès », « débit PHY bas » et « itinérance pendant
+  le flux ». Nouveau module `netcross_core.wifi`, champ `Report.wifi_clients`
+  (clé JSON `wifi_clients`).
 
 ### Sécurité
 - Clés dérivées 802.11 (PMK, KCK, KEK, TK, GTK) exposées par tshark en
