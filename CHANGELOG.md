@@ -7,6 +7,8 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-11-19
+
 ### Ajouté
 - Décapsulation 802.11 → IP et déchiffrement WPA/WPA2-PSK (#1143,
   sous-issue 2/5 du chantier Wi-Fi en mode moniteur #1006) : fichier de
