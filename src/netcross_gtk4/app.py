@@ -738,6 +738,11 @@ class MainWindow(Gtk.ApplicationWindow):
         # fichiers -- leurs sidecars d'annotations sont charges a la fin
         # de l'analyse (None : diff ou capture en direct, rien a annoter)
         self._annotation_captures: list | None = None
+        # Issue #1083 : extraits pcap de preuve du dernier run simple
+        # (refs cle evidence_pcaps, pour les liens du rapport HTML) et
+        # table d'anonymisation du run (None sans --redact)
+        self.last_evidence_pcaps = None
+        self._last_redactor = None
 
         # etat propre a la capture en direct (mode live, voir _begin_live_capture)
         self._live_capturing = False
@@ -2073,6 +2078,18 @@ class MainWindow(Gtk.ApplicationWindow):
         self.md_btn.set_sensitive(False)
         self.md_btn.connect("clicked", self.on_export_markdown)
         bottom.append(self.md_btn)
+
+        # Issue #1083 : --html-report (analyse simple, comme la CLI)
+        self.html_btn = Gtk.Button(label="Exporter en HTML")
+        self.html_btn.set_sensitive(False)
+        self.html_btn.connect("clicked", self.on_export_html)
+        bottom.append(self.html_btn)
+
+        # Issue #1083 : --evidence-pcaps (analyse simple, comme la CLI)
+        self.evidence_btn = Gtk.Button(label="Extraire les pcaps de preuve")
+        self.evidence_btn.set_sensitive(False)
+        self.evidence_btn.connect("clicked", self.on_extraire_pcaps_preuve)
+        bottom.append(self.evidence_btn)
         page.append(bottom)
 
         self.stack.add_titled(page, "results", "Resultats")
@@ -2401,6 +2418,8 @@ class MainWindow(Gtk.ApplicationWindow):
         self.csv_btn.set_sensitive(False)
         self.json_btn.set_sensitive(False)
         self.md_btn.set_sensitive(False)
+        self.html_btn.set_sensitive(False)
+        self.evidence_btn.set_sensitive(False)
         self.log_view.get_buffer().set_text("")
         self.work_status_label.set_text("Analyse en cours...")
         self.spinner.start()
@@ -2640,6 +2659,8 @@ class MainWindow(Gtk.ApplicationWindow):
         self.pdf_btn.set_sensitive(False)
         self.csv_btn.set_sensitive(False)
         self.md_btn.set_sensitive(False)
+        self.html_btn.set_sensitive(False)
+        self.evidence_btn.set_sensitive(False)
         self.log_view.get_buffer().set_text("")
         # Apres la remise a zero du journal, sinon ces messages seraient effaces.
         for message in ring_messages:
@@ -3022,6 +3043,11 @@ class MainWindow(Gtk.ApplicationWindow):
             logger.debug("MainWindow._run_analysis_thread: except Exception -> retour")
             return
 
+        # Issue #1083 : extraits du run precedent obsolètes (les fichiers
+        # cites n'existent plus pour cette analyse), redactor garde pour
+        # anonymiser les extraits de CE run avec la meme table.
+        self.last_evidence_pcaps = None
+        self._last_redactor = getattr(result, "redactor", None)
         GLib.idle_add(
             self._on_analysis_done,
             result.mode,
@@ -3215,6 +3241,8 @@ class MainWindow(Gtk.ApplicationWindow):
         self.csv_btn.set_sensitive(True)
         self.json_btn.set_sensitive(True)
         self.md_btn.set_sensitive(mode == "single")
+        self.html_btn.set_sensitive(mode == "single")
+        self.evidence_btn.set_sensitive(mode == "single" and bool(self._annotation_captures))
         self._reset_comm_map_filters()
         # dashboard analytique (issue #18) : reinitialise le contexte de
         # selection partage et peuple les six vues depuis le meme run
@@ -3333,7 +3361,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.pdf_btn.set_sensitive(True)
         self.csv_btn.set_sensitive(True)
         self.json_btn.set_sensitive(True)
-        self.md_btn.set_sensitive(False)  # pas de Markdown en comparaison (CLI : idem)
+        self.md_btn.set_sensitive(False)
+        self.html_btn.set_sensitive(False)
+        self.evidence_btn.set_sensitive(False)  # pas de Markdown en comparaison (CLI : idem)
         self._reset_comm_map_filters()
         # dashboard analytique (issue #18) : reinitialise le contexte de
         # selection partage et peuple les six vues depuis le meme run
@@ -3969,6 +3999,107 @@ class MainWindow(Gtk.ApplicationWindow):
             return
         self.export_markdown_to(gfile.get_path())
         logger.debug("_on_markdown_path_chosen: retour")
+
+    # Issue #1083 : --html-report (meme document que la CLI, fichier unique
+    # autonome ; les extraits produits par « Extraire les pcaps de preuve »
+    # sont references par des liens relatifs)
+
+    def on_export_html(self, _btn):
+        if self.last_mode != "single":
+            logger.debug("MainWindow.on_export_html: pas d'analyse simple -> retour")
+            return
+        logger.debug("on_export_html: mode={}", self.last_mode)
+        dialog = Gtk.FileDialog()
+        dialog.set_initial_name("rapport_analyse.html")
+        dialog.save(self, None, self._on_html_path_chosen)
+        logger.debug("MainWindow.on_export_html: fin")
+
+    def _on_html_path_chosen(self, dialog, result):
+        try:
+            gfile = dialog.save_finish(result)
+        except GLib.Error:
+            logger.exception("échec dans _on_html_path_chosen")
+            logger.debug("_on_html_path_chosen: retour")
+            return
+        self.export_html_to(gfile.get_path())
+        logger.debug("_on_html_path_chosen: retour")
+
+    def export_html_to(self, path):
+        """Issue #1083 : meme document que --html-report (rapport, constats,
+        TLS/QUIC, securite, objets de session, moteur de regles, extraits
+        pcap de preuve s'ils ont ete produits). Separe de la callback du
+        dialogue pour pouvoir etre pilote directement (tests)."""
+        from netcross_report.html_report import generate_html_report
+
+        logger.debug("export_html_to: {}", path)
+        try:
+            generate_html_report(
+                self.last_report,
+                path,
+                findings=self.last_findings,
+                tls_findings=self.last_tls_findings,
+                quic_findings=self.last_quic_findings,
+                security_report=self.last_security_report,
+                rule_engine_findings=self.last_rule_engine,
+                names=self.names_table,
+                evidence_pcaps=self.last_evidence_pcaps,
+                **self._session_objects().json_kwargs(),
+            )
+        except OSError as e:
+            logger.exception(f"échec dans export_html_to: {e}")
+            self.status_label.set_text(f"Erreur HTML : {e}")
+            logger.debug("export_html_to: retour")
+            return None
+        self.status_label.set_text(f"Rapport HTML ecrit dans {path}")
+        logger.debug("export_html_to: retour")
+        return path
+
+    # Issue #1083 : --evidence-pcaps (meme regle que la CLI : un pcapng par
+    # constat et par point, points a fichier unique, anonymise avec --redact)
+
+    def on_extraire_pcaps_preuve(self, _btn):
+        if self.last_mode != "single":
+            logger.debug("MainWindow.on_extraire_pcaps_preuve: pas d'analyse simple -> retour")
+            return
+        logger.debug("on_extraire_pcaps_preuve: mode={}", self.last_mode)
+        dialog = Gtk.FileDialog()
+        dialog.select_folder(self, None, self._on_evidence_dir_chosen)
+        logger.debug("MainWindow.on_extraire_pcaps_preuve: fin")
+
+    def _on_evidence_dir_chosen(self, dialog, result):
+        try:
+            gfile = dialog.select_folder_finish(result)
+        except GLib.Error:
+            logger.exception("échec dans _on_evidence_dir_chosen")
+            logger.debug("_on_evidence_dir_chosen: retour")
+            return
+        self.extraire_pcaps_preuve_dans(gfile.get_path())
+        logger.debug("_on_evidence_dir_chosen: retour")
+
+    def extraire_pcaps_preuve_dans(self, dossier):
+        """Ecrit les extraits dans ``dossier`` (comme --evidence-pcaps) et
+        garde les refs pour le rapport HTML ; pilote directement (tests)."""
+        from netcross_core.extract.evidence_pcaps import extraire_preuves_pcaps
+        from netcross_report import build_findings
+
+        logger.debug("extraire_pcaps_preuve_dans: {}", dossier)
+        findings = self.last_findings if self.last_findings is not None else build_findings(self.last_report)
+        par_point: dict[str, list[str]] = {}
+        for _label, _chemin in self._annotation_captures or []:
+            par_point.setdefault(_label, []).append(_chemin)
+        self.last_evidence_pcaps = extraire_preuves_pcaps(
+            {point: chemins[0] for point, chemins in par_point.items() if len(chemins) == 1},
+            findings,
+            dossier,
+            redactor=self._last_redactor,
+        )
+        if self.last_evidence_pcaps:
+            n_fichiers = len({e["fichier"] for e in self.last_evidence_pcaps})
+            self.status_label.set_text(f"{n_fichiers} extrait(s) pcap de preuve dans {dossier}")
+        else:
+            self.status_label.set_text("Aucun extrait pcap de preuve (preuve sans fichier source ?)")
+        logger.debug("extraire_pcaps_preuve_dans: retour {} extrait(s)", len(self.last_evidence_pcaps or []))
+        return self.last_evidence_pcaps
 
     def export_markdown_to(self, path):
         """Issue #864 : meme document que --md-report (rapport, constats,

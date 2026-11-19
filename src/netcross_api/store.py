@@ -148,6 +148,8 @@ class AnalysesStore:
         all_packets: Any = None,
         redaction_map: Any = None,
         redactor: Any = None,
+        evidence_pcaps: Any = None,
+        evidence_dir: Any = None,
     ) -> None:
         """Passe l'analyse en ``completed`` avec son document brut, son
         résumé et son rapport structuré (celui de ``--json-report``).
@@ -179,6 +181,11 @@ class AnalysesStore:
             # Issue #1155 : redacteur vivant, pour traduire les adresses
             # --client-group (client-diff) avec la meme table -- en mémoire
             redactor=redactor,
+            # Issue #1083 : extraits pcap de preuve (en mémoire seulement,
+            # comme les autres objets vivants : les fichiers restent sur le
+            # disque tant que l'analyse existe)
+            evidence_pcaps=evidence_pcaps,
+            evidence_dir=evidence_dir,
         )
         logger.debug("AnalysesStore.complete: fin")
 

@@ -264,6 +264,49 @@ def test_sorties_csv_markdown_json_sequence_et_expert(lance, tmp_path, capsys):
     assert "Table des noms chargee" in out
 
 
+def test_rapport_html_et_anonymisation(monkeypatch, tmp_path, capsys):
+    """Issue #1083 : --html-report ecrit le rapport autonome ; avec
+    --redact, aucune adresse reelle ne figure dans le HTML (les paquets
+    sont anonymises avant l'analyse, le rapport n'en voit jamais).
+
+    Paquets frais locaux : les tests --redact precedents mutent PKTS en
+    place (pseudonymes definitifs), ce test doit voir les adresses reelles
+    au premier passage."""
+    pkts = [*_conversation("A", 100.0), *_conversation("B", 100.005)]
+    monkeypatch.setattr(
+        cli, "parse_capture", lambda label, path, raise_on_error=False: [p for p in pkts if p.point == label]
+    )
+    monkeypatch.setattr(security_findings, "scan_capture_exploits", lambda label, path: [])
+
+    def _lance(*argv):
+        args = ["cross_capture_analyzer_cli.py", "--capture", "A=a.pcap", "--capture", "B=b.pcap"]
+        monkeypatch.setattr(sys, "argv", [*args, *map(str, argv)])
+        try:
+            cli.main()
+        except SystemExit as exc:
+            return exc.code
+        return 0
+
+    html = tmp_path / "r.html"
+    code = _lance("--html-report", html)
+    out = capsys.readouterr().out
+    assert code == 0
+    assert html.is_file()
+    contenu = html.read_text(encoding="utf-8")
+    assert "Rapport HTML ecrit" in out
+    assert "netcross" in contenu.lower()
+    assert "10.0.0.1" in contenu  # adresses reelles visibles sans --redact
+
+    html_redacte = tmp_path / "r-redacte.html"
+    code = _lance("--redact", "--html-report", html_redacte)
+    out = capsys.readouterr().out
+    assert code == 0
+    assert html_redacte.is_file()
+    contenu = html_redacte.read_text(encoding="utf-8")
+    assert "10.0.0.1" not in contenu
+    assert "10.0.0.2" not in contenu
+
+
 def test_pdf_genere_et_dependances_absentes(lance, monkeypatch, tmp_path, capsys):
     """Lignes 3167-3190 : PDF (meta d'anonymisation) puis reportlab absent."""
     import netcross_report

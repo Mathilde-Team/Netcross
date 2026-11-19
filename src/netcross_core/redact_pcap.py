@@ -403,6 +403,27 @@ def _bloc_epb(interface_id: int, ts_us: int, trame: bytes, longueur_originale: i
 # --------------------------------------------------------------------------
 
 
+def recrire_trame_anonymisee(
+    trame: bytes,
+    linktype: int,
+    redactor: AddressRedactor,
+    garder_payload: bool = True,
+) -> bytes:
+    """Anonymise UNE trame brute (issue #1083) : adresses IP/MAC remplacées
+    par leurs pseudonymes de la table du run, charges utiles conservées
+    (contrairement à :func:`ecrire_pcapng_anonymise`, qui les zéroée par
+    défaut : ici la trame est une preuve, sa charge utile fait partie du
+    constat) et sommes de contrôle recalculées. Les types de liaison non
+    traités par ``_recrire_trame`` sont rendus tels quels (limite assumée).
+
+    Utilisé par ``netcross_core.extract.evidence_pcaps`` pour les extraits
+    ``--evidence-pcaps --redact`` : même table que le reste du rapport."""
+    logger.debug("recrire_trame_anonymisee: entrée (linktype={})", linktype)
+    reecrite = _recrire_trame(trame, linktype, redactor, garder_payload)
+    logger.debug("recrire_trame_anonymisee: retour {} octet(s)", len(reecrite))
+    return reecrite
+
+
 def ecrire_pcapng_anonymise(
     label: str,
     chemins: list[str],

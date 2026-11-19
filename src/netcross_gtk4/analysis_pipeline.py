@@ -129,6 +129,10 @@ class AnalysisResult:
     report_context: ReportContext | None = None
     # Issue #866 : resultat JSON du module IA (meme document que --ai-report)
     ai: dict | None = None
+    # Issue #1083 : table d'anonymisation du run (None sans --redact) --
+    # les extraits pcap de preuve de la GUI l'utilisent pour anonymiser
+    # les trames avec les memes pseudonymes que le rapport
+    redactor: Any = None
 
 
 def load_packets(
@@ -591,6 +595,7 @@ def _run_pipeline(
         expertise=expertise_exports,
         report_context=report_context,
         ai=ai_result,
+        redactor=redactor,
     )
 
 

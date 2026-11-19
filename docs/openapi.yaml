@@ -474,6 +474,118 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /analyses/{analysis_id}/report/html:
+    get:
+      tags:
+      - analyses
+      summary: Get Analysis Html
+      description: 'Rapport HTML autonome d''une analyse terminée (équivalent de
+
+        ``--html-report``, issue #1083) : fichier unique, aucune ressource
+
+        externe, preuves cliquables et extraits ``--evidence-pcaps`` référencés
+
+        par des liens relatifs si l''analyse les avait demandés.
+
+
+        409 si l''analyse a été relue depuis SQLite après un redémarrage.'
+      operationId: get_analysis_html_analyses__analysis_id__report_html_get
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: analysis_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Analysis Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+            text/html: {}
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unauthorized
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflict
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /analyses/{analysis_id}/evidence-pcaps:
+    get:
+      tags:
+      - analyses
+      summary: Get Analysis Evidence Pcaps
+      description: 'Archive zip des extraits pcap de preuve d''une analyse terminée
+
+        (équivalent de ``--evidence-pcaps``, issue #1083) : un pcapng par constat
+
+        et par point, trames de preuve et contexte, commentaire de paquet.
+
+        Anonymisés si l''analyse a été faite avec ``redact=true``.
+
+
+        404 si l''analyse n''a pas demandé ``evidence_pcaps=true``.'
+      operationId: get_analysis_evidence_pcaps_analyses__analysis_id__evidence_pcaps_get
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: analysis_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Analysis Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+            application/zip: {}
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unauthorized
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Conflict
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /analyses/{analysis_id}/pdf:
     get:
       tags:
@@ -3200,6 +3312,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /probe/v1/enrollments:
+    post:
+      tags:
+      - probe
+      summary: Enroller Sonde
+      description: 'Inscription d''une sonde : jeton à usage unique + CSR, le
+
+        collecteur signe le certificat client (SAN URI netcross).'
+      operationId: enroller_sonde_probe_v1_enrollments_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '201':
+          description: Sonde inscrite, certificat client signé.
+        '400':
+          description: Requête ou CSR invalide.
+        '401':
+          description: Jeton inconnu, consommé ou sonde révoquée.
+        '409':
+          description: Nom de sonde déjà inscrit.
+        '426':
+          description: Aucune version de contrat commune.
   /gel/config:
     get:
       tags:
@@ -4138,6 +4275,19 @@ components:
           - type: 'null'
           title: History Label
           description: Étiquette du run dans l'historique (équivalent de --history-label)
+        evidence_pcaps:
+          type: boolean
+          title: Evidence Pcaps
+          description: 'true : extraire un pcapng par constat et par point de preuve
+            (équivalent de --evidence-pcaps), téléchargeable via GET /analyses/{id}/evidence-pcaps
+            (archive zip) ; anonymisé avec redact=true (issue #1083)'
+          default: false
+        evidence_pcaps_context:
+          type: integer
+          title: Evidence Pcaps Context
+          description: Fenêtre de trames autour de chaque trame de preuve (équivalent
+            de --evidence-pcaps-context)
+          default: 3
         plugins:
           anyOf:
           - type: string
@@ -4390,6 +4540,19 @@ components:
           - type: 'null'
           title: History Label
           description: Étiquette du run dans l'historique (équivalent de --history-label)
+        evidence_pcaps:
+          type: boolean
+          title: Evidence Pcaps
+          description: 'true : extraire un pcapng par constat et par point de preuve
+            (équivalent de --evidence-pcaps), téléchargeable via GET /analyses/{id}/evidence-pcaps
+            (archive zip) ; anonymisé avec redact=true (issue #1083)'
+          default: false
+        evidence_pcaps_context:
+          type: integer
+          title: Evidence Pcaps Context
+          description: Fenêtre de trames autour de chaque trame de preuve (équivalent
+            de --evidence-pcaps-context)
+          default: 3
         plugins:
           anyOf:
           - type: string

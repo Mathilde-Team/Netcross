@@ -29,6 +29,16 @@ from netcross_report.triage import health_label, health_score, rank_segments
 logger = get_logger(__name__)
 
 
+def _horloge_annoncee(r, point: str) -> dict | None:
+    """Issue #1103 : horloge ANNONCÉE par la sonde du point (déclarée par
+    chrony/timesyncd, pas estimée par l'analyse), None si la sonde n'a rien
+    annoncé (--sonde-meta absent ou clé clock vide)."""
+    logger.debug("_horloge_annoncee: entrée (point {})", point)
+    annonce = (getattr(r, "horloges_sondes", None) or {}).get(point) or None
+    logger.debug("_horloge_annoncee: retour")
+    return annonce
+
+
 def _evidence_list_dict(evidence) -> list[dict]:
     """Serialise une liste d'EvidenceLink -- factorise entre _finding_dict
     et _expert_event_dict (Session 36), meme format des deux cotes
@@ -280,6 +290,7 @@ def build_json_report_document(
     security_report=None,
     packet_flows=None,
     sequence_budget_octets=None,
+    evidence_pcaps=None,
     redaction=None,
 ) -> dict:
     """
@@ -320,7 +331,14 @@ def build_json_report_document(
     des constats vue a chaque point (``netcross_report.evidence_frames``) ;
     les cles ``sequence_diagrams`` (flux principaux NON TRONQUES,
     echantillonnes au-dela d'un budget de poids, issue #1079) et ``comm_map``
-    (carte des communications, issue #909) en sont deduites ; absentes sinon.
+    (carte des communications, issue #909) en sont deduitees ; absentes sinon.
+
+    evidence_pcaps (issue #1081) : liste produite par
+    ``netcross_core.extract.evidence_pcaps.extraire_preuves_pcaps()``
+    (une entree par preuve, ``ref``/``point``/``frame_number``/
+    ``fichier``), reportee telle quelle sous la cle ``evidence_pcaps``
+    pour que le HTML reference les extraits par des liens relatifs ;
+    absente sinon (rien n'est extrait par ce module).
     """
     logger.debug(
         "build_json_report_document: r={} title={} meta={} findings={} tls_findings={} "
@@ -358,7 +376,9 @@ def build_json_report_document(
         # Issue #996 : estimation d'horloge par paire -- decalage a t0,
         # derive (ppm), intervalles 95 %, echantillons et methode ; les
         # latences du rapport sont DEJA corrigees (par paquet), ces
-        # valeurs permettent d'auditer la correction.
+        # valeurs permettent d'auditer la correction. Issue #1103 : quand
+        # les sondes ont annonce leur horloge (--sonde-meta), l'annonce
+        # accompagne l'estimation pour la confronter.
         "clock_offsets": [
             {
                 "pair": [a, b],
@@ -372,6 +392,9 @@ def build_json_report_document(
                 "method": est.methode,
                 "sources": list(est.sources),
                 "forced": est.manuel,
+                "annonce": {
+                    point: _horloge_annoncee(r, point) for point in (a, b) if _horloge_annoncee(r, point) is not None
+                },
             }
             for (a, b), est in r.clock_offset_estimate.items()
         ],
@@ -417,6 +440,17 @@ def build_json_report_document(
     # Correlation en flux (#1022) : posee par la CLI avec --streaming.
     if getattr(r, "streaming", None):
         doc["streaming"] = r.streaming
+    # Issue #1103 : métadonnées de sonde par point (pertes DÉCLARÉES,
+    # horloge ANNONCÉE) -- à distinguer des pertes réseau estimées. Clés
+    # absentes sans --sonde-meta (convention « section absente si la
+    # fonctionnalité n'a pas tourné »).
+    pertes_sondes = getattr(r, "pertes_sondes", None)
+    horloges_sondes = getattr(r, "horloges_sondes", None)
+    if pertes_sondes or horloges_sondes:
+        doc["sondes"] = {
+            "capture_loss": dict(pertes_sondes or {}),
+            "clock": dict(horloges_sondes or {}),
+        }
     decryption = document_json(r)
     if decryption:
         doc["decryption"] = {"by_point": decryption}
@@ -521,6 +555,12 @@ def build_json_report_document(
             packet_flows, budget_octets=sequence_budget_octets or BUDGET_DONNEES_DEFAUT
         )
         doc["comm_map"] = build_comm_map_dict(packet_flows)
+
+    # Extraits pcap de preuve par constat (issue #1081) : liste produite par
+    # netcross_core.extract.evidence_pcaps.extraire_preuves_pcaps(), pas
+    # calculee ici -- netcross_report ne relit pas les fichiers de capture.
+    if evidence_pcaps:
+        doc["evidence_pcaps"] = evidence_pcaps
 
     logger.debug("build_json_report_document: retour doc={}", summarize(doc, "doc"))
     return doc

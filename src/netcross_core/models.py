@@ -539,6 +539,14 @@ class Report:
         default_factory=lambda: defaultdict(list)
     )
     clock_offset_estimate: dict[tuple[str, str], EstimationHorloge] = field(default_factory=dict)
+    # -- sondes (#1103) : pertes de capture DECLAREES par la sonde (ISB
+    # pcapng : ifdrop/osdrop) et etat d'horloge ANNONCE (chrony /
+    # timesyncd), par point. A distinguer des pertes RESEAUX estimees :
+    # une sonde qui admet avoir perdu n'a pas vu ce trafic, aucun constat
+    # ne peut le pretendre. Dictionnaire vide = pas de metadonnees de
+    # sonde (cas historique : fichiers pcap classiques sans ISB). --
+    pertes_sondes: dict[str, dict] = field(default_factory=dict)
+    horloges_sondes: dict[str, dict] = field(default_factory=dict)
     # -- VLAN 802.1Q --
     vlan_seen: dict[str, set[int]] = field(default_factory=lambda: defaultdict(set))
     vlan_change: dict[tuple[str, str], int] = field(default_factory=lambda: defaultdict(int))

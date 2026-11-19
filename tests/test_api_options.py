@@ -91,6 +91,9 @@ def test_options_par_defaut_enregistrees():
         "history_label": None,
         "plugins": (),
         "tls_keylogs": [],
+        # Issue #1083 : extraits pcap de preuve (équiv. --evidence-pcaps)
+        "evidence_pcaps": False,
+        "evidence_pcaps_context": 3,
     }
 
 

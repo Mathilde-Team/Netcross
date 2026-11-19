@@ -44,7 +44,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response, StreamingResponse
 from fastapi.security import APIKeyHeader
 
 from netcross_api.models import (
@@ -132,6 +132,16 @@ _ANALYSIS_HISTORY_FORM = Form(
 )
 _ANALYSIS_HISTORY_LABEL_FORM = Form(
     default=None, description="Étiquette du run dans l'historique (équivalent de --history-label)"
+)
+# Issue #1083 : extraits pcap de preuve (équivalents --evidence-pcaps)
+_EVIDENCE_PCAPS_FORM = Form(
+    default=False,
+    description="true : extraire un pcapng par constat et par point de preuve "
+    "(équivalent de --evidence-pcaps), téléchargeable via GET /analyses/{id}/evidence-pcaps "
+    "(archive zip) ; anonymisé avec redact=true (issue #1083)",
+)
+_EVIDENCE_PCAPS_CONTEXT_FORM = Form(
+    default=3, description="Fenêtre de trames autour de chaque trame de preuve (équivalent de --evidence-pcaps-context)"
 )
 _TEST_NET_EXTERNAL_FORM = Form(
     default=False,
@@ -382,6 +392,9 @@ class ApiAnalysisOptions:
     history: bool = False
     history_label: str | None = None
 
+    # Issue #1083 : extraits pcap de preuve (équiv. --evidence-pcaps)
+    evidence_pcaps: bool = False
+    evidence_pcaps_context: int = 3
     # Issue #867 : plugins autorisés (équiv. --plugins)
     plugins: tuple[str, ...] = ()
     # Issue #1040 : fichier de clés TLS par point (chemins temporaires,
@@ -446,6 +459,8 @@ def _options(
     duplicate_threshold_ms: float = DEFAULT_DUPLICATE_THRESHOLD_MS,
     history: bool = False,
     history_label: str | None = None,
+    evidence_pcaps: bool = False,
+    evidence_pcaps_context: int = 3,
     plugins: str | None = None,
 ) -> ApiAnalysisOptions:
     """Valide les options comme la CLI : ``redact`` se combine avec
@@ -562,6 +577,8 @@ def _options(
         duplicate_threshold_ms=duplicate_threshold_ms,
         history=history,
         history_label=history_label,
+        evidence_pcaps=evidence_pcaps,
+        evidence_pcaps_context=evidence_pcaps_context,
         plugins=plugin_names,
         confirm_active=confirm_active,
         active_dry_run=active_dry_run,
@@ -985,6 +1002,28 @@ def _run_job(
         logger.exception("analyse {} : erreur interne", analysis_id)
         store.fail(analysis_id, f"Erreur interne: {exc}")
     else:
+        # Issue #1083 : extraits pcap de preuve (--evidence-pcaps) : extraits
+        # pendant que les fichiers téléversés existent encore (supprimés dans
+        # le finally), anonymisés avec la table du run si redact=true. Les
+        # points à plusieurs fichiers (rotation) sont exclus, comme la CLI.
+        evidence_pcaps = None
+        evidence_dir = None
+        if options is not None and options.evidence_pcaps and findings:
+            from netcross_core.extract.evidence_pcaps import extraire_preuves_pcaps
+
+            par_point: dict[str, list[str]] = {}
+            for _label, _chemin in captures:
+                par_point.setdefault(_label, []).append(_chemin)
+            evidence_dir = tempfile.mkdtemp(prefix=f"netcross-evidence-{analysis_id}-")
+            evidence_pcaps = extraire_preuves_pcaps(
+                {point: chemins[0] for point, chemins in par_point.items() if len(chemins) == 1},
+                findings,
+                evidence_dir,
+                contexte=max(0, options.evidence_pcaps_context),
+                redactor=redactor if options.redact else None,
+            )
+            if evidence_pcaps:
+                summary["evidence_pcaps_url"] = f"/analyses/{analysis_id}/evidence-pcaps"
         if options is not None and options.history:
             # Issue #890 : comme --history-db, en fin de run ; une base
             # illisible n'annule pas l'analyse (history_error dans le statut).
@@ -1007,6 +1046,10 @@ def _run_job(
             all_packets=all_packets,
             redaction_map=redactor.entries() if redactor is not None else None,
             redactor=redactor if options and options.redact else None,
+            # Issue #1083 : extraits de preuve (fichiers sur le serveur,
+            # servis par GET /analyses/{id}/evidence-pcaps)
+            evidence_pcaps=evidence_pcaps,
+            evidence_dir=evidence_dir,
         )
     finally:
         for _label, path in captures:
@@ -1205,6 +1248,8 @@ async def upload_capture(
     duplicate_threshold_ms: float = _DUPLICATE_THRESHOLD_FORM,
     history: bool = _ANALYSIS_HISTORY_FORM,
     history_label: str | None = _ANALYSIS_HISTORY_LABEL_FORM,
+    evidence_pcaps: bool = _EVIDENCE_PCAPS_FORM,
+    evidence_pcaps_context: int = _EVIDENCE_PCAPS_CONTEXT_FORM,
     plugins: str | None = _PLUGINS_FORM,
     wait: bool = _WAIT_QUERY,
     _auth: None = Depends(_verify_api_key),
@@ -1269,6 +1314,8 @@ async def upload_capture(
         duplicate_threshold_ms=duplicate_threshold_ms,
         history=history,
         history_label=history_label,
+        evidence_pcaps=evidence_pcaps,
+        evidence_pcaps_context=evidence_pcaps_context,
         plugins=plugins,
     )
     if not file.filename:
@@ -1448,6 +1495,8 @@ async def upload_multi_capture(
     duplicate_threshold_ms: float = _DUPLICATE_THRESHOLD_FORM,
     history: bool = _ANALYSIS_HISTORY_FORM,
     history_label: str | None = _ANALYSIS_HISTORY_LABEL_FORM,
+    evidence_pcaps: bool = _EVIDENCE_PCAPS_FORM,
+    evidence_pcaps_context: int = _EVIDENCE_PCAPS_CONTEXT_FORM,
     plugins: str | None = _PLUGINS_FORM,
     wait: bool = _WAIT_QUERY,
     _auth: None = Depends(_verify_api_key),
@@ -1510,6 +1559,8 @@ async def upload_multi_capture(
         duplicate_threshold_ms=duplicate_threshold_ms,
         history=history,
         history_label=history_label,
+        evidence_pcaps=evidence_pcaps,
+        evidence_pcaps_context=evidence_pcaps_context,
         plugins=plugins,
     )
     # Issue #474 lot 2 : avec split_interfaces, un seul pcapng multi-interfaces
@@ -1789,6 +1840,107 @@ async def get_analysis_markdown(
         document,
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="netcross-{analysis_id}.md"'},
+    )
+
+
+@app.get(
+    "/analyses/{analysis_id}/report/html",
+    tags=["analyses"],
+    responses={**_ANALYSIS_RESPONSES, 200: {"content": {"text/html": {}}}},
+)
+async def get_analysis_html(
+    analysis_id: str,
+    _auth: None = Depends(_verify_api_key),
+) -> HTMLResponse:
+    """Rapport HTML autonome d'une analyse terminée (équivalent de
+    ``--html-report``, issue #1083) : fichier unique, aucune ressource
+    externe, preuves cliquables et extraits ``--evidence-pcaps`` référencés
+    par des liens relatifs si l'analyse les avait demandés.
+
+    409 si l'analyse a été relue depuis SQLite après un redémarrage.
+    """
+    logger.debug("get_analysis_html(analysis_id={})", analysis_id)
+    entry = _live_objects(analysis_id)
+    report = entry["report_obj"]
+    findings = entry.get("findings")
+    from netcross_report.html_report import render_html_report
+    from netcross_report.json_report import build_json_report_document
+    from netcross_report.session_objects import build_session_objects
+
+    options = (entry.get("metadata") or {}).get("options") or {}
+    rule_engine_findings = None
+    if options.get("rule_engine"):
+        from netcross_report.rule_engine import available_rule_ids, evaluate
+
+        rule_engine_findings = {rule_id: evaluate(rule_id, report) for rule_id in available_rule_ids()}
+    meta = {"Source": "API REST"}
+    redaction_info = None
+    if options.get("redact"):
+        meta["Anonymisation"] = "adresses IP/MAC et noms DNS/HTTP/TLS/SIP anonymises (redact)"
+        redactor = entry.get("redactor")
+        if redactor is not None:
+            from netcross_report.redaction_note import build_redaction_info
+
+            redaction_info = build_redaction_info(redactor, redactor.scope)
+    document = build_json_report_document(
+        report,
+        meta=meta,
+        findings=findings,
+        tls_findings=entry.get("tls_findings"),
+        quic_findings=entry.get("quic_findings"),
+        security_report=entry.get("security_report_obj"),
+        rule_engine_findings=rule_engine_findings,
+        redaction=redaction_info,
+        evidence_pcaps=entry.get("evidence_pcaps"),
+        **build_session_objects(report, findings, entry.get("flows"), entry.get("all_packets")).json_kwargs(),
+    )
+    logger.debug("get_analysis_html: retour")
+    return HTMLResponse(
+        render_html_report(document),
+        headers={"Content-Disposition": f'attachment; filename="netcross-{analysis_id}.html"'},
+    )
+
+
+@app.get(
+    "/analyses/{analysis_id}/evidence-pcaps",
+    tags=["analyses"],
+    responses={**_ANALYSIS_RESPONSES, 200: {"content": {"application/zip": {}}}},
+)
+async def get_analysis_evidence_pcaps(
+    analysis_id: str,
+    _auth: None = Depends(_verify_api_key),
+) -> Response:
+    """Archive zip des extraits pcap de preuve d'une analyse terminée
+    (équivalent de ``--evidence-pcaps``, issue #1083) : un pcapng par constat
+    et par point, trames de preuve et contexte, commentaire de paquet.
+    Anonymisés si l'analyse a été faite avec ``redact=true``.
+
+    404 si l'analyse n'a pas demandé ``evidence_pcaps=true``.
+    """
+    logger.debug("get_analysis_evidence_pcaps(analysis_id={})", analysis_id)
+    entry = _completed_entry(analysis_id)
+    evidence_dir = entry.get("evidence_dir")
+    if not evidence_dir or not entry.get("evidence_pcaps"):
+        logger.debug("get_analysis_evidence_pcaps: si pas d'extraits -> levée HTTPException")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Analyse {analysis_id} sans extraits pcap de preuve (relancer avec evidence_pcaps=true)",
+        )
+    import io
+    import zipfile
+
+    tampon = io.BytesIO()
+    with zipfile.ZipFile(tampon, "w", zipfile.ZIP_DEFLATED) as archive:
+        for extrait in entry["evidence_pcaps"]:
+            nom = extrait.get("fichier")
+            chemin = Path(evidence_dir) / (nom or "")
+            if nom and chemin.is_file():
+                archive.write(chemin, nom)
+    logger.debug("get_analysis_evidence_pcaps: retour")
+    return Response(
+        tampon.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="netcross-{analysis_id}-evidence-pcaps.zip"'},
     )
 
 
@@ -3385,6 +3537,14 @@ _annotations_routes.register(app, _verify_api_key, _completed_entry, lambda: sto
 from netcross_api import bpf_routes as _bpf_routes  # noqa: E402
 
 _bpf_routes.register(app, _verify_api_key)
+
+# Issue #1101 : enrôlement des sondes auprès du collecteur (contrat v1,
+# docs/probe-api-v1.yaml) -- seule route sans certificat client ni clé
+# API : la sonde ne possède encore ni l'un ni l'autre, elle s'authentifie
+# par le jeton d'enrôlement à usage unique.
+from netcross_api import probe_routes as _probe_routes  # noqa: E402
+
+_probe_routes.register(app)
 
 # Issue #1095 : gel rétroactif et incidents archivés (réglages partagés avec
 # la GUI, fichier fixé par NETCROSS_API_GEL_CONFIG)

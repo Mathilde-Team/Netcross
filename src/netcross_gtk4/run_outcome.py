@@ -88,6 +88,9 @@ class RunOutcome:
     security_report: Any
     # issue #864 : {rule_id: [Finding]} de --rule-engine (export Markdown)
     rule_engine: Any
+    # Issue #1083 : extraits pcap de preuve du run simple (refs des
+    # --evidence-pcaps de la CLI), produits a la demande dans la GUI
+    evidence_pcaps: Any
     diff_findings: Any
     baseline_report: Any
     current_report: Any
@@ -117,6 +120,7 @@ class RunOutcome:
         "wireshark_expert_events",
         "security_report",
         "rule_engine",
+        "evidence_pcaps",
         "diff_findings",
         "baseline_report",
         "current_report",
@@ -208,6 +212,7 @@ def analysis_outcome(
     wireshark_expert_events: Any = None,
     security_report: Any = None,
     rule_engine: Any = None,
+    evidence_pcaps: Any = None,
 ) -> RunOutcome:
     """Etat retenu apres une analyse simple.
 
@@ -227,6 +232,7 @@ def analysis_outcome(
         wireshark_expert_events=wireshark_expert_events,
         security_report=security_report,
         rule_engine=rule_engine,
+        evidence_pcaps=evidence_pcaps,
         diff_findings=None,
         baseline_report=None,
         current_report=None,
@@ -290,6 +296,7 @@ def diff_outcome(
         wireshark_expert_events=None,
         security_report=None,
         rule_engine=None,
+        evidence_pcaps=None,
         diff_findings=findings,
         baseline_report=baseline_report,
         current_report=current_report,

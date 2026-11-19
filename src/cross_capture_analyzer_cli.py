@@ -115,6 +115,7 @@ besoin explicite et maitrise d'un rejeu sur un segment reel) :
 
 import argparse
 import atexit
+import json
 import os
 import re
 import shutil
@@ -1613,6 +1614,42 @@ def _run_ai(args, ai_options, report, all_packets) -> None:
     logger.debug("_run_ai: fin")
 
 
+def _charger_sondes_meta(specifications, points):
+    """Lit les fichiers ``--sonde-meta POINT=JSON`` (#1103) et renvoie
+    (pertes par point, horloges par point). Refuse (exit 1) un point
+    inconnu ou un JSON illisible : une métadonnée de sonde silencieusement
+    ignorée laisserait croire que la sonde n'a rien perdu."""
+    logger.debug("_charger_sondes_meta: entrée ({} spécification(s))", len(specifications))
+    pertes: dict[str, dict] = {}
+    horloges: dict[str, dict] = {}
+    for spec in specifications:
+        if "=" not in spec:
+            print(f"--sonde-meta : format attendu POINT=JSON, reçu {spec!r}", file=sys.stderr)
+            sys.exit(1)
+        point, chemin = spec.split("=", 1)
+        if point not in points:
+            print(
+                f"--sonde-meta : point {point!r} inconnu (points : {', '.join(points)})",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        try:
+            with open(chemin, encoding="utf-8") as fh:
+                document = json.load(fh)
+        except (OSError, json.JSONDecodeError) as erreur:
+            logger.error("--sonde-meta {} : {} illisible ({})", point, chemin, erreur)
+            print(f"--sonde-meta {point} : {chemin} illisible ({erreur})", file=sys.stderr)
+            sys.exit(1)
+        # Les schémas capture_loss/clock figurent au premier niveau de la
+        # fenêtre (Window) comme de la santé (Health) du contrat v1.
+        if document.get("capture_loss"):
+            pertes[point] = document["capture_loss"]
+        if document.get("clock"):
+            horloges[point] = document["clock"]
+    logger.debug("_charger_sondes_meta: retour ({} point(s))", len(pertes))
+    return pertes, horloges
+
+
 def main():
     # `netcross lua-doc ...` : documentation hors ligne de l'API Lua Wireshark (issue #388)
     logger.debug("main: entrée")
@@ -2235,6 +2272,37 @@ def main():
         "Issue #761.",
     )
     ap.add_argument(
+        "--html-report",
+        help="Chemin de sortie pour un rapport HTML autonome (issue #1083) : "
+        "fichier unique, aucune ressource externe, diagrammes et preuves "
+        "cliquables (meme document que --json-report, rendu HTML). Les "
+        "extraits --evidence-pcaps y sont references par des liens relatifs. "
+        "Aucune dependance supplementaire.",
+    )
+    ap.add_argument(
+        "--evidence-pcaps",
+        metavar="DOSSIER",
+        help="Extraction des pcap de preuve (issue #1081) : ecrit dans "
+        "DOSSIER un pcapng par constat et par point de preuve, avec les "
+        "seules trames de preuve et leur contexte (voir --evidence-pcaps-"
+        "context) et un commentaire de paquet indiquant le constat. Les "
+        "points de capture a plusieurs fichiers (rotation) sont exclus : "
+        "leurs numeros de trames ne sont pas continus. Les extraits sont "
+        "referencees par --json-report/--html-report (cle evidence_pcaps) "
+        "sous forme de liens relatifs. Avec --redact (issue #1083) : les "
+        "trames ecrites sont anonymisees avec la meme table que le rapport. "
+        "Voir aussi --evidence-pcaps-context.",
+    )
+    ap.add_argument(
+        "--evidence-pcaps-context",
+        metavar="N",
+        type=int,
+        default=3,
+        help="Fenetre de trames autour de chaque trame de preuve dans les "
+        "extraits --evidence-pcaps (defaut : 3, comme le contexte du "
+        "diagramme de preuve du rapport HTML).",
+    )
+    ap.add_argument(
         "--rule-engine",
         action="store_true",
         help="Active le moteur d'execution de regles declaratives "
@@ -2500,6 +2568,17 @@ def main():
         default=0.0,
         help="Avec --redact-pcap : décalage uniforme des horodatages (les "
         "différences inter-points restent exactes). Défaut : 0 (conservés).",
+    )
+    ap.add_argument(
+        "--sonde-meta",
+        metavar="POINT=JSON",
+        action="append",
+        help="Métadonnées de sonde (#1103) pour un point : fichier JSON "
+        "décrit par la sonde (sortie `python3 -m netcross_probe fenetre`, "
+        "schémas capture_loss/clock du contrat v1). Le rapport distingue "
+        "alors « le réseau a perdu » de « la sonde a perdu » (pertes "
+        "déclarées ifdrop/osdrop) et affiche l'état d'horloge annoncé. "
+        "Répétable, un par point.",
     )
     ap.add_argument(
         "--support-ticket",
@@ -3502,6 +3581,14 @@ def main():
         r.capture_comments = read_capture_comments(captures)
         r.capture_infos = read_capture_infos(captures)
         r.points_keylog = sorted(tls_keylogs)
+    # Issue #1103 : métadonnées de sonde par point (pertes de capture
+    # DÉCLARÉES par les ISB, état d'horloge ANNONCÉ) -- lues des fichiers
+    # JSON décrits par les sondes (sortie `netcross_probe fenetre` ou
+    # santé du contrat v1, mêmes clés capture_loss/clock). Comme
+    # capture_comments, c'est une métadonnée de fichier, pas un résultat
+    # de l'analyse : remplie par l'appelant, jamais par analyse().
+    if args.sonde_meta:
+        r.pertes_sondes, r.horloges_sondes = _charger_sondes_meta(args.sonde_meta, r.points)
     # Report.truncated/truncation_note (issue #283, Etape 3) : ecrit ici, pas
     # dans analyse() -- meme discipline que capture_comments/capture_infos
     # ci-dessus, la troncature est une decision de l'appelant (CLI), pas un
@@ -3641,7 +3728,16 @@ def main():
     findings = None
     tls_findings = None
     quic_findings = None
-    if args.triage or args.pdf_report or args.json_report or args.md_report or args.history_db or args.expert_section:
+    if (
+        args.triage
+        or args.pdf_report
+        or args.json_report
+        or args.md_report
+        or args.html_report
+        or args.history_db
+        or args.expert_section
+        or args.evidence_pcaps
+    ):
         # calcule dans tous les cas si --pdf-report/--json-report/--history-db :
         # les trois integrent desormais le meme classement en tete (voir
         # netcross_report.pdf / netcross_report.json_report / netcross_report.history)
@@ -3791,7 +3887,7 @@ def main():
     # voir netcross_report.session_objects pour l'extraction (meme
     # sequence d'appels, aucun calcul nouveau).
     session_objects = None
-    if args.expert_section or args.pdf_report or args.json_report or args.md_report:
+    if args.expert_section or args.pdf_report or args.json_report or args.md_report or args.html_report:
         from netcross_report.session_objects import build_session_objects, print_session_objects
 
         session_objects = build_session_objects(r, findings, flows, all_packets)
@@ -3870,6 +3966,27 @@ def main():
             r.plugin_runs.append(run)
             print(f"Plugins : {run['line']}")
 
+    evidence_pcaps = None
+    if args.evidence_pcaps and findings:
+        # Extraction des pcap de preuve (issue #1081) : les points de capture
+        # a plusieurs fichiers (rotation) sont exclus, leurs numeros de
+        # trames ne sont pas continus d'un fichier a l'autre.
+        from netcross_core.extract.evidence_pcaps import extraire_preuves_pcaps
+
+        par_point: dict[str, list[str]] = {}
+        for _label, _chemin in captures:
+            par_point.setdefault(_label, []).append(_chemin)
+        evidence_pcaps = extraire_preuves_pcaps(
+            {point: chemins[0] for point, chemins in par_point.items() if len(chemins) == 1},
+            findings,
+            args.evidence_pcaps,
+            contexte=max(0, args.evidence_pcaps_context),
+            redactor=redactor,
+        )
+        if evidence_pcaps:
+            n_fichiers = len({e["fichier"] for e in evidence_pcaps})
+            print(f"Extraits pcap de preuve : {n_fichiers} fichier(s) dans {args.evidence_pcaps}")
+
     if args.json_report:
         from netcross_report import generate_json_report
 
@@ -3887,9 +4004,32 @@ def main():
             meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
             redaction=redaction_info,
             names=names,
+            evidence_pcaps=evidence_pcaps,
             **session_objects.json_kwargs(),
         )
         print(f"Rapport JSON ecrit dans {args.json_report}")
+
+    if args.html_report:
+        from netcross_report.html_report import generate_html_report
+
+        # Issue #1083 : meme document que --json-report, rendu HTML autonome
+        # (fichier unique, aucune ressource externe). Les extraits
+        # --evidence-pcaps y sont references par des liens relatifs.
+        generate_html_report(
+            r,
+            args.html_report,
+            findings=findings,
+            security_report=security_report_obj,
+            tls_findings=tls_findings,
+            quic_findings=quic_findings,
+            rule_engine_findings=rule_engine_findings,
+            meta={"Anonymisation": scope_label(args.redact_scope)} if args.redact else None,
+            redaction=redaction_info,
+            names=names,
+            evidence_pcaps=evidence_pcaps,
+            **session_objects.json_kwargs(),
+        )
+        print(f"Rapport HTML ecrit dans {args.html_report}")
 
     # Issues #359/#360/#361 : sorties JSON d'analyse avancee
     if args.flow_timeline:

@@ -1,5 +1,14 @@
 # netcross — CLAUDE.md
 
+
+## Mission
+
+Avant toute intervention autonome sur ce dépôt : lire et appliquer la
+mission d'équipe :
+https://github.com/Mathilde-Team/.github/blob/dev/MISSION.md
+(le socle qualité, SOCLE.md, prime sur la mission en cas de conflit ; si
+le fichier est absent sur `dev`, le chercher sur `main`).
+
 Analyse croisée de captures réseau multi-points (`pcap_parser`/`tshark`,
 `netcross_core`, `netcross_report`, CLI, export JSON/PDF, GUI GTK4),
 développée session par session en comparaison fonctionnalité par
