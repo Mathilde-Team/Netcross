@@ -232,7 +232,9 @@ def test_mtls_sans_certificat_client_refuse(serveur_sonde):
     contexte.verify_mode = ssl.CERT_NONE
     with socket.create_connection((hote, int(port)), timeout=5) as brut:
         tls = contexte.wrap_socket(brut)
-        with pytest.raises(ssl.SSLError):
+        # Refus de poignée de main : erreur TLS, ou fermeture d'autorité par
+        # le serveur selon le timing -- les deux traduisent le même refus.
+        with pytest.raises((ssl.SSLError, ConnectionResetError)):
             tls.send(b"x")
             tls.recv(1)
 
