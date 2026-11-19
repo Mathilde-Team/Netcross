@@ -410,6 +410,7 @@ def build_json_report_document(
         "findings": [_finding_dict(f) for f in findings],
         "microbursts": r.microbursts,
         "microburst_correlations": r.microburst_correlations,
+        "wifi_clients": r.wifi_clients,
         "link_speeds": r.link_speeds,
         "triage": [_segment_score_dict(s) for s in ranked],
         # health_score/health_label : voir netcross_report.triage --

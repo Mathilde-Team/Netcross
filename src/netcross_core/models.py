@@ -213,6 +213,9 @@ class Pkt:
     # l'air reste UN paquet reseau. Voir netcross_core.retransmissions_radio.
     wlan_mpdu: tuple[str, int, int] | None = None
     radio_retries: int = 0
+    # Station cliente 802.11 (MAC, BSSID, emise par la station) reportee
+    # depuis RawPacket (issue #1146) ; consommee par netcross_core.wifi.
+    wlan_station: tuple[str, str, bool] | None = None
     # Empreinte SHA-256 d'un datagramme identifié RTCP par tshark (#1029).
     rtcp_hash: str | None = None
     # -- Checksums IP/TCP/UDP (Job 43/issue #163) : valeurs brutes (chaine
@@ -782,6 +785,10 @@ class Report:
     # #1137 : associations temporelles épisode/segment aval, preuves bornées.
     # Une absence de paquet n'est pas une preuve de congestion physique.
     microburst_correlations: list[dict] = field(default_factory=list)
+    # #1146 : point -> fiches radio par station 802.11 (RSSI, MCS, débit PHY,
+    # retransmissions radio, itinérance, temps d'antenne, constats). Voir
+    # netcross_core.wifi.metriques_clients ; vide hors capture 802.11.
+    wifi_clients: dict[str, list[dict]] = field(default_factory=dict)
     # -- Couverture du dechiffrement TLS/QUIC (issue #1043) -- dechiffrement
     # est rempli par analyse() (netcross_core.dechiffrement.compter_sessions) :
     # point -> {"tls"/"quic": {"sessions", "dechiffrees"}}. points_keylog est

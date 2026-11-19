@@ -85,6 +85,39 @@ Une retransmission radio est fusionnée dans le paquet d'origine :
 Une trame à bit `retry` dont l'original n'a pas été capté est conservée,
 car c'est la seule copie vue.
 
+## Métriques radio par client
+
+Pour chaque point 802.11, le rapport (section « Wi-Fi : métriques radio par
+client » du texte, clé `wifi_clients` du JSON) donne une fiche par station
+cliente, identifiée par son adresse MAC. Comme les autres adresses, cette MAC
+est anonymisée par `--redact` (le BSSID et l'émetteur radio aussi). La station
+et le sens de la trame sont lus dans les bits ToDS/FromDS.
+
+| Métrique | Calcul |
+| --- | --- |
+| RSSI médian | trames **émises** par la station (le signal d'une trame descendante est celui du point d'accès) |
+| MCS, débit PHY | distribution sur les trames des deux sens, et débit médian |
+| Taux de retransmission radio | copies *retry* fusionnées / transmissions totales |
+| Itinérance | changements de BSSID datés, avec le nombre de flux vus avant et après |
+| Temps d'antenne | somme de `longueur × 8 / débit PHY` par transmission, copies *retry* comprises |
+
+Le temps d'antenne est un ordre de grandeur : il ne compte ni le préambule, ni
+les intervalles entre trames, ni les acquittements.
+
+Constats :
+
+- **perte dans l'air** : un segment TCP du client est retransmis et sa
+  transmission d'origine, au même point, porte des copies *retry*. La trame a
+  peiné dans l'air.
+- **perte après le point d'accès** : l'origine a été vue sans *retry*, donc
+  acquittée au niveau 802.11. Le cas couvre aussi un segment descendant jamais
+  vu dans l'air, perdu avant d'atteindre l'antenne. Un segment montant jamais
+  vu reste « indéterminé », car la sonde a pu le manquer.
+- **débit PHY bas** : débit PHY médian sous 24 Mbit/s
+  (`netcross_core.wifi.SEUIL_DEBIT_PHY_BAS_MBPS`).
+- **itinérance pendant le flux** : un flux du client est vu avant ET après un
+  changement de BSSID.
+
 ## Non-fuite de la phrase de passe
 
 La phrase de passe ne passe jamais sur la ligne de commande de tshark, qui

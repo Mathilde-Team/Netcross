@@ -386,6 +386,19 @@ class AddressRedactor:
         if pk.arp_sender_mac is not None and _is_mac(pk.arp_sender_mac):
             pk.arp_sender_mac = self._pseudonym(pk.arp_sender_mac, "mac")
 
+        # Issue #1146 : adresses 802.11 (emetteur radio, station, BSSID),
+        # pour que les metriques radio par client soient anonymisables.
+        mpdu = getattr(pk, "wlan_mpdu", None)
+        if mpdu is not None and _is_mac(mpdu[0]):
+            pk.wlan_mpdu = (self._pseudonym(mpdu[0], "mac"), mpdu[1], mpdu[2])
+        station = getattr(pk, "wlan_station", None)
+        if station is not None:
+            pk.wlan_station = (
+                self._pseudonym(station[0], "mac") if _is_mac(station[0]) else station[0],
+                self._pseudonym(station[1], "mac") if _is_mac(station[1]) else station[1],
+                station[2],
+            )
+
         if pk.dhcp_server_id is not None:
             kind = _ip_kind(pk.dhcp_server_id)
             if kind is not None:
