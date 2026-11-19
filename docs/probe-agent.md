@@ -146,6 +146,7 @@ arrête service et capture ; le tampon est conservé.
 L'agent est aussi une bibliothèque (`AgentProbe`) : capture
 (`AgentCapture`, réglages `ReglagesCapture`) et registre de fenêtres avec
 expiration (`extraire`/`fenetre`/`liberer`). La couche réseau (mTLS,
-#1101), la remontée pertes/horloge (#1103), le collecteur et le schéma
-`probe://` (#1105) et les paquets de déploiement (#1107) s'y brancheront
-sans réécrire cette mécanique.
+#1101), la remontée pertes/horloge (#1103) et le collecteur et le schéma
+`probe://` (#1105) s'y branchent sans réécrire cette mécanique. Le
+déploiement — paquets, unité systemd durcie, image conteneur — est
+décrit dans [Déployer une sonde](deploiement-sonde.md) (#1107).
