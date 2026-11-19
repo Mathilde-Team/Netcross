@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-261 modules · 374 classes · 914 fonctions publiques de module.
+262 modules · 375 classes · 916 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -452,6 +452,7 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +tuple~str, int, int~? wlan_mpdu
         +str? rtcp_hash
         +str? comment
         +str? ip_checksum
@@ -501,6 +502,7 @@ classDiagram
     class mod_pcap_parser_radio["pcap_parser.radio"] {
         <<module>>
         +extract_radio(layers) RadioInfo?
+        +extract_mpdu_id(layers) tuple~str, int, int~?
         +missing_radiotap_note(path) str?
     }
 
@@ -828,6 +830,7 @@ classDiagram
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.redact_pcap` | réécriture pcapng anonymisée multi-points. |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
+| `netcross_core.retransmissions_radio` | retransmissions 802.11 (issue #1145). |
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
 | `netcross_core.rtp_segments` | Qualité de transport entre jambes RTP appariées, sans lire le contenu. |
@@ -2026,6 +2029,8 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +tuple~str, int, int~? wlan_mpdu
+        +int radio_retries
         +str? rtcp_hash
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -2422,6 +2427,16 @@ classDiagram
         +load_capture_annotations(captures) dict~str, list~PacketAnnotation~~
         +print_capture_annotations(by_point) None
         +write_detail_csv(path, flows, points, names)
+    }
+
+    %% ===== netcross_core.retransmissions_radio =====
+    class FiltreRetransmissionsRadio {
+        +accepte(pk) bool
+        +filtrer(paquets) Iterator~Pkt~
+    }
+    class mod_netcross_core_retransmissions_radio["netcross_core.retransmissions_radio"] {
+        <<module>>
+        +retirer_retransmissions_radio(paquets) list~Pkt~
     }
 
     %% ===== netcross_core.retro_capture =====

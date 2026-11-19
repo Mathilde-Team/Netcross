@@ -7,6 +7,15 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Ajouté
+- Appariement air ↔ filaire (#1145, sous-issue 3/5 du chantier Wi-Fi en
+  mode moniteur #1006) : les retransmissions 802.11 (bit retry, même
+  émetteur, séquence et fragment au même point) sont fusionnées dans le
+  paquet d'origine (`Pkt.radio_retries`) au lieu d'être comptées comme
+  retransmissions TCP ou doublons réseau, en lot comme en live. Nouvelle
+  identité 802.11 `RawPacket.wlan_mpdu` / `Pkt.wlan_mpdu`, module
+  `netcross_core.retransmissions_radio`.
+
 ### Sécurité
 - Clés dérivées 802.11 (PMK, KCK, KEK, TK, GTK) exposées par tshark en
   sortie EK retirées de chaque enregistrement dès la lecture (#1143).
