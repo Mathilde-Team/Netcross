@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Unité systemd durcie de la sonde Netcross (issue #1107).
+#
+# Installation (détaillée dans docs/deploiement-sonde.md) :
+#   sudo cp deploy/systemd/netcross-probe.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now netcross-probe
+#
+# La configuration (interface, nom, enrôlement) vit dans
+# /etc/netcross-probe/netcross-probe.conf, lu comme environnement : rien
+# de sensible n'est écrit dans l'unité elle-même. Le jeton d'enrôlement
+# n'est utile qu'au premier lancement ; retirez la ligne JETON= ensuite.
+#
+# Durcissement : utilisateur dynamique sans privilèges (DynamicUser),
+# repart des seules capacités réseau nécessaires à la capture
+# (CAP_NET_RAW, CAP_NET_ADMIN), système de fichiers racine en lecture
+# seule (ProtectSystem=strict) avec le seul /var/lib/netcross-probe
+# inscriptible (StateDirectory), pas de /home, /tmp privé, matériel
+# protégé, noyau (tunables/modules/cgroups/horloge) protégé, syscalls
+# filtrés à @system-service, écriture-exécution mémoire interdite.
+
+[Unit]
+Description=Sonde Netcross (tampon circulaire local + service mTLS du contrat v1)
+Documentation=file:/usr/share/doc/netcross/deploiement-sonde.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+EnvironmentFile=/etc/netcross-probe/netcross-probe.conf
+ExecStart=/usr/bin/netcross-probe servir \
+    --interface ${NETCROSS_PROBE_INTERFACE} \
+    --dossier /var/lib/netcross-probe/tampon \
+    --identite /var/lib/netcross-probe/identite \
+    --nom ${NETCROSS_PROBE_NOM} \
+    --ecoute ${NETCROSS_PROBE_ECOUTE} \
+    --enrolement ${NETCROSS_PROBE_ENROLEMENT} \
+    --jeton ${NETCROSS_PROBE_JETON} \
+    --listen-url ${NETCROSS_PROBE_LISTEN_URL} \
+    --nb-fichiers ${NETCROSS_PROBE_NB_FICHIERS} \
+    --duree-par-fichier ${NETCROSS_PROBE_DUREE_PAR_FICHIER}
+Restart=on-failure
+RestartSec=5s
+
+# Utilisateur dynamique, /var/lib/netcross-probe créé et possédé par lui
+DynamicUser=yes
+StateDirectory=netcross-probe
+CacheDirectory=netcross-probe
+LogsDirectory=netcross-probe
+
+# Seules les capacités de capture ; le binaire ne tourne pas en root
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+
+# Système de fichiers : racine en lecture seule, pas de /home ni /usr
+# inscriptible, /tmp privé, /dev restreint, chemins inscriptibles limités
+# à l'état de la sonde (StateDirectory ci-dessus)
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+
+# Réseau : IPv4/IPv6 + sockets paquets AF_PACKET pour libpcap, rien d'autre
+RestrictAddressFamilies=AF_INET AF_INET6 AF_PACKET AF_UNIX
+
+# Appels système restreints au service, pas de changement de personnalité,
+# pas de mémoire exécutable en écriture, pas de temps réel, pas de SUID
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

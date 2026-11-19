@@ -1,0 +1,90 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Image conteneur de la sonde (issue #1107).
+#
+# Construit deploy/conteneur/Dockerfile et vérifie que la sonde s'y
+# lance (python3 -m netcross_probe --help). En PR : construction seule,
+# sans pousser -- l'image de la sonde n'est publiée que depuis dev.
+#
+# Déclencheurs :
+#   - pull_request touchant deploy/ ou ce workflow : construction + contrôle ;
+#   - push sur dev touchant deploy/ ou ce workflow : construction, contrôle
+#     et publication vers ghcr.io/mathilde-team/netcross-probe:latest ;
+#   - manuel (workflow_dispatch).
+
+name: Image de sonde
+
+"on":
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - "deploy/**"
+      - "src/netcross_probe/**"
+      - "src/pcap_parser/**"
+      - ".github/workflows/ci-image-sonde.yml"
+  push:
+    branches: [dev]
+    paths:
+      - "deploy/**"
+      - "src/netcross_probe/**"
+      - "src/pcap_parser/**"
+      - ".github/workflows/ci-image-sonde.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write  # push vers ghcr.io (paquet de l'organisation)
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/mathilde-team/netcross-probe
+  TAG: latest
+
+jobs:
+  image:
+    name: Construction de l'image de sonde
+    # Runner maison avec Docker sur l'hôte (même label que ci-image.yml) ;
+    # repli inchangé : NETCROSS_RUNS_ON.
+    runs-on: ${{ fromJSON(vars.NETCROSS_RUNS_ON || '{"group":"maison","labels":["self-hosted","linux","docker"]}') }}
+    steps:
+      - name: Checkout du dépôt
+        uses: actions/checkout@v7
+
+      - name: Construction
+        # --pull : repart toujours du dernier python:3.12-slim. Le contexte
+        # est la racine du dépôt (le Dockerfile COPY src/…) : seul
+        # deploy/conteneur/Dockerfile est passé par -f.
+        run: |
+          docker build --pull \
+            -f deploy/conteneur/Dockerfile \
+            -t "$IMAGE:$TAG" \
+            -t "$IMAGE:$TAG-${GITHUB_SHA::12}" \
+            .
+
+      - name: Contrôle de la sonde dans l'image
+        run: |
+          docker run --rm "$IMAGE:$TAG" --help >/dev/null
+          docker run --rm --entrypoint bash "$IMAGE:$TAG" -c '
+            set -e
+            for outil in tshark editcap mergecap capinfos; do
+              command -v "$outil" >/dev/null || { echo "outil manquant : $outil"; exit 1; }
+            done
+            python3 -c "import cryptography, loguru"
+            python3 -c "import netcross_probe, pcap_parser"
+          '
+
+      - name: Connexion à ghcr.io
+        if: github.event_name != 'pull_request'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:$TAG-${GITHUB_SHA::12}"
+
+      - name: Déconnexion de ghcr.io
+        if: always() && github.event_name != 'pull_request'
+        run: docker logout ghcr.io
