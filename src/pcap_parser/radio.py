@@ -86,6 +86,59 @@ def extract_radio(layers: dict) -> RadioInfo | None:
     return info
 
 
+def extract_mpdu_id(layers: dict) -> tuple[str, int, int] | None:
+    """Identite 802.11 d'une trame (adresse de l'emetteur radio TA, numero
+    de sequence, numero de fragment), ou None hors 802.11 / champ absent.
+    C'est la cle de detection des doublons d'un recepteur 802.11
+    (IEEE 802.11-2020, 10.3.2.14) : une trame a bit retry de meme cle
+    qu'une trame deja vue est une retransmission radio (issue #1145)."""
+    logger.debug("extract_mpdu_id: debut")
+    wlan = layers.get("wlan")
+    if isinstance(wlan, list):
+        wlan = wlan[-1]
+    if wlan is None:
+        logger.debug("extract_mpdu_id: pas de couche wlan -> retour None")
+        return None
+    emetteur = g(wlan, "wlan_wlan_ta") or g(wlan, "wlan_wlan_sa")
+    seq = hex_or_dec_to_int(g(wlan, "wlan_wlan_seq"))
+    if not isinstance(emetteur, str) or seq is None:
+        logger.debug("extract_mpdu_id: emetteur ou sequence absent -> retour None")
+        return None
+    mpdu = (emetteur, seq, hex_or_dec_to_int(g(wlan, "wlan_wlan_frag")) or 0)
+    logger.debug("extract_mpdu_id: retour sequence {}", seq)
+    return mpdu
+
+
+def extract_station(layers: dict) -> tuple[str, str, bool] | None:
+    """Station cliente d'une trame 802.11 : (adresse MAC de la station,
+    BSSID, True si la trame est emise par la station), lue dans les bits
+    ToDS/FromDS (issue #1146). ToDS seul : station -> point d'acces
+    (station = TA/SA) ; FromDS seul : point d'acces -> station (station =
+    RA/DA). None hors 802.11, en WDS (ToDS et FromDS, pas de station) ou
+    sans BSSID."""
+    logger.debug("extract_station: debut")
+    wlan = layers.get("wlan")
+    if isinstance(wlan, list):
+        wlan = wlan[-1]
+    if wlan is None:
+        logger.debug("extract_station: pas de couche wlan -> retour None")
+        return None
+    ds = hex_or_dec_to_int(g(wlan, "wlan_wlan_fc_ds"))
+    bssid = g(wlan, "wlan_wlan_bssid")
+    if ds == 1:
+        station, emise = g(wlan, "wlan_wlan_ta") or g(wlan, "wlan_wlan_sa"), True
+    elif ds == 2:
+        station, emise = g(wlan, "wlan_wlan_ra") or g(wlan, "wlan_wlan_da"), False
+    else:
+        logger.debug("extract_station: ds={} sans station -> retour None", ds)
+        return None
+    if not isinstance(station, str) or not isinstance(bssid, str):
+        logger.debug("extract_station: station ou BSSID absent -> retour None")
+        return None
+    logger.debug("extract_station: retour (emise={})", emise)
+    return (station, bssid, emise)
+
+
 def missing_radiotap_note(path: str) -> str | None:
     """Message explicite si `path` est une capture 802.11 sans en-tete
     radio (linktype 105 sur toutes ses interfaces 802.11), None sinon (ou

@@ -7,9 +7,43 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 
 ## [Unreleased]
 
+### Ajouté
+- Appariement air ↔ filaire (#1145, sous-issue 3/5 du chantier Wi-Fi en
+  mode moniteur #1006) : les retransmissions 802.11 (bit retry, même
+  émetteur, séquence et fragment au même point) sont fusionnées dans le
+  paquet d'origine (`Pkt.radio_retries`) au lieu d'être comptées comme
+  retransmissions TCP ou doublons réseau, en lot comme en live. Nouvelle
+  identité 802.11 `RawPacket.wlan_mpdu` / `Pkt.wlan_mpdu`, module
+  `netcross_core.retransmissions_radio`.
+- Métriques et constats radio par client 802.11 (#1146, sous-issue 4/5 du
+  chantier #1006) : RSSI médian, distribution MCS et débit PHY, taux de
+  retransmission radio, itinérance et temps d'antenne approximatif par
+  station (MAC anonymisable par `--redact`) ; constats « perte dans l'air »,
+  « perte après le point d'accès », « débit PHY bas » et « itinérance pendant
+  le flux ». Nouveau module `netcross_core.wifi`, champ `Report.wifi_clients`
+  (clé JSON `wifi_clients`).
+- Section « Wi-Fi : métriques radio par client » du rapport PDF (#1148,
+  sous-issue 5/5 du chantier #1006). La couverture Wi-Fi et ses limites sont
+  documentées dans `docs/detectors.md` et dans le README, qui ne la classe
+  plus « hors périmètre ».
+
+### Sécurité
+- Clés dérivées 802.11 (PMK, KCK, KEK, TK, GTK) exposées par tshark en
+  sortie EK retirées de chaque enregistrement dès la lecture (#1143).
+
 ## [1.2.0] — 2026-11-19
 
 ### Ajouté
+- Décapsulation 802.11 → IP et déchiffrement WPA/WPA2-PSK (#1143,
+  sous-issue 2/5 du chantier Wi-Fi en mode moniteur #1006) : fichier de
+  clés `wpa-pwd:PHRASE:SSID` ou `wpa-psk:HEX64` via `--wifi-keys` ou
+  `NETCROSS_WIFI_KEYS` (toutes surfaces, live compris). La phrase n'est
+  jamais sur la ligne de commande de tshark : fichier `80211_keys` d'un
+  `WIRESHARK_CONFIG_DIR` temporaire (0700/0600) supprimé après lecture.
+  Sans clé ou sans 4-way handshake, avertissement explicite et métriques
+  radio seules. Paquets déchiffrés tagués `802.11(déchiffré)`. Capture
+  de référence synthétique `tests/data/wpa2-psk-reference.pcap`
+  (générateur `tests/wpa2_reference.py`), doc `docs/dechiffrement-wifi.md`.
 - mTLS, enrôlement et révocation des sondes (#1101, sous-issue 3/6 du
   chantier sondes distribuées #1002, dépend de #1099) : aucune écoute ni
   transfert sans authentification mutuelle. La sonde s'inscrit par jeton à

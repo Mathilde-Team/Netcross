@@ -85,6 +85,7 @@ celui que produit `tableau_markdown()`.
 | `infer_topology` | phase | seconde_passe | écarts de TTL et ensembles de flux vus par paire de points | capture entière | `topology_edges` | recouvrement de Jaccard entre ensembles complets ; sans objet avec --order |
 | `compute_throughput` | phase | incremental | octets par (point, tranche) | aucune | `throughput` |  |
 | `detect_microbursts` | phase | seconde_passe | médianes des tranches non vides et fenêtres glissantes par point | 100 µs, 1 ms, 10 ms ; référence sur la capture entière | `microbursts` | tri et référence globale actuellement nécessaires ; ne prétend pas être un détecteur en flux |
+| `wifi_clients` | phase | seconde_passe | trames 802.11 par point et par station, premières transmissions des segments TCP | capture entière | `wifi_clients` | médianes et itinérances calculées sur toutes les trames de la station |
 | `detect_extracted_files` | phase | fenetre_bornee | charges utiles en cours de réassemblage par flux | durée du transfert de l'objet | `extracted_files` |  |
 | `application_transactions` | phase | fenetre_bornee | requêtes HTTP/DNS en attente de réponse | seuil de réponse du protocole ; « réponse manquante » décidée à l'expiration | `application_transactions` |  |
 | `clock_sync` | phase | seconde_passe | échanges SYN / SYN-ACK et copies d'un même paquet entre paires de points | capture entière | `clock_offset_estimate`, `clock_offset_samples` | estimateur robuste (Theil-Sen, #996) calculé avant la boucle des flux : la latence par segment est corrigée au temps de chaque paquet |
@@ -146,7 +147,7 @@ celui que produit `tableau_markdown()`.
 | `quic_diagnostics` | diagnostic | seconde_passe | paquets QUIC Initial de chaque point | capture entière |  | --quic : relit les fichiers avec tshark |
 | `greffons` | greffon | seconde_passe | DetectorContext : tous les paquets et le rapport, en lecture seule | capture entière |  | contrat de netcross_core.plugins.api ; un mode en flux devra proposer un contrat incrémental |
 
-Total : 63 détecteurs -- incremental : 28, fenetre_bornee : 27, seconde_passe : 8.
+Total : 64 détecteurs -- incremental : 28, fenetre_bornee : 27, seconde_passe : 9.
 
 <!-- inventaire-detecteurs:fin -->
 
@@ -265,6 +266,31 @@ Le résultat établit une **association temporelle**, pas une causalité physiqu
 une duplication, un rejeu ou un incident indépendant peuvent expliquer ces
 observations. Vérifier les compteurs de files et la qualité de capture avant
 d'attribuer les pertes à la rafale ; aucun essai matériel n'est implicite.
+
+## Wi-Fi : métriques radio par client
+
+Le détecteur `wifi_clients` (`netcross_core.wifi`, issue #1146) lit les points
+de capture 802.11 en mode moniteur. Il produit une fiche par station cliente :
+RSSI médian, distribution MCS et débit PHY, taux de retransmission radio,
+itinérances et temps d'antenne approximatif. Il émet aussi quatre constats :
+« perte dans l'air », « perte après le point d'accès », « débit PHY bas » et
+« itinérance pendant le flux ». Les définitions et les seuils sont détaillés
+dans [Déchiffrement Wi-Fi](dechiffrement-wifi.md#metriques-radio-par-client).
+Les fiches apparaissent dans le rapport texte, le PDF et la clé JSON
+`wifi_clients`.
+
+Couverture et limites :
+
+| Sujet | Couverture |
+| --- | --- |
+| En-têtes radio | radiotap, PPI, AVS et Prism via la pseudo-couche `wlan_radio` de tshark ; sans en-tête radio (linktype 105), seul le bit *retry* est lu, et un avertissement l'annonce |
+| Canaux | un canal par interface de capture. Une station qui change de canal n'est suivie que si une autre interface écoute le nouveau canal, déclarée comme un autre point |
+| MCS | 802.11n et 802.11ac (premier utilisateur) ; 802.11ax lu, mais en MU-MIMO/OFDMA seul le MCS du premier utilisateur est retenu (couverture partielle) |
+| Chiffrement | WPA/WPA2-PSK avec 4-way handshake capturé (`--wifi-keys`) ; WPA3-SAE et 802.1X/EAP non déchiffrés : métriques radio seules |
+| Retransmissions | copies *retry* fusionnées si elles ont la même identité (TA, séquence, fragment) au même point dans un délai d'une seconde (#1145) |
+| Localisation d'une perte | classée d'après la transmission d'origine vue par la sonde : une trame montante jamais captée reste « indéterminée » |
+| Temps d'antenne | ordre de grandeur, sans préambule, intervalles entre trames ni acquittements |
+| Anonymisation | `--redact` pseudonymise la station, le BSSID et l'émetteur radio |
 
 ## Voir aussi
 

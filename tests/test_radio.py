@@ -10,6 +10,7 @@ import pytest
 from radiotap_reference import NO_RADIOTAP_PCAP, RADIOTAP_PCAP, no_radiotap_bytes, radiotap_bytes
 
 import netcross_core.parsing as parsing
+import pcap_parser
 from pcap_parser.packet import RawPacket
 from pcap_parser.radio import RadioInfo, extract_radio, missing_radiotap_note
 
@@ -118,26 +119,35 @@ def test_parse_capture_avertit_sans_radiotap(monkeypatch):
 
 @pytest.mark.skipif(shutil.which("tshark") is None, reason="tshark absent du PATH")
 def test_capture_radiotap_de_reference_bout_en_bout():
-    pkts = parsing.parse_capture("WIFI", str(RADIOTAP_PCAP))
-    assert [(p.src, p.dst, p.proto, p.sport, p.dport) for p in pkts[:2]] == [
+    # Metadonnees de chaque trame, retransmission radio comprise (pcap_parser).
+    bruts = pcap_parser.parse_capture(str(RADIOTAP_PCAP))
+    assert [(p.src, p.dst, p.proto, p.sport, p.dport) for p in bruts[:2]] == [
         ("10.0.0.1", "10.0.0.2", "UDP", 5000, 6000),
         ("10.0.0.1", "10.0.0.2", "UDP", 5000, 6000),
     ]
-    assert [p.radio for p in pkts] == [
+    assert [p.radio for p in bruts] == [
         RadioInfo(rssi_dbm=-42, mcs=None, data_rate_mbps=54.0, retry=False, channel=6, frequency_mhz=2437),
         RadioInfo(rssi_dbm=-60, mcs=7, data_rate_mbps=65.0, retry=True, channel=36, frequency_mhz=5180),
         RadioInfo(rssi_dbm=-61, mcs=15, data_rate_mbps=130.0, retry=False, channel=36, frequency_mhz=5180),
         RadioInfo(rssi_dbm=-55, mcs=9, data_rate_mbps=780.0, retry=False, channel=36, frequency_mhz=5180),
     ]
+    assert [p.wlan_mpdu for p in bruts] == [("02:00:00:00:00:02", n, 0) for n in (1, 1, 2, 3)]
+    # La trame 2 reemet la trame 1 (meme TA et sequence, bit retry) : un seul
+    # paquet reseau, la retransmission est comptee dans l'original (#1145).
+    pkts = parsing.parse_capture("WIFI", str(RADIOTAP_PCAP))
+    assert [p.radio for p in pkts] == [bruts[0].radio, bruts[2].radio, bruts[3].radio]
+    assert [p.radio_retries for p in pkts] == [1, 0, 0]
 
 
 @pytest.mark.skipif(shutil.which("tshark") is None, reason="tshark absent du PATH")
 def test_capture_80211_sans_radiotap_bout_en_bout():
-    pkts = parsing.parse_capture("WIFI", str(NO_RADIOTAP_PCAP))
-    assert len(pkts) == 4
-    assert [p.radio for p in pkts] == [
+    bruts = pcap_parser.parse_capture(str(NO_RADIOTAP_PCAP))
+    assert [p.radio for p in bruts] == [
         RadioInfo(retry=False),
         RadioInfo(retry=True),
         RadioInfo(retry=False),
         RadioInfo(retry=False),
     ]
+    # Retransmission radio de la trame 1 fusionnee (#1145), meme sans radiotap.
+    pkts = parsing.parse_capture("WIFI", str(NO_RADIOTAP_PCAP))
+    assert [p.radio_retries for p in pkts] == [1, 0, 0]

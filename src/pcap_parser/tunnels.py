@@ -37,6 +37,26 @@ def is_tunnel(layers: dict) -> bool:
     return any(key in layers for key in TUNNEL_LAYER_KEYS)
 
 
+# Paquet IP extrait d'une trame de donnees 802.11 protegee que tshark a
+# dechiffree (issue #1143) : le contexte « Wi-Fi chiffre » reste visible.
+TAG_80211_DECHIFFRE = "802.11(déchiffré)"
+
+
+def _wlan_dechiffre(layers: dict) -> bool:
+    """Trame 802.11 protegee (CCMP/TKIP) dont la couche IP a ete extraite.
+    Les trames 802.11 transportees par CAPWAP ne sont pas concernees : le
+    tag CAPWAP decrit deja leur encapsulation."""
+    wlan = layers.get("wlan")
+    if wlan is None or "capwap" in layers or "capwap_data" in layers or not ("ip" in layers or "ipv6" in layers):
+        logger.debug("_wlan_dechiffre: pas de trame 802.11 avec IP -> retour False")
+        return False
+    if isinstance(wlan, list):
+        wlan = wlan[0]
+    protegee = g(wlan, "wlan_wlan_fc_protected") in (True, "1", "true")
+    logger.debug("_wlan_dechiffre: retour {}", protegee)
+    return protegee
+
+
 def detect_encapsulation(layers: dict) -> tuple[str, ...]:
     """Renvoie les tags decrivant la pile d'encapsulation detectee, dans
     le meme format textuel que l'ancienne version (VLAN100,
@@ -70,6 +90,9 @@ def detect_encapsulation(layers: dict) -> tuple[str, ...]:
         tags.append("ERSPAN")
 
     tags.extend(_capwap_tags(layers))
+
+    if _wlan_dechiffre(layers):
+        tags.append(TAG_80211_DECHIFFRE)
 
     if tags:
         logger.trace("detect_encapsulation: {}", ",".join(tags))

@@ -11,7 +11,7 @@
 > Il remplace l'ancienne section 3 de `docs/features-backlog.md`, tenue à la main, qui avait dérivé
 > (voir `docs/sessions/session-36.md`, issue #140).
 
-257 modules · 368 classes · 901 fonctions publiques de module.
+260 modules · 371 classes · 910 fonctions publiques de module.
 
 Conventions : `+` public, `-` privé (préfixe `_`) ; `int?` = `int | None` ; `list~str~` = `list[str]` ;
 `<<module>>` regroupe les fonctions publiques d'un module ; `A --> B : champ` = `A` a un champ annoté
@@ -36,7 +36,7 @@ flowchart TD
     CLI -->|"29 imports"| netcross_report
     CLI -->|"8 imports"| netcross_ai
     CLI -->|"65 imports"| netcross_core
-    CLI -->|"8 imports"| pcap_parser
+    CLI -->|"9 imports"| pcap_parser
     netcross_gtk4 -->|"36 imports"| netcross_report
     netcross_gtk4 -->|"4 imports"| netcross_ai
     netcross_gtk4 -->|"122 imports"| netcross_core
@@ -168,6 +168,7 @@ flowchart LR
 | `pcap_parser.radio` | metadonnees radio 802.11 par paquet (issue #1142). |
 | `pcap_parser.remote` | sources de capture distantes (issue #166). |
 | `pcap_parser.tunnels` | couche 3 : detection de la pile d'encapsulation (VLAN/MPLS/GRE/VXLAN/GTP-U/ERSPAN/CAPWAP) et selection de la couche IP/TCP/UDP/ICMP la plus interne a utiliser pour l'analyse. |
+| `pcap_parser.wifi_keys` | dechiffrement WPA/WPA2-PSK par tshark (issue #1143). |
 
 ### Diagramme
 
@@ -450,6 +451,8 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +tuple~str, int, int~? wlan_mpdu
+        +tuple~str, str, bool~? wlan_station
         +str? rtcp_hash
         +str? comment
         +str? ip_checksum
@@ -499,6 +502,8 @@ classDiagram
     class mod_pcap_parser_radio["pcap_parser.radio"] {
         <<module>>
         +extract_radio(layers) RadioInfo?
+        +extract_mpdu_id(layers) tuple~str, int, int~?
+        +extract_station(layers) tuple~str, str, bool~?
         +missing_radiotap_note(path) str?
     }
 
@@ -529,6 +534,25 @@ classDiagram
         +is_tunnel(layers) bool
         +detect_encapsulation(layers) tuple~str, ...~
         +select_innermost_layers(layers) dict
+    }
+
+    %% ===== pcap_parser.wifi_keys =====
+    class WifiKeysError {
+        <<ValueError>>
+    }
+    class WifiKey {
+        <<dataclass, frozen>>
+        +str kind
+        +str secret
+        +str? ssid
+        +uat_line() str
+    }
+    class mod_pcap_parser_wifi_keys["pcap_parser.wifi_keys"] {
+        <<module>>
+        +parse_wifi_keys(texte) tuple~WifiKey, ...~
+        +load_wifi_keys(chemin) tuple~WifiKey, ...~
+        +wifi_keys_from_env(environ) tuple~WifiKey, ...~
+        +wlan_decryption(cles) Iterator~tuple~dict~str, str~, tuple~str, ...~~~
     }
 
     %% ===== relations =====
@@ -770,6 +794,7 @@ classDiagram
 | `netcross_core.redact` | anonymisation des adresses (IP/MAC) d'une liste de paquets deja chargee, en vue d'un partage externe (ticket support vendeur, rapport transmis a un tiers) sans exposer l'adressage reel du reseau du… |
 | `netcross_core.redact_pcap` | réécriture pcapng anonymisée multi-points. |
 | `netcross_core.report_text` | mise en forme du Report en sortie texte console et en CSV de detail. |
+| `netcross_core.retransmissions_radio` | retransmissions 802.11 (issue #1145). |
 | `netcross_core.retro_capture` | netcross_core.retro_capture — gel rétroactif sur alarme (issue #1087, chantier #1001 : enregistrement rétroactif des incidents). |
 | `netcross_core.rtp_match` | appariement des flux RTP entre points de capture (issue #1121, sous-issue 2/6 du chantier #1004). |
 | `netcross_core.rtp_segments` | Qualité de transport entre jambes RTP appariées, sans lire le contenu. |
@@ -781,6 +806,7 @@ classDiagram
 | `netcross_core.tls_diagnostics` | extrait l'etat des handshakes TLS (ClientHello/ServerHello/Alert/donnees applicatives) a chaque point de capture et localise le segment ou un handshake qui reussissait en amont se met a echouer. |
 | `netcross_core.tls_keylog` | Fichiers de clés TLS (SSLKEYLOGFILE) par point de capture (issue #1040, chantier #997). |
 | `netcross_core.voip` | Analyse VoIP orientee appel, association SIP/RTP par SDP. |
+| `netcross_core.wifi` | Métriques et constats radio par client 802.11 (issue #1146). |
 | `netcross_core.wireshark_expert` | Session 1 de FEATURES.md section 13.3 ("exploitation de l'expertise Wireshark/TShark") : convertit les signaux d'expertise BRUTS deja produits par le moteur de dissection de tshark (champs… |
 
 ### Diagramme (1/2)
@@ -1968,6 +1994,9 @@ classDiagram
         +str? sip_via
         +str? sip_contact
         +RadioInfo? radio
+        +tuple~str, int, int~? wlan_mpdu
+        +int radio_retries
+        +tuple~str, str, bool~? wlan_station
         +str? rtcp_hash
         +str? ip_checksum
         +bool? ip_checksum_bad
@@ -2165,6 +2194,7 @@ classDiagram
         +dict~str, dict~ link_speeds
         +dict~str, dict~ microbursts
         +list~dict~ microburst_correlations
+        +dict~str, list~dict~~ wifi_clients
         +dict~str, dict~str, dict~str, int~~~ dechiffrement
         +list~str~ points_keylog
         +list~ChecksumError~ checksum_errors
@@ -2355,6 +2385,16 @@ classDiagram
         +load_capture_annotations(captures) dict~str, list~PacketAnnotation~~
         +print_capture_annotations(by_point) None
         +write_detail_csv(path, flows, points, names)
+    }
+
+    %% ===== netcross_core.retransmissions_radio =====
+    class FiltreRetransmissionsRadio {
+        +accepte(pk) bool
+        +filtrer(paquets) Iterator~Pkt~
+    }
+    class mod_netcross_core_retransmissions_radio["netcross_core.retransmissions_radio"] {
+        <<module>>
+        +retirer_retransmissions_radio(paquets) list~Pkt~
     }
 
     %% ===== netcross_core.retro_capture =====
@@ -2643,6 +2683,13 @@ classDiagram
     class mod_netcross_core_voip["netcross_core.voip"] {
         <<module>>
         +build_calls(all_packets, rtp_streams) tuple~list~Call~, dict~str, int~~
+    }
+
+    %% ===== netcross_core.wifi =====
+    class mod_netcross_core_wifi["netcross_core.wifi"] {
+        <<module>>
+        +metriques_clients(all_packets) dict~str, list~dict~~
+        +format_fiche(point, fiche) str
     }
 
     %% ===== netcross_core.wireshark_expert =====

@@ -23,6 +23,7 @@ from netcross_core.models import (
     Report,
     SequenceGap,
 )
+from netcross_core.wifi import format_fiche
 
 logger = get_logger(__name__)
 
@@ -308,6 +309,12 @@ def print_report(r: Report):
         print("\n-- Microrafales et impacts aval (association temporelle) --")
         for correlation in r.microburst_correlations:
             print(f"  {format_microburst_correlation(correlation)}")
+
+    if r.wifi_clients:
+        print("\n-- Wi-Fi : métriques radio par client --")
+        for point, fiches in r.wifi_clients.items():
+            for fiche in fiches:
+                print(f"  {format_fiche(point, fiche)}")
 
     couverture = lignes_dechiffrement(r)
     if couverture:

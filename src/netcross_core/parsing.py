@@ -36,6 +36,7 @@ from netcross_core.application.banners import extract_banners
 from netcross_core.fingerprint.report import compute_pkt_fingerprints
 from netcross_core.logging_config import get_logger
 from netcross_core.models import Pkt
+from netcross_core.retransmissions_radio import FiltreRetransmissionsRadio, retirer_retransmissions_radio
 from pcap_parser.capinfos_source import read_capture_comment
 from pcap_parser.capture import keylog_task_args
 from pcap_parser.ek_source import CaptureAccessError, TsharkError, TsharkNotFoundError
@@ -142,6 +143,8 @@ def _to_pkt(label: str, raw: RawPacket) -> Pkt:
         sip_via=raw.sip_via,
         sip_contact=raw.sip_contact,
         radio=raw.radio,
+        wlan_mpdu=raw.wlan_mpdu,
+        wlan_station=raw.wlan_station,
         comment=raw.comment,
         ip_checksum=raw.ip_checksum,
         ip_checksum_bad=raw.ip_checksum_bad,
@@ -214,6 +217,9 @@ def parse_capture(label, path, raise_on_error=False, *, tls_keylog: str | None =
     for i in range(n):
         pkts.append(_to_pkt(label, raw_packets[i]))
         raw_packets[i] = None  # type: ignore[call-overload]  # liberation memoire volontaire
+    # Issue #1145 : une trame 802.11 reemise (bit retry) n'est pas un
+    # doublon reseau -- fusionnee dans le paquet d'origine.
+    pkts = retirer_retransmissions_radio(pkts)
     logger.debug("parse_capture: {} paquet(s) convertis pour {}", len(pkts), label)
     return pkts
 
@@ -394,8 +400,11 @@ def parse_live(label, interface, bpf_filter=None, stop_event=None):
     ek_source.iter_ek_records pour le detail (arret reactif y compris
     sans trafic sur l'interface)."""
     logger.debug("parse_live: point {} sur {} (filtre={})", label, interface, bpf_filter)
+    filtre = FiltreRetransmissionsRadio()  # issue #1145
     for raw in pcap_parser.iter_live(interface, bpf_filter=bpf_filter, stop_event=stop_event):
-        yield _to_pkt(label, raw)
+        pk = _to_pkt(label, raw)
+        if filtre.accepte(pk):
+            yield pk
     logger.debug("parse_live: fin")
 
 
@@ -417,7 +426,8 @@ def parse_live_multi(interfaces, stop_event=None, *, bpf_filter=None):
     logger.debug("parse_live_multi: capture multi-interfaces (filtre={})", bpf_filter)
     packets = pcap_parser.iter_live_multi(interfaces, stop_event=stop_event, bpf_filter=bpf_filter)
     logger.debug("parse_live_multi: retour générateur")
-    return (_to_pkt(label, raw) for label, raw in packets)
+    # Issue #1145 : retransmissions 802.11 retirees, par point (cle du filtre).
+    return FiltreRetransmissionsRadio().filtrer(_to_pkt(label, raw) for label, raw in packets)
 
 
 # -- re-exports pour compat avec l'ancienne API (baseline_diff.py et

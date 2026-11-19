@@ -95,6 +95,15 @@ DETECTEURS: tuple[Detecteur, ...] = (
         "tri et référence globale actuellement nécessaires ; ne prétend pas être un détecteur en flux",
     ),
     Detecteur(
+        "wifi_clients",
+        PHASE,
+        SECONDE_PASSE,
+        "trames 802.11 par point et par station, premières transmissions des segments TCP",
+        "capture entière",
+        ("wifi_clients",),
+        "médianes et itinérances calculées sur toutes les trames de la station",
+    ),
+    Detecteur(
         "detect_extracted_files",
         PHASE,
         FENETRE_BORNEE,
