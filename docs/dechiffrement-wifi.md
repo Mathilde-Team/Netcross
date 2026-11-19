@@ -67,7 +67,12 @@ serait visible dans la liste des processus. Le mécanisme est le suivant :
 - ce répertoire est désigné à tshark par `WIRESHARK_CONFIG_DIR` ;
 - il est supprimé dès la fin du processus, même en cas d'erreur.
 
-Seule la préférence `wlan.enable_decryption:TRUE` passe en `-o`. La phrase
+Seule la préférence `wlan.enable_decryption:TRUE` passe en `-o`.
+
+Avec le déchiffrement actif, tshark ajoute aussi à chaque trame les clés
+dérivées (`wlan.analysis.pmk`, `.kck`, `.kek`, `.tk`, `.gtk`). Elles valent
+la phrase de passe pour qui les lit. Netcross les retire de chaque
+enregistrement dès la lecture, avant toute autre exploitation. La phrase
 n'apparaît ni dans les journaux, ni dans les messages d'erreur, ni dans le
 `repr` des clés, ni dans les rapports. Les tests
 `tests/test_wifi_dechiffrement.py` le vérifient sur argv, loguru, stdout,
