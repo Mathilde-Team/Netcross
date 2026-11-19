@@ -22,6 +22,10 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
   « perte après le point d'accès », « débit PHY bas » et « itinérance pendant
   le flux ». Nouveau module `netcross_core.wifi`, champ `Report.wifi_clients`
   (clé JSON `wifi_clients`).
+- Section « Wi-Fi : métriques radio par client » du rapport PDF (#1148,
+  sous-issue 5/5 du chantier #1006). La couverture Wi-Fi et ses limites sont
+  documentées dans `docs/detectors.md` et dans le README, qui ne la classe
+  plus « hors périmètre ».
 
 ### Sécurité
 - Clés dérivées 802.11 (PMK, KCK, KEK, TK, GTK) exposées par tshark en

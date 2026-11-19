@@ -262,8 +262,9 @@ le point d'accès et le contrôleur (CAPWAP, UDP/5247). Si le canal data n'est
 pas chiffré par DTLS, `netcross` décapsule automatiquement et analyse le
 trafic client réel (voir [Limites connues](#limites-connues) pour la
 couverture exacte de ce module). Pour de l'analyse RF pure (retries radio,
-RSSI, roaming), il faut une capture en mode moniteur dédiée — hors périmètre
-de cet outil, qui travaille sur du trafic filaire encapsulé.
+RSSI, roaming), ajouter une capture en mode moniteur avec radiotap comme point
+de capture « segment radio » : voir [Limites connues](#limites-connues) et
+[docs/detectors.md](docs/detectors.md#wi-fi--métriques-radio-par-client).
 
 ### Bonnes pratiques communes à toutes ces méthodes
 
@@ -1299,8 +1300,7 @@ avant un déploiement en production.
   l'état du handshake par segment (ClientHello/ServerHello/Alert) — pas de
   réassemblage TCP inter-segments, pas de TLS en tunnel, pas de chaîne de
   certificats.
-- **Analyse RF WiFi** (retries, RSSI, roaming 802.11) : en cours (#1006).
-  Une capture en mode moniteur avec radiotap (linktype 127) est acceptée
+- **Analyse RF WiFi** (retries, RSSI, roaming 802.11, #1006). Une capture en mode moniteur avec radiotap (linktype 127) est acceptée
   comme point, et chaque trame porte RSSI, MCS, débit, retry et canal
   (`Pkt.radio`, issue #1142) ; une capture 802.11 sans radiotap
   (linktype 105) est lue avec un avertissement explicite (retry seul).
@@ -1308,7 +1308,20 @@ avant un déploiement en production.
   `--wifi-keys FICHIER` (ou `NETCROSS_WIFI_KEYS`) les déchiffre si le
   4-way handshake est capturé, sinon métriques radio seules avec un
   avertissement (issue #1143, [docs/dechiffrement-wifi.md](docs/dechiffrement-wifi.md)).
-  Pas encore de constats radio ni de section de rapport dédiée.
+  Les copies *retry* sont fusionnées avant l'appariement air ↔ filaire (#1145).
+  Le rapport (texte, PDF, JSON `wifi_clients`) donne par station : RSSI
+  médian, MCS et débit PHY, taux de retransmission radio, itinérance et temps
+  d'antenne approximatif. Il émet aussi les constats « perte dans l'air »,
+  « perte après le point d'accès », « débit PHY bas » et « itinérance pendant
+  le flux » (#1146). Limites :
+  - un canal par interface de capture ;
+  - 802.11ax MU partiel (MCS du premier utilisateur seul) ;
+  - pas de déchiffrement WPA3-SAE ni 802.1X/EAP ;
+  - perte « indéterminée » quand la sonde n'a pas vu la trame montante
+    d'origine ;
+  - temps d'antenne approché.
+
+  Détail dans [docs/detectors.md](docs/detectors.md#wi-fi--métriques-radio-par-client).
 - **Protocoles propriétaires non standard** (ex : signalisation Alcatel NOE
   historique, non-SIP) : non couverts, faute de spécification publique
   fiable.
