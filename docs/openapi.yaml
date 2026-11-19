@@ -3337,6 +3337,58 @@ paths:
           description: Nom de sonde déjà inscrit.
         '426':
           description: Aucune version de contrat commune.
+  /probes:
+    get:
+      tags:
+      - probe
+      summary: Inventaire Sondes
+      description: 'Inventaire des sondes inscrites (issue #1105) : identité, adresse
+
+        annoncée, révocation, expiration du certificat, dernière santé.'
+      operationId: inventaire_sondes_probes_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+                title: Response Inventaire Sondes Probes Get
+      security:
+      - APIKeyHeader: []
+  /probes/{probe_id}/health:
+    get:
+      tags:
+      - probe
+      summary: Sante Sonde
+      description: 'Santé actuelle d''une sonde, lue en direct en mTLS par le
+
+        collecteur (issue #1105). Une sonde muette est un refus explicite,
+
+        jamais une santé inventée.'
+      operationId: sante_sonde_probes__probe_id__health_get
+      security:
+      - APIKeyHeader: []
+      parameters:
+      - name: probe_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Probe Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /gel/config:
     get:
       tags:
@@ -4706,6 +4758,7 @@ components:
           type: string
           title: Interface
           description: Interface du serveur (autorisée par NETCROSS_API_LIVE_INTERFACES)
+            ou source de sonde probe://
         bpf:
           anyOf:
           - type: string
@@ -4724,7 +4777,18 @@ components:
       - name
       - interface
       title: LivePoint
-      description: 'Un point de capture : nom, interface du serveur, filtre BPF propre.'
+      description: 'Un point de capture : nom, interface du serveur, filtre BPF propre.
+
+
+        L''interface peut être une source de sonde ``probe://hote:port`` (issue
+
+        #1105) : la sonde tient son propre tampon circulaire, la fenêtre de la
+
+        session est tirée à la fin puis analysée par le pipeline habituel --
+
+        pas de flux continu, pas de ring buffer ni de rapport en continu pour
+
+        ces points (refus explicite).'
     LiveReport:
       properties:
         interval:

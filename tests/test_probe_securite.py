@@ -229,7 +229,10 @@ def test_mtls_poignee_de_main_sans_certificat_client_refusee(autorite, certifica
         # Client SANS certificat : la poignée de main échoue.
         client = socket.create_connection(("127.0.0.1", serveur.port), timeout=5)
         tls = _s_contexte_client(autorite.certificat_pem, False).wrap_socket(client)
-        with pytest.raises(ssl.SSLError):
+        # Selon le système, le refus se voit côté client comme une erreur
+        # TLS ou comme une connexion fermée d'autorité par le serveur : les
+        # deux traduisent le même refus de poignée de main.
+        with pytest.raises((ssl.SSLError, ConnectionResetError)):
             tls.send(b"x")
             tls.recv(1)
         tls.close()

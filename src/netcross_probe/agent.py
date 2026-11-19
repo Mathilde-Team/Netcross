@@ -104,6 +104,19 @@ class AgentProbe:
         logger.debug("AgentProbe.liberer: retour {}", memoire is not None)
         return memoire is not None
 
+    def expiration_fenetre(self, identifiant: str) -> float | None:
+        """Date d'expiration (secondes Unix) d'une fenêtre retenue (issue
+        #1105 : ``Window.expires_at`` du contrat v1) ; ``None`` si elle est
+        inconnue ou déjà expirée."""
+        logger.debug("AgentProbe.expiration_fenetre: entrée ({})", identifiant)
+        self._nettoyer_expirees()
+        memoire = self._fenetres.get(identifiant)
+        if memoire is None:
+            logger.debug("AgentProbe.expiration_fenetre: inconnue ou expirée -> retour None")
+            return None
+        logger.debug("AgentProbe.expiration_fenetre: retour {}", memoire.expire_a)
+        return memoire.expire_a
+
     def _nettoyer_expirees(self) -> None:
         """Retire les fenêtres expirées du registre (le pcapng reste sur disque)."""
         logger.debug("AgentProbe._nettoyer_expirees: entrée")

@@ -43,6 +43,7 @@ __all__ = [
     "contexte_mtls_client",
     "contexte_mtls_serveur",
     "creer_autorite",
+    "creer_certificat_collecteur",
     "expiration_certificat",
     "generer_cle_privee",
     "generer_csr_sonde",
@@ -54,6 +55,7 @@ __all__ = [
 ]
 
 _URN_PREFIXE = "urn:netcross:probe:"
+_URN_PREFIXE_COLLECTEUR = "urn:netcross:collector:"
 
 
 @dataclass(frozen=True)
@@ -162,10 +164,10 @@ def generer_csr_sonde(nom_sonde: str, cle_pem: str) -> str:
     return pem
 
 
-def signer_csr_sonde(csr_pem: str, probe_id: str, autorite: AutoriteConfiance, jours: int = 365) -> str:
-    """Signe la CSR d'une sonde : le certificat porte son identité en SAN
-    URI ``urn:netcross:probe:<probe_id>`` (contrat v1)."""
-    logger.debug("signer_csr_sonde: entrée (sonde {})", probe_id)
+def _signer_csr(csr_pem: str, san_uri: str, autorite: AutoriteConfiance, jours: int) -> str:
+    """Signe une CSR en apposant l'identité netcross donnée en SAN URI
+    (mécanique commune sonde/collecteur, contrat v1)."""
+    logger.debug("_signer_csr: entrée (SAN {})", san_uri)
     csr = x509.load_pem_x509_csr(csr_pem.encode())
     cle_autorite = autorite._cle
     maintenant = datetime.datetime.now(datetime.timezone.utc)
@@ -177,15 +179,40 @@ def signer_csr_sonde(csr_pem: str, probe_id: str, autorite: AutoriteConfiance, j
         .serial_number(x509.random_serial_number())
         .not_valid_before(maintenant - datetime.timedelta(minutes=5))
         .not_valid_after(maintenant + datetime.timedelta(days=jours))
-        .add_extension(
-            x509.SubjectAlternativeName([x509.UniformResourceIdentifier(_URN_PREFIXE + probe_id)]),
-            critical=True,
-        )
+        .add_extension(x509.SubjectAlternativeName([x509.UniformResourceIdentifier(san_uri)]), critical=True)
         .sign(cle_autorite, hashes.SHA256())
     )
     pem = certificat.public_bytes(serialization.Encoding.PEM).decode()
+    logger.debug("_signer_csr: retour certificat PEM")
+    return pem
+
+
+def signer_csr_sonde(csr_pem: str, probe_id: str, autorite: AutoriteConfiance, jours: int = 365) -> str:
+    """Signe la CSR d'une sonde : le certificat porte son identité en SAN
+    URI ``urn:netcross:probe:<probe_id>`` (contrat v1)."""
+    logger.debug("signer_csr_sonde: entrée (sonde {})", probe_id)
+    pem = _signer_csr(csr_pem, _URN_PREFIXE + probe_id, autorite, jours)
     logger.debug("signer_csr_sonde: retour certificat PEM")
     return pem
+
+
+def creer_certificat_collecteur(
+    autorite: AutoriteConfiance, identifiant: str = "collecteur", jours: int = 365
+) -> tuple[str, str]:
+    """Certificat **client** du collecteur (issue #1105) : SAN URI
+    ``urn:netcross:collector:<identifiant>``, signé par sa propre autorité.
+
+    Le collecteur détient déjà l'autorité (il signe les sondes) : la clé
+    privée est générée ici et ne quitte pas le processus appelant. C'est
+    l'identité mTLS avec laquelle le collecteur appelle les routes de
+    chaque sonde (santé, métadonnées, fenêtres).
+    """
+    logger.debug("creer_certificat_collecteur: entrée ({})", identifiant)
+    cle_pem = generer_cle_privee()
+    csr_pem = generer_csr_sonde(identifiant, cle_pem)
+    certificat_pem = _signer_csr(csr_pem, _URN_PREFIXE_COLLECTEUR + identifiant, autorite, jours)
+    logger.debug("creer_certificat_collecteur: retour (certificat, clé)")
+    return certificat_pem, cle_pem
 
 
 def expiration_certificat(certificat_pem: str) -> float:

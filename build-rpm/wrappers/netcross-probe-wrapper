@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Wrapper installe dans /usr/bin/netcross-probe par le paquet RPM.
+# Agent de sonde distribue (issue #1105) : capture locale et fenetres a la
+# demande servies en mTLS au collecteur (sous-commande "servir").
+export PYTHONPATH="/usr/share/netcross:${PYTHONPATH:-}"
+exec /usr/bin/python3 -m netcross_probe "$@"

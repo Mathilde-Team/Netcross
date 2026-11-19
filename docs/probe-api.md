@@ -8,7 +8,8 @@ Le schéma OpenAPI 3.1 qui fait foi est [`probe-api-v1.yaml`](probe-api-v1.yaml)
 La CI le valide contre le méta-schéma officiel OpenAPI 3.1 et vérifie que ses
 exemples respectent ses propres schémas (`tests/test_probe_api_spec.py`).
 
-Version du contrat : **1.0.0**.
+Version du contrat : **1.1.0** (ajouts de #1105, purement additifs —
+voir « Changelog »).
 
 ## Rôles
 
@@ -33,6 +34,8 @@ aucun paquet au point de mesure. Le collecteur ne tire que les fenêtres utiles
 | `GET` | `/probe/v1/windows/{window_id}` | sonde | métadonnées de la fenêtre (`get_window`) | mTLS |
 | `DELETE` | `/probe/v1/windows/{window_id}` | sonde | libération de la fenêtre (`delete_window`) | mTLS |
 | `GET` | `/probe/v1/windows/{window_id}/pcapng` | sonde | téléchargement du pcapng (`download_window`) | mTLS |
+| `GET` | `/probes` | collecteur | inventaire des sondes inscrites (#1105) | clé API |
+| `GET` | `/probes/{probe_id}/health` | collecteur | santé actuelle d'une sonde, lue en mTLS (#1105) | clé API |
 
 ### Inscription
 
@@ -47,6 +50,23 @@ aucun paquet au point de mesure. Le collecteur ne tire que les fenêtres utiles
 
 Un nom de sonde déjà inscrit renvoie `409` ; un jeton consommé, expiré ou
 inconnu renvoie `401` ; sans version majeure commune, `426`.
+
+### Inventaire et santé des sondes (#1105)
+
+Une sonde qui sert ses routes elle-même annonce son adresse à
+l'inscription : `listen_base_url` (facultatif, `https://` — 1.1). Le
+collecteur s'en sert pour deux routes propres à lui, derrière la clé API
+de `netcross_api` (pas le mTLS : ce sont des routes du collecteur, pas
+de la sonde) :
+
+- `GET /probes` : chaque sonde inscrite — identité, adresse annoncée,
+  révocation, expiration du certificat, dernière santé connue ;
+- `GET /probes/{probe_id}/health` : la santé **actuelle**, lue en direct
+  auprès de la sonde en mTLS avec le certificat client du collecteur
+  (SAN `urn:netcross:collector:<id>`, forgé par l'autorité du
+  collecteur). Refus explicites : `404` sonde inconnue, `401` révoquée,
+  `409` sans adresse annoncée (sonde 1.0), `502` sonde muette ou
+  refusante — jamais une santé inventée.
 
 ### Fenêtre de trafic
 
@@ -127,3 +147,14 @@ sonde a perdu », et alimentent l'estimation de décalage entre points.
   transférées.
 - Pas de compression négociée en v1 (capacité réservée `compression_zstd`).
 - La rotation des certificats avant expiration sera précisée avec #1101.
+
+## Changelog
+
+- **1.1.0** (#1105) : ajout purement additif — `listen_base_url`
+  facultatif à l'inscription (le collecteur s'en sert pour
+  `GET /probes` et `GET /probes/{probe_id}/health`, routes du
+  collecteur derrière la clé API). Une sonde 1.0 parle à un collecteur
+  1.1 sans changement : champ absent = comportement 1.0 (sonde inscrite,
+  non interrogeable en direct).
+- **1.0.0** (#1098) : contrat initial — inscription, santé,
+  métadonnées, fenêtres, mTLS obligatoire, jeton à usage unique.

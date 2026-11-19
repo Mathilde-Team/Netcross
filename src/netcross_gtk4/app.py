@@ -72,6 +72,7 @@ from netcross_core.dashboard import (  # noqa: E402
 )
 from netcross_core.forensic import DEFAULT_DUPLICATE_THRESHOLD_MS, detect_cross_capture_duplicates  # noqa: E402
 from netcross_core.logging_config import DEBUG_FLAG, enable_debug, get_logger, is_debug_enabled, summarize  # noqa: E402
+from netcross_core.probe_capture import collecter_fenetre_sonde, est_source_sonde  # noqa: E402
 from netcross_gtk4 import capture_list, row_labels  # noqa: E402
 from netcross_gtk4 import incidents_panel as netcross_gtk4_incidents_panel  # noqa: E402
 from netcross_gtk4.advanced_options import (  # noqa: E402
@@ -300,7 +301,7 @@ class LiveCaptureRow(Gtk.Box):
             # bouton depend du contenu du champ, pas seulement du nombre de lignes
             self.interface_entry.connect("changed", lambda _entry: on_change())
         self.interface_entry.set_width_chars(10)
-        self.interface_entry.set_placeholder_text("eth0, eth0, eth1 ou rpcap://hote/eth0")
+        self.interface_entry.set_placeholder_text("eth0, eth0, eth1, rpcap://hote/eth0 ou probe://hote:9443/sonde")
         self.interface_entry.set_tooltip_text(
             "Nom de l'interface reseau a capturer (voir `tshark -D` ou "
             "`ip link` pour lister les interfaces disponibles). Plusieurs "
@@ -308,8 +309,9 @@ class LiveCaptureRow(Gtk.Box):
             "capturees simultanement : chacune devient un point "
             "'NOM:interface', dans l'ordre saisi (= chemin physique reseau). "
             "Source distante possible : rpcap://hote[:port]/eth0 (rpcapd), "
-            "sshdump://utilisateur@hote/eth0 (tcpdump via SSH), pipe:///chemin/fifo "
-            "ou pipe://- (entree standard)."
+            "sshdump://utilisateur@hote/eth0 (tcpdump via SSH), "
+            "probe://hote[:9443]/nom-de-sonde (sonde netcross, issue #1105), "
+            "pipe:///chemin/fifo ou pipe://- (entree standard)."
         )
         self.interface_entry.set_hexpand(True)
         self.append(self.interface_entry)
@@ -2607,12 +2609,19 @@ class MainWindow(Gtk.ApplicationWindow):
 
         # Issue #676 : rotation de capture -- un enregistreur tshark par point,
         # lance AVANT les threads d'analyse ; refus d'un point -> rien ne demarre.
+        # Issue #1105 : les points probe:// n'ont rien a enregistrer localement
+        # (la sonde tamponne deja) -- ils sont ecartes, avec un message.
         self._live_ring_recorders = {}
         ring_messages = []
+        local_rows = [row for row in rows_data if not est_source_sonde(row[1])]
+        if len(local_rows) != len(rows_data):
+            ring_messages.append(
+                "Rotation de capture : points probe:// sans enregistrement local (la sonde tamponne deja ses paquets)."
+            )
         if self.ring_buffer_box.get_visible() and self.ring_buffer_check.get_active():
             try:
                 self._live_ring_recorders, ring_messages = start_ring_recorders(
-                    rows_data,
+                    local_rows,
                     int(self.ring_max_files_spin.get_value()),
                     self.ring_max_duration_spin.get_value(),
                 )
@@ -2650,6 +2659,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self._live_packets = []
         self._live_lock = threading.Lock()
         self._live_threads = []
+        self._live_t0 = time.time()  # issue #1105 : borne de départ des fenêtres probe://
 
         self.live_panel.set_sensitive(False)
         self.live_extra_box.set_sensitive(False)
@@ -2697,6 +2707,10 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _live_capture_worker(self, label, interface, bpf_filter):
         logger.debug("_live_capture_worker: label={} interface={}", label, interface)
+        if est_source_sonde(interface):
+            self._live_sonde_worker(label, interface)
+            logger.debug("_live_capture_worker: retour après capture sonde (interface={})", interface)
+            return
         GLib.idle_add(
             self._log,
             f"[{label}] capture demarree sur {interface}"
@@ -2733,6 +2747,40 @@ class MainWindow(Gtk.ApplicationWindow):
             report_session.point_stopped(label, error)
         GLib.idle_add(self._log, f"[{label}] capture arretee -- {count} paquet(s) au total.")
         logger.debug("MainWindow._live_capture_worker: fin")
+
+    def _live_sonde_worker(self, label, source):
+        """Thread d'un point probe:// (issue #1105) : rien pendant la
+        session -- la sonde tamponne -- puis, à l'arrêt, une fenêtre
+        [t0, maintenant] est collectée (mTLS, contrat v1) et ses paquets
+        rejoignent le même pipeline que les autres points."""
+        logger.debug("_live_sonde_worker: label={} source={}", label, source)
+        GLib.idle_add(
+            self._log,
+            f"[{label}] sonde en attente ({source}) -- la fenêtre sera collectée à l'arrêt.",
+        )
+        report_session = self._live_report_session
+        error = None
+        count = 0
+        try:
+            self._live_stop_event.wait()
+            GLib.idle_add(self._log, f"[{label}] collecte de la fenêtre de la sonde...")
+            debut = getattr(self, "_live_t0", None) or time.time()
+            for pkt in collecter_fenetre_sonde(label, source, debut, time.time()):
+                with self._live_lock:
+                    self._live_packets.append(pkt)
+                if report_session is not None:
+                    report_session.add(pkt)
+                count += 1
+        except Exception as e:  # noqa: BLE001 -- thread de fond : toute erreur
+            # (sonde injoignable, fenêtre refusée, pcapng corrompu...) doit
+            # remonter au journal GUI plutôt que de tuer le thread.
+            logger.exception(f"échec dans _live_sonde_worker: {e}")
+            GLib.idle_add(self._log, f"[{label}] ERREUR : {e}")
+            error = str(e)
+        if report_session is not None:
+            report_session.point_stopped(label, error)
+        GLib.idle_add(self._log, f"[{label}] sonde collectée -- {count} paquet(s).")
+        logger.debug("MainWindow._live_sonde_worker: fin")
 
     def _end_live_capture(self):
         if not self._live_capturing or self._live_stop_event.is_set():

@@ -4,6 +4,7 @@ src/netcross_report usr/share/netcross/
 src/netcross_gtk4 usr/share/netcross/
 src/netcross_api usr/share/netcross/
 src/netcross_ai usr/share/netcross/
+src/netcross_probe usr/share/netcross/
 src/cross_capture_analyzer_cli.py usr/share/netcross/
 src/cross_capture_diff_cli.py usr/share/netcross/
 src/cross_history_cli.py usr/share/netcross/
@@ -20,4 +21,5 @@ wrappers/netcross-history usr/bin/
 wrappers/netcross-batch usr/bin/
 wrappers/netcross-ai-models usr/bin/
 wrappers/netcross-lua-doc usr/bin/
+wrappers/netcross-probe usr/bin/
 locale/* usr/share/locale/

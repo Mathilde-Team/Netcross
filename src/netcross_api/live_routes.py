@@ -65,6 +65,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTex
 from pydantic import BaseModel, Field
 
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.probe_capture import est_source_sonde, telecharger_fenetre_sonde
 from pcap_parser.capture import start_ring_recorder, stop_ring_recorder
 
 logger = get_logger(__name__)
@@ -95,10 +96,20 @@ _RESPONSES: dict[int | str, dict[str, Any]] = {
 
 
 class LivePoint(BaseModel):
-    """Un point de capture : nom, interface du serveur, filtre BPF propre."""
+    """Un point de capture : nom, interface du serveur, filtre BPF propre.
+
+    L'interface peut être une source de sonde ``probe://hote:port`` (issue
+    #1105) : la sonde tient son propre tampon circulaire, la fenêtre de la
+    session est tirée à la fin puis analysée par le pipeline habituel --
+    pas de flux continu, pas de ring buffer ni de rapport en continu pour
+    ces points (refus explicite).
+    """
 
     name: str = Field(..., description="Nom du point (devient le point de capture de l'analyse)")
-    interface: str = Field(..., description=f"Interface du serveur (autorisée par {INTERFACES_ENV})")
+    interface: str = Field(
+        ...,
+        description=f"Interface du serveur (autorisée par {INTERFACES_ENV}) ou source de sonde probe://",
+    )
     bpf: str | None = Field(None, description="Filtre BPF de capture de ce point (ex. 'tcp port 443')")
     bpf_library: str | None = Field(
         None,
@@ -219,11 +230,17 @@ class _LiveCaptures:
             )
         autorisees = allowed_interfaces()
         for point in req.points:
-            if point.interface.strip() not in autorisees:
+            interface = point.interface.strip()
+            if est_source_sonde(interface):
+                # Issue #1105 : une sonde n'est pas une interface locale du
+                # serveur, la liste blanche ne s'applique pas -- l'authentification
+                # est celle de la session (clé API) puis du mTLS avec la sonde.
+                continue
+            if interface not in autorisees:
                 logger.debug("live: interface {} hors liste blanche -> 403", point.interface)
                 raise HTTPException(
                     status_code=403,
-                    detail=f"interface {point.interface!r} non autorisée par {INTERFACES_ENV}"
+                    detail=f"interface {interface!r} non autorisée par {INTERFACES_ENV}"
                     + ("" if autorisees else " (vide)"),
                 )
         logger.debug("_LiveCaptures._check_security: fin")
@@ -258,12 +275,28 @@ class _LiveCaptures:
                 logger.debug("live: point {} : filtre {!r} de la bibliothèque", p.name, p.bpf_library)
         if req.ring_buffer is not None:
             for p in req.points:
+                if est_source_sonde(p.interface.strip()):
+                    logger.debug("_LiveCaptures._check_request: sonde + ring_buffer -> 400")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"{p.name} : ring_buffer incompatible avec une source probe:// "
+                        "(la sonde tient son propre tampon circulaire)",
+                    )
                 if p.interface.strip().startswith("pipe://"):
                     logger.debug(
                         "_LiveCaptures._check_request: si p.interface.strip().startswith('pipe://') -> levée HTTPExce…"
                     )
                     raise HTTPException(
                         status_code=400, detail=f"{p.name} : ring_buffer incompatible avec une source pipe://"
+                    )
+        if req.live_report is not None:
+            for p in req.points:
+                if est_source_sonde(p.interface.strip()):
+                    logger.debug("_LiveCaptures._check_request: sonde + live_report -> 400")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"{p.name} : live_report incompatible avec une source probe:// "
+                        "(le rapport en continu lit un flux, la sonde sert des fenêtres)",
                     )
         borne = max_duration()
         if req.duration > borne:
@@ -321,6 +354,7 @@ class _LiveCaptures:
                 "status": CAPTURING,
                 "started_at": datetime.now(timezone.utc).isoformat(),
                 "_t0": time.monotonic(),
+                "_t0_epoch": time.time(),  # issue #1105 : borne de la fenêtre des sondes
                 "_t1": None,
                 "duration": req.duration,
                 "points": [
@@ -330,6 +364,7 @@ class _LiveCaptures:
                         "bpf": p.bpf or None,
                         "_dir": f"{workdir}/{i}",
                         "_ring": f"{ringdir}/{_safe_name(n)}" if ringdir else None,
+                        "_probe": est_source_sonde(p.interface.strip()),
                     }
                     for i, (n, p) in enumerate(zip(noms, req.points, strict=True))
                 ],
@@ -404,12 +439,47 @@ class _LiveCaptures:
         reporter.stop()  # dernier relevé (final)
         logger.debug("_LiveCaptures._stop_report: fin")
 
+    def _fetch_probe_windows(self, entry: dict[str, Any]) -> list[str]:
+        """Fenêtres des points ``probe://`` (issue #1105) : la session est
+        finie, chaque sonde livre sa fenêtre [début de session, maintenant]
+        filtrée BPF, écrite dans le dossier du point pour l'analyse
+        habituelle. Renvoie les messages d'erreur (un point sonde en échec
+        ne prive pas les autres points de leur analyse)."""
+        logger.debug("_LiveCaptures._fetch_probe_windows: entrée ({})", entry["capture_id"])
+        erreurs: list[str] = []
+        tirer = self._deps.get("fetch_probe_window", telecharger_fenetre_sonde)
+        for point in entry["points"]:
+            if not point.get("_probe"):
+                continue
+            try:
+                donnees = tirer(point["interface"], entry["_t0_epoch"], time.time(), point["bpf"] or None)
+            except Exception as exc:  # noqa: BLE001 -- tâche de fond : l'erreur va dans l'état
+                logger.exception(
+                    "capture en direct {} : fenêtre de sonde {} impossible", entry["capture_id"], point["name"]
+                )
+                erreurs.append(f"{point['name']} : sonde injoignable ou refus ({exc})")
+                continue
+            chemin = os.path.join(point["_dir"], f"{_safe_name(point['name'])}-sonde.pcapng")
+            try:
+                os.makedirs(point["_dir"], exist_ok=True)  # aucun enregistreur ne l'a créé : point sonde
+                with open(chemin, "wb") as fichier:
+                    fichier.write(donnees)
+            except OSError as exc:
+                logger.exception("échec dans _fetch_probe_windows: écriture du pcapng")
+                erreurs.append(f"{point['name']} : pcapng de fenêtre non écrivable ({exc})")
+        logger.debug("_LiveCaptures._fetch_probe_windows: retour {} erreur(s)", len(erreurs))
+        return erreurs
+
     def _run(self, entry: dict[str, Any], order: list[str] | None, options: Any) -> None:
         recorders: list[tuple[dict[str, Any], Any]] = []
         reporter: Any = None
         report_threads: list[threading.Thread] = []
         try:
             for point in entry["points"]:
+                if point.get("_probe"):
+                    # Issue #1105 : la sonde tient son propre tampon -- rien
+                    # à enregistrer localement, la fenêtre est tirée à la fin.
+                    continue
                 proc = self._deps["start_recorder"](
                     point["interface"],
                     point["_dir"],
@@ -443,6 +513,11 @@ class _LiveCaptures:
             if err and not point.get("_is_ring") and not self._files(point):
                 erreurs.append(f"{point['name']} : {err}")
         entry["_t1"] = time.monotonic()
+        # Issue #1105 : fenêtres des points sonde -- tirées maintenant que la
+        # session est finie (durée atteinte ou /stop), écrites comme fichier
+        # de capture du point. Une sonde injoignable fait échouer la capture
+        # (erreur explicite), pas une analyse silencieusement vide.
+        erreurs.extend(self._fetch_probe_windows(entry))
         for point in entry["points"]:  # figé : les fichiers sont supprimés après l'analyse
             point["_bytes"] = sum(_size(f) for f in self._files(point))
         captures = [(p["name"], f) for p in entry["points"] for f in self._files(p)]
@@ -732,6 +807,7 @@ def register(app: FastAPI, verify: Callable[..., None], deps: dict[str, Callable
         "start_recorder": start_ring_recorder,
         "stop_recorder": stop_ring_recorder,
         "resolve_bpf_library": resolve_bpf_library,
+        "fetch_probe_window": telecharger_fenetre_sonde,
         **deps,
     }
     live = _LiveCaptures(deps)

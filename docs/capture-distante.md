@@ -12,6 +12,7 @@ librement.
 |---|---|---|
 | rpcapd | `rpcap://[utilisateur@]hote[:port]/interface` | démon `rpcapd` (port 2002 par défaut) |
 | SSH (sshdump) | `sshdump://[utilisateur@]hote[:port]/interface[?key=CLE&priv=sudo]` (alias `ssh://`) | `tcpdump` + serveur SSH |
+| Sonde netcross (#1105) | `probe://hote[:9443][/nom-de-sonde]` | sonde `netcross-probe` en mTLS |
 | Entrée standard | `pipe://-` ou `-` | n'importe quel producteur pcap |
 | Tube nommé | `pipe:///chemin/fifo` | n'importe quel producteur pcap |
 
@@ -29,11 +30,38 @@ ssh routeur tcpdump -U -w - -i eth0 'not port 22' | netcross-analyze --live GW:-
 
 # Tube nomme alimente par un autre processus
 mkfifo /tmp/capteur && netcross-analyze --live CAPTEUR:pipe:///tmp/capteur
+
+# Sonde netcross (#1105) : rien ne circule pendant la session, la fenetre
+# est tiree a l'arret -- le nom de sonde du chemin porte le filtre BPF
+netcross-analyze --live "GW:probe://sonde.lan:9443/ROUTEUR:tcp port 443"
 ```
 
 Le filtre BPF optionnel suit l'URL (`LABEL:URL:FILTRE`) : les `:` de l'hôte, du
 port ou d'une adresse IPv6 entre crochets ne comptent pas, seul le premier `:`
 après `/interface` sépare le filtre.
+
+## Sonde netcross `probe://` (#1105)
+
+Une sonde `netcross-probe` (sous-commande `servir`, voir [la page de
+l'agent](probe-agent.md)) remplace le flux tiré à travers le réseau : elle
+écrit **localement** dans son propre tampon circulaire et le collecteur
+tire la fenêtre [début de session, arrêt] **à la fin** — une coupure du
+lien d'administration pendant la session ne fait perdre aucun paquet au
+point de mesure. Le pcapng livré passe par le même pipeline que `eth0`.
+
+- **Syntaxe** : `probe://hote[:9443][/nom-de-sonde]` — le port est celui
+  du contrat (9443), le chemin est le nom de la sonde (informatif, mais
+  nécessaire pour accoler un filtre BPF : même règle que `rpcap://`).
+- **Aucun secret dans l'URL** : l'authentification est le TLS mutuel —
+  identités du collecteur dans `NETCROSS_PROBE_CERT_PEM`,
+  `NETCROSS_PROBE_KEY_PEM` et `NETCROSS_PROBE_CA_PEM` (chemin de fichier
+  ou PEM en clair ; `NETCROSS_PROBE_TIMEOUT` pour le délai, 10 s par
+  défaut). Un utilisateur (`utilisateur@`) est refusé.
+- **Incompatibilités assumées** : pas de ring buffer local ni de rapport
+  en continu sur un point `probe://` (la sonde tient déjà son tampon ; le
+  rapport lit un flux, la sonde sert des fenêtres) — refus explicite.
+- Une sonde injoignable ou refusante à l'arrêt fait échouer le point
+  (erreur explicite), jamais une analyse silencieusement vide.
 
 ## Prérequis
 
