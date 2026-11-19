@@ -81,6 +81,7 @@ nav:
       - Export SIEM (CEF, LEEF, STIX): siem-export.md
       - Journaux Zeek conn.log: zeek-export.md
       - Couverture du déchiffrement TLS/QUIC: couverture-dechiffrement.md
+      - Déchiffrement Wi-Fi WPA2-PSK: dechiffrement-wifi.md
       - Notifications: notifications.md
       - Plugins: plugins.md
       - Empreintes JA4/HASSH: fingerprints-ja4-hassh.md

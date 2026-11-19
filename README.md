@@ -1304,6 +1304,10 @@ avant un déploiement en production.
   comme point, et chaque trame porte RSSI, MCS, débit, retry et canal
   (`Pkt.radio`, issue #1142) ; une capture 802.11 sans radiotap
   (linktype 105) est lue avec un avertissement explicite (retry seul).
+  Les paquets IP sont décapsulés de l'air ; sur un réseau WPA/WPA2-PSK,
+  `--wifi-keys FICHIER` (ou `NETCROSS_WIFI_KEYS`) les déchiffre si le
+  4-way handshake est capturé, sinon métriques radio seules avec un
+  avertissement (issue #1143, [docs/dechiffrement-wifi.md](docs/dechiffrement-wifi.md)).
   Pas encore de constats radio ni de section de rapport dédiée.
 - **Protocoles propriétaires non standard** (ex : signalisation Alcatel NOE
   historique, non-SIP) : non couverts, faute de spécification publique

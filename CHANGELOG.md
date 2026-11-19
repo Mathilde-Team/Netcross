@@ -10,6 +10,16 @@ et le projet adhère au [SemVer](https://semver.org/lang/fr/).
 ## [1.2.0] — 2026-11-19
 
 ### Ajouté
+- Décapsulation 802.11 → IP et déchiffrement WPA/WPA2-PSK (#1143,
+  sous-issue 2/5 du chantier Wi-Fi en mode moniteur #1006) : fichier de
+  clés `wpa-pwd:PHRASE:SSID` ou `wpa-psk:HEX64` via `--wifi-keys` ou
+  `NETCROSS_WIFI_KEYS` (toutes surfaces, live compris). La phrase n'est
+  jamais sur la ligne de commande de tshark : fichier `80211_keys` d'un
+  `WIRESHARK_CONFIG_DIR` temporaire (0700/0600) supprimé après lecture.
+  Sans clé ou sans 4-way handshake, avertissement explicite et métriques
+  radio seules. Paquets déchiffrés tagués `802.11(déchiffré)`. Capture
+  de référence synthétique `tests/data/wpa2-psk-reference.pcap`
+  (générateur `tests/wpa2_reference.py`), doc `docs/dechiffrement-wifi.md`.
 - mTLS, enrôlement et révocation des sondes (#1101, sous-issue 3/6 du
   chantier sondes distribuées #1002, dépend de #1099) : aucune écoute ni
   transfert sans authentification mutuelle. La sonde s'inscrit par jeton à
