@@ -30,6 +30,9 @@ exploitable.
 
 from __future__ import annotations
 
+import hashlib
+import math
+import os
 import re
 import statistics
 import struct
@@ -39,6 +42,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from netcross_core.logging_config import get_logger, summarize
+from netcross_core.rtp_match import TS_MOD, RtpLeg, match_rtp_legs
 from pcap_parser.protocols import compute_mos
 
 logger = get_logger(__name__)
@@ -509,3 +513,192 @@ def export_stream(st: RtpStream, out_dir: Path) -> Path:
     path.chmod(0o600)
     logger.debug("export_stream: retour path={}", summarize(path, "path"))
     return path
+
+
+def _audio_key(stream) -> tuple:
+    logger.debug("_audio_key: entrée")
+    if isinstance(stream, dict):
+        key = tuple(stream[name] for name in ("point", "src", "sport", "dst", "dport", "ssrc"))
+    else:
+        key = (stream.point, stream.src, stream.sport, stream.dst, stream.dport, stream.ssrc)
+    logger.debug("_audio_key: sortie")
+    return key
+
+
+def _wav_info(path: Path, point: str | None = None) -> dict:
+    logger.debug("_wav_info: entrée")
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    info = {"path": str(path), "sha256": digest.hexdigest(), "size": path.stat().st_size}
+    if point is not None:
+        info["point"] = point
+    logger.debug("_wav_info: sortie")
+    return info
+
+
+def _write_aligned_wav(path: Path, pcm: bytes | bytearray, rate: int, right: bytes | bytearray | None = None) -> None:
+    logger.debug("_write_aligned_wav: entrée")
+    # Ouverture exclusive : une course ne doit ni écraser ni supprimer un fichier tiers.
+    binary = path.open("xb")
+    try:
+        with binary:
+            os.fchmod(binary.fileno(), 0o600)
+            with wave.open(binary, "wb") as output:
+                output.setnchannels(1 if right is None else 2)
+                output.setsampwidth(2)
+                output.setframerate(rate)
+                if right is None:
+                    output.writeframes(pcm)
+                else:
+                    for start in range(0, len(pcm), 65536):
+                        left_block, right_block = pcm[start : start + 65536], right[start : start + 65536]
+                        block = bytearray(len(left_block) * 2)
+                        block[0::4], block[1::4] = left_block[0::2], left_block[1::2]
+                        block[2::4], block[3::4] = right_block[0::2], right_block[1::2]
+                        output.writeframesraw(block)
+    except (ValueError, OSError, wave.Error):
+        logger.exception("échec d'écriture du WAV créé exclusivement, suppression de ce seul fichier")
+        path.unlink(missing_ok=True)
+        logger.debug("_write_aligned_wav: sortie en erreur")
+        raise
+    logger.debug("_write_aligned_wav: sortie")
+
+
+def _aligned_group(group: dict, streams: dict, target: Path, index: int, max_duration: float) -> dict:
+    """Origine média commune, indépendante du délai réseau et des horloges de capture."""
+    logger.debug("_aligned_group: entrée")
+    selected = [(leg, streams[_audio_key(leg)]) for leg in group["legs"]]
+    first_leg, first_stream = selected[0]
+    anchor = (first_stream.packets[0].ts - first_leg["ts_offset"]) % TS_MOD
+    series = []
+    for leg, stream in selected:
+        if stream.clock_rate != 8000:
+            logger.debug("_aligned_group: refus de l'horloge non G.711")
+            raise ValueError("alignement audio : seule l'horloge G.711 à 8000 Hz est prise en charge")
+        packets = []
+        for _, packet in _ordered_unique(stream):
+            if packet.pt != stream.pt:
+                logger.debug("_aligned_group: refus du changement de payload type")
+                raise ValueError("alignement audio : changement de payload type dans le flux")
+            tick = (packet.ts - leg["ts_offset"] - anchor + TS_MOD // 2) % TS_MOD - TS_MOD // 2
+            packets.append((tick, packet))
+        series.append((stream, sorted(packets, key=lambda item: item[0])))
+    origin = min(tick for _, packets in series for tick, _ in packets)
+    end = max(tick + len(packet.payload) for _, packets in series for tick, packet in packets)
+    samples = end - origin
+    if samples <= 0 or samples > max_duration * 8000:
+        logger.debug("_aligned_group: refus de la durée vide ou hors budget")
+        raise ValueError("alignement audio : durée vide ou supérieure au budget, aucun WAV tronqué n'est produit")
+    # Vérifier tous les chevauchements AVANT de créer les fichiers.
+    for _, packets in series:
+        previous_end = origin
+        for tick, packet in packets:
+            if tick < previous_end:
+                logger.debug("_aligned_group: refus des échantillons chevauchants")
+                raise ValueError("alignement audio : horodatages RTP chevauchants")
+            previous_end = tick + len(packet.payload)
+    target.mkdir(mode=0o700, parents=True, exist_ok=True)
+    mono = []
+    edges = []
+    created = []
+    try:
+        for n, (stream, packets) in enumerate(series):
+            path = target / f"aligne-{index:04d}-{n + 1:02d}.wav"
+            if path.exists():
+                logger.debug("_aligned_group: refus d'écraser un mono existant")
+                raise ValueError("alignement audio : refus d'écraser un fichier existant")
+            pcm = bytearray(samples * 2)
+            for tick, packet in packets:
+                start = (tick - origin) * 2
+                decoded = decode_g711(stream.codec, packet.payload)
+                pcm[start : start + len(decoded)] = decoded
+            _write_aligned_wav(path, pcm, 8000)
+            created.append(path)
+            mono.append({**_wav_info(path, stream.point), "source": stream.label})
+            if n in (0, len(series) - 1):
+                edges.append(pcm)
+        stereo = target / f"comparaison-{index:04d}-stereo.wav"
+        if stereo.exists():
+            logger.debug("_aligned_group: refus d'écraser une stéréo existante")
+            raise ValueError("alignement audio : refus d'écraser un fichier existant")
+        _write_aligned_wav(stereo, edges[0], 8000, edges[1])
+        created.append(stereo)
+        result = {
+            "timeline": "RTP normalisée, pas une mesure du délai réseau",
+            "origin_rtp_timestamp": (anchor + origin) % TS_MOD,
+            "sample_rate": 8000,
+            "samples": samples,
+            "duration_s": samples / 8000,
+            "method": group["method"],
+            "mono": mono,
+            "stereo": {**_wav_info(stereo), "left": series[0][0].point, "right": series[-1][0].point},
+        }
+    except (ValueError, OSError, wave.Error):
+        logger.exception("échec de l'export audio aligné, nettoyage de ses seuls nouveaux fichiers")
+        for path in created:
+            path.unlink(missing_ok=True)
+        logger.debug("_aligned_group: sortie en erreur")
+        raise
+    logger.debug("_aligned_group: sortie points={}, échantillons={}", len(mono), samples)
+    return result
+
+
+def _checked_aligned_group(group, index, target, n, budget) -> tuple[dict | None, str | None]:
+    logger.debug("_checked_aligned_group: entrée")
+    try:
+        result = _aligned_group(group, index, target, n, budget)
+    except (ValueError, OSError, wave.Error) as exc:
+        logger.exception("échec d'une comparaison audio multi-points")
+        logger.debug("_checked_aligned_group: sortie en erreur")
+        return None, str(exc)
+    logger.debug("_checked_aligned_group: sortie")
+    return result, None
+
+
+def export_aligned_audio(
+    streams: list[RtpStream], out_dir: Path, points=None, *, max_duration_seconds: float = 3600
+) -> tuple[list[dict], list[str]]:
+    """WAV mono alignés et stéréo premier/dernier point pour les jambes G.711 claires.
+
+    Une heure maximum par groupe par défaut ; jamais de troncature silencieuse.
+    L'appariement reste celui des en-têtes RTP, pas une identification des voix.
+    """
+    logger.debug("export_aligned_audio: entrée flux={}", len(streams))
+    if not math.isfinite(max_duration_seconds) or max_duration_seconds <= 0:
+        logger.debug("export_aligned_audio: refus du budget invalide")
+        raise ValueError("le budget de durée audio doit être fini et strictement positif")
+    eligible = [
+        stream
+        for stream in streams
+        if stream.kind == "audio" and stream.codec in _G711 and not stream.encrypted and stream.packets
+    ]
+    index = {_audio_key(stream): stream for stream in eligible}
+    legs = []
+    for stream in eligible:
+        ordered = sorted(stream.packets, key=lambda packet: packet.arrival)
+        legs.append(
+            RtpLeg(
+                stream.point,
+                stream.src,
+                stream.sport,
+                stream.dst,
+                stream.dport,
+                stream.ssrc,
+                ordered[0].arrival,
+                ordered[-1].arrival,
+                len(ordered),
+                [(packet.seq, packet.ts) for packet in ordered],
+                [packet.arrival for packet in ordered],
+            )
+        )
+    records, errors = [], []
+    for n, group in enumerate(match_rtp_legs(legs, points), 1):
+        record, error = _checked_aligned_group(group, index, out_dir / "audio", n, max_duration_seconds)
+        if record is not None:
+            records.append(record)
+        if error is not None:
+            errors.append(error)
+    logger.debug("export_aligned_audio: sortie comparaisons={}, erreurs={}", len(records), len(errors))
+    return records, errors

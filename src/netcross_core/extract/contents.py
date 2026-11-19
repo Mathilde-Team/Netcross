@@ -25,7 +25,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from netcross_core.extract.carver import detect_file_type
-from netcross_core.extract.media import KINDS, RtpStream, StreamQuality, analyse_stream, collect_streams, export_stream
+from netcross_core.extract.media import (
+    KINDS,
+    RtpStream,
+    StreamQuality,
+    analyse_stream,
+    collect_streams,
+    export_aligned_audio,
+    export_stream,
+)
 from netcross_core.logging_config import get_logger, summarize
 
 logger = get_logger(__name__)
@@ -66,6 +74,7 @@ class ContentExtraction:
     media: list[StreamQuality] = field(default_factory=list)
     documents: list[ExtractedDocument] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    audio_comparisons: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         logger.debug("ContentExtraction.to_dict: retour dictionnaire")
@@ -76,6 +85,7 @@ class ContentExtraction:
             "media": [m.to_dict() for m in self.media],
             "documents": [d.to_dict() for d in self.documents],
             "errors": list(self.errors),
+            "audio_comparisons": self.audio_comparisons,
         }
 
 
@@ -209,6 +219,7 @@ def run_extraction(
     kinds: Sequence[str] = KINDS,
     read_capture=None,
     tshark_bin: str = "tshark",
+    points_order=None,
 ) -> ContentExtraction:
     """Analyse qualitative des flux RTP de ``captures`` et, si ``out_dir``
     est donne, extraction des contenus des types ``kinds``.
@@ -228,16 +239,24 @@ def run_extraction(
     if media_kinds or out is None:
         datagrams = (d for label, path in captures for d in datagrams_from_raw(label, read_capture(path)))
         streams, qualities = analyse_media(datagrams)
+        aligned = {}
+        if out is not None and "audio" in media_kinds:
+            result.audio_comparisons, errors = export_aligned_audio(
+                streams, out, points_order or [point for point, _path in captures]
+            )
+            result.errors.extend(errors)
+            aligned = {mono["source"]: mono["path"] for record in result.audio_comparisons for mono in record["mono"]}
         for st, q in zip(streams, qualities):
             if out is not None and st.kind in media_kinds:
                 try:
-                    q.exported = str(export_stream(st, out))
+                    q.exported = aligned.get(st.label) or str(export_stream(st, out))
                 except ValueError as exc:
                     logger.exception(f"échec dans read_capture: {exc}")
                     q.note = f"{q.note} ; {exc}" if q.note else str(exc)
             result.media.append(q)
     if out is not None and "documents" in kinds:
-        result.documents, result.errors = export_documents(captures, out, tshark_bin=tshark_bin)
+        result.documents, errors = export_documents(captures, out, tshark_bin=tshark_bin)
+        result.errors.extend(errors)
     if out is not None:
         write_manifest(result, out)
     logger.debug("run_extraction: retour result={}", summarize(result, "result"))
@@ -284,6 +303,13 @@ def format_extraction(result: ContentExtraction) -> list[str]:
             lines.append(f"    ({q.note})")
         if q.exported:
             lines.append(f"    -> {q.exported}")
+    for comparison in result.audio_comparisons:
+        stereo = comparison["stereo"]
+        lines.append(
+            f"Audio aligné : {comparison['samples']} échantillons à {comparison['sample_rate']} Hz ; "
+            f"{stereo['left']} à gauche / {stereo['right']} à droite -> {stereo['path']}"
+        )
+        lines.append("    Origine média RTP commune ; les silences remplacent les pertes, pas les délais réseau.")
     if result.out_dir is not None and "documents" in result.kinds:
         lines.append(f"Documents extraits : {len(result.documents)}")
         lines.extend(

@@ -360,8 +360,8 @@ def test_qualite_media_et_extraction(lance, monkeypatch, tmp_path, capsys):
 
     recus = []
 
-    def _extraction(captures, out_dir, kinds):
-        recus.append((out_dir, kinds))
+    def _extraction(captures, out_dir, kinds, points_order=None):
+        recus.append((out_dir, kinds, points_order))
         return "resultat"
 
     monkeypatch.setattr(contents, "run_extraction", _extraction)
@@ -373,6 +373,9 @@ def test_qualite_media_et_extraction(lance, monkeypatch, tmp_path, capsys):
     assert "EXTRACTION=resultat" in captured.out
     assert contents.USAGE_REMINDER in captured.err
     assert recus[0][0] == str(sortie) and recus[0][1]
+    assert recus[0][2] is None
+    assert lance("--extract-contents", sortie, "--order", "B,A") == 0
+    assert recus[-1][2] == ["B", "A"]
 
 
 def test_moteur_de_regles_avec_constats(lance, monkeypatch, capsys):
