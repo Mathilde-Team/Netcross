@@ -257,7 +257,9 @@ def _cles_derivees() -> tuple[str, ...]:
 @avec_tshark
 def test_cles_derivees_absentes_des_enregistrements_reels(fichier_cles):
     os.environ[ENV_WIFI_KEYS] = str(fichier_cles)
-    brut = "".join(json.dumps(r.layers) for r in iter_ek_records(path=str(wpa2_reference.WPA2_PCAP)))
+    brut = "".join(
+        json.dumps(r.layers) for r in iter_ek_records(path=str(wpa2_reference.WPA2_PCAP), read_via_stdin=True)
+    )
     assert '"ip"' in brut
     for secret in _cles_derivees():
         assert secret not in brut
